@@ -28,7 +28,7 @@ namespace {
 
 struct Choice {
   const char* name;
-  int value; /* evolver_type: 0 rk, 1 ndf15, 2 rkdp45, 3 etd, 4 tsit5 */
+  int value; /* evolver_type: 1 ndf15, 2 rkdp45, 3 etd, 4 tsit5 */
 };
 
 /* Small enough to stay quick, large enough to exercise the source machinery. */
@@ -48,7 +48,7 @@ FileContent input(int evolver) {
 }
 
 void test_every_evolver_runs() {
-  const Choice choices[] = {{"rk", 0}, {"ndf15", 1}, {"rkdp45", 2}, {"etd", 3}, {"tsit5", 4}};
+  const Choice choices[] = {{"ndf15", 1}, {"rkdp45", 2}, {"etd", 3}, {"tsit5", 4}};
 
   for (const Choice& choice : choices) {
     FileContent fc = input(choice.value);

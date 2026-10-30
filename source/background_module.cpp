@@ -23,8 +23,7 @@
 #include "../species/ultra_relativistic.h"
 #include "bisection.h"
 #include "evolver_erk.h"
-#include "evolver_etd.h"
-#include "evolver_tsit5.h"
+#include "evolver_options.h"
 
 /**
  * Return all NCDMBaseSpecies pointers from all_species_ in deterministic order.
@@ -128,22 +127,6 @@ std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& sp
     return a_peak;
   }
   return 1. / a_peak - 1.;
-}
-
-/**
- * Evolution timescale for the background integration. This only exists to feed
- * the legacy explicit Runge-Kutta evolver (evolver=rk), which asks the caller
- * for a step size rather than judging the evolution speed itself; the stiff
- * ndf15 default and the modern rkdp45 evolver size their own steps and ignore
- * it. The background is integrated in loga (see background_derivs_loga),
- * where a unit step is the natural variation scale, so the timescale is simply
- * constant. evolver_rk then advances in steps of timestep_over_timescale, which
- * exceeds the requested output spacing, so it effectively integrates from one
- * output point to the next under the control of tol_background_integration.
- */
-void BackgroundModule::background_timescale(double loga, double* timescale) {
-  (void) loga;
-  *timescale = 1.;
 }
 
 /**
@@ -743,8 +726,7 @@ void BackgroundModule::background_solve_evolver() {
   /* The options are built alongside the evolver choice, and carry ONLY what the
      chosen evolver honours -- setting anything else is now an error rather than
      a silent ignore. That makes visible here what used to be buried in the
-     evolver implementations: the Jacobian diagonal matters to etd alone, and the
-     timescale pair to the legacy rk alone. */
+     evolver implementations: the Jacobian diagonal matters to etd alone. */
   auto derivs = [this, &bpaw](double x, double* y, double* dy) {
     background_derivs_loga(x, y, dy, &bpaw);
   };
@@ -762,24 +744,9 @@ void BackgroundModule::background_solve_evolver() {
   options.used_in_output  = used_in_output.data();
   options.output          = add_line_to_bg_table;
 
-  auto generic_evolver = &evolver_ndf15;
-  if (ppr->evolver_background == evolver_type::rk) {
-    generic_evolver                 = &evolver_rk;
-    options.evaluate_timescale      = background_timescale;
-    options.timestep_over_timescale = ppr->perturb_integration_stepsize;
-  }
-  else if (ppr->evolver_background == evolver_type::rkdp45) {
-    generic_evolver = &evolver_rkdp45;
-    options.erk     = ppr->erk_controller_config();
-  }
-  else if (ppr->evolver_background == evolver_type::tsit5) {
-    generic_evolver = &evolver_tsit5;
-    options.erk     = ppr->erk_controller_config();
-  }
-  else if (ppr->evolver_background == evolver_type::etd) {
-    generic_evolver         = &evolver_etd;
-    options.derivs_diagonal = derivs_diagonal;
-  }
+  const EvolverDiagonal diagonal = derivs_diagonal;
+  const Evolver generic_evolver =
+      SelectEvolver(ppr->evolver_background, options, ppr->erk_controller_config(), &diagonal);
 
   /* Size of vector to integrate is (bi_size_-1) rather than
    * (bi_size_), since a is not integrated.
@@ -1322,7 +1289,7 @@ void BackgroundModule::background_output_budget() {
 
 /**
  * Derivative with respect to log(a) of the quantities which are integrated
- * (tau, t, etc), for the evolver (generic_evolver / evolver_ndf15 / evolver_rk),
+ * (tau, t, etc), for the evolver (generic_evolver),
  * which calls it through a lambda in background_solve_evolver.
  *
  * @param loga  Input: log of the scale factor

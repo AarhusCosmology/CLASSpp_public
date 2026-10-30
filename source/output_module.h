@@ -18,7 +18,6 @@ class OutputModule : public BaseModule {
                LensingModulePtr lensing_module);
 
  private:
-  void output_total_cl_at_l(int l, double* cl);
   void output_init();
   void output_cl();
   void output_pk(enum pk_outputs pk_output);

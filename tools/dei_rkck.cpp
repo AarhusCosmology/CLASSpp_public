@@ -26,8 +26,6 @@ void initialize_generic_integrator(int n_dim, struct generic_integrator_workspac
 
 /**
  * Free the integrator's memory space
- *
- * Called by background_solve(); thermodynamics_solve_with_recfast(); perturb_solve().
  */
 void cleanup_generic_integrator(struct generic_integrator_workspace* pgi) {}
 

@@ -180,7 +180,6 @@ class BackgroundModule : public BaseModule {
                                        double* y,
                                        double* diag,
                                        background_parameters_and_workspace* pbpaw);
-  static void background_timescale(double loga, double* timescale);
   void background_add_line_to_bg_table(double loga, double* y, double* dy, int index_loga);
   void background_output_budget();
   void background_print_variables(double loga,

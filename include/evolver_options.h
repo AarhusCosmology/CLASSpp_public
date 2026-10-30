@@ -27,11 +27,10 @@
    void*; see function_ref.h. Derivs, Print and Diagonal share one type, so the
    names are for the reader: the compiler cannot catch a transposition of those
    three. */
-using EvolverDerivs    = FunctionRef<void(double x, double* y, double* dy)>;
-using EvolverOutput    = FunctionRef<void(double x, double* y, double* dy, int index_x)>;
-using EvolverPrint     = FunctionRef<void(double x, double* y, double* dy)>;
-using EvolverTimescale = FunctionRef<void(double x, double* timescale)>;
-using EvolverDiagonal  = FunctionRef<void(double x, double* y, double* diag)>;
+using EvolverDerivs   = FunctionRef<void(double x, double* y, double* dy)>;
+using EvolverOutput   = FunctionRef<void(double x, double* y, double* dy, int index_x)>;
+using EvolverPrint    = FunctionRef<void(double x, double* y, double* dy)>;
+using EvolverDiagonal = FunctionRef<void(double x, double* y, double* diag)>;
 
 /** Step statistics, filled when a caller asks for them.
  *
@@ -75,7 +74,6 @@ struct EvolverStats {
 /** Optional features. An evolver names the ones it honours; anything else that
  *  is set makes the call fail rather than quietly doing nothing. */
 enum class EvolverFeature {
-  Timescale,     /**< evaluate_timescale + timestep_over_timescale */
   Diagonal,      /**< derivs_diagonal */
   MaxOrder,      /**< max_order */
   ErkController, /**< erk */
@@ -95,10 +93,7 @@ struct EvolverOptions {
    *
    *  ndf15, etd and the explicit Runge-Kutta evolvers each hardwired 1e-15
    *  independently; the default preserves that everywhere, and they now read it
-   *  from here. The legacy `rk` does NOT honour it -- its error scale is built
-   *  inside generic_integrator from _TINY_ = 1e-30, a different quantity -- so
-   *  setting a non-default value with that evolver is an error rather than a
-   *  silent no-op. That is the same rule as every other feature here. */
+   *  from here. */
   double abstol = kEvolverDefaultAbsTol;
 
   /* ---- dense output, honoured by every evolver --------------------------- */
@@ -128,10 +123,6 @@ struct EvolverOptions {
   std::optional<EvolverPrint> print_variables;
 
   /* ---- evolver-specific; unset at the default, validated ----------------- */
-
-  /** Fixed-step control for the legacy `rk` evolver only. */
-  std::optional<EvolverTimescale> evaluate_timescale;
-  double timestep_over_timescale = 0.0;
 
   /** Analytic Jacobian diagonal. Consumed by etd, which exponentiates it. */
   std::optional<EvolverDiagonal> derivs_diagonal;
@@ -168,5 +159,35 @@ void EvolverOptionsCheck(const EvolverOptions& options,
                          const char* evolver_name,
                          double x_ini,
                          std::initializer_list<EvolverFeature> honoured);
+
+using Evolver = void (*)(EvolverDerivs derivs,
+                         double x_ini,
+                         double x_end,
+                         double* y,
+                         int y_size,
+                         const EvolverOptions& options);
+
+/** Dormand-Prince 5(4) and Tsitouras 5(4), adaptive; see evolver_erk.h. */
+void evolver_rkdp45(EvolverDerivs derivs,
+                    double x_ini,
+                    double x_end,
+                    double* y,
+                    int y_size,
+                    const EvolverOptions& options);
+void evolver_tsit5(EvolverDerivs derivs,
+                   double x_ini,
+                   double x_end,
+                   double* y,
+                   int y_size,
+                   const EvolverOptions& options);
+
+enum class evolver_type;  // precision.h
+
+/** The evolver `type` names, with the options only that evolver consumes filled in:
+ *  the controller `erk` for the explicit pairs, `diagonal` for etd (when not null). */
+Evolver SelectEvolver(evolver_type type,
+                      EvolverOptions& options,
+                      const ErkControllerConfig& erk,
+                      const EvolverDiagonal* diagonal);
 
 #endif  // CLASS_EVOLVER_OPTIONS_H

@@ -27,8 +27,6 @@
 #include "background_module.h"
 #include "bisection.h"
 #include "evolver_erk.h"
-#include "evolver_etd.h"
-#include "evolver_tsit5.h"
 #include "thermodynamics_module.h"
 #include "thread_pool.h"
 
@@ -2300,7 +2298,13 @@ void PerturbationsModule::perturb_solve(int index_md,
 
   if (all_species_.has_ncdm()) {
     for (const auto& sp : all_species_) {
-      sp->CheckUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w);
+      const double deviation = sp->DeviationFromRadiation(ppw->pvecback.data());
+      class_test(deviation > ppr->tol_ncdm_initial_w,
+                 "your choice of initial time for integrating wavenumbers is inappropriate: it "
+                 "corresponds to a time at which the species '%s' is not ultra-relativistic "
+                 "anymore, with |w - 1/3| = %g",
+                 sp->name().c_str(),
+                 deviation);
     }
   }
 
@@ -2323,7 +2327,7 @@ void PerturbationsModule::perturb_solve(int index_md,
     /* if there are non-cold relics, check that they are relativistic enough */
     if (all_species_.has_ncdm()) {
       for (const auto& sp : all_species_) {
-        if (!sp->IsUltraRelativisticAtIc(ppw->pvecback.data(), ppr->tol_ncdm_initial_w)) {
+        if (!(sp->DeviationFromRadiation(ppw->pvecback.data()) <= ppr->tol_ncdm_initial_w)) {
           is_early_enough = false;
         }
       }
@@ -2421,12 +2425,10 @@ void PerturbationsModule::perturb_solve(int index_md,
   auto print_variables = [this, &ppaw](double x, double* y, double* dy) {
     perturb_print_variables(x, y, dy, &ppaw);
   };
-  auto timescale = [this, &ppaw](double x, double* timescale_x) {
-    perturb_timescale(x, timescale_x, &ppaw);
-  };
   auto derivs_diagonal = [this, &ppaw](double x, double* y, double* diag) {
     perturb_derivs_diagonal(x, y, diag, &ppaw);
   };
+  const EvolverDiagonal diagonal = derivs_diagonal;
 
   /** - check whether we need to print perturbations to a file for this wavenumber */
 
@@ -2489,36 +2491,16 @@ void PerturbationsModule::perturb_solve(int index_md,
       options.print_variables = print_variables;
     }
 
-    auto generic_evolver = &evolver_ndf15;
-    if (ppr->evolver_perturbations == evolver_type::rk) {
-      generic_evolver                 = &evolver_rk;
-      options.evaluate_timescale      = timescale;
-      options.timestep_over_timescale = ppr->perturb_integration_stepsize;
-    }
-    else if (ppr->evolver_perturbations == evolver_type::rkdp45) {
-      generic_evolver = &evolver_rkdp45;
-      options.erk     = ppr->erk_controller_config();
-    }
-    else if (ppr->evolver_perturbations == evolver_type::etd) {
-      generic_evolver         = &evolver_etd;
-      options.derivs_diagonal = derivs_diagonal;
-    }
-    else if (ppr->evolver_perturbations == evolver_type::tsit5) {
-      generic_evolver = &evolver_tsit5;
-      options.erk     = ppr->erk_controller_config();
-    }
+    const Evolver generic_evolver =
+        SelectEvolver(ppr->evolver_perturbations, options, ppr->erk_controller_config(), &diagonal);
 
     /* Counters are per call and unsynchronised, so collecting them is free; the
-       histograms cost a log10 per step and are collected only on request. */
+       histograms cost a log10 per step, are collected only on request, and only
+       the explicit pairs report them (setting an option an evolver does not
+       honour is an error). */
     EvolverStats call_stats;
     ErkHistograms call_histograms;
-    /* Only where the chosen evolver reports them: setting an option an evolver
-       does not honour is an error, so this cannot be unconditional. The legacy rk
-       delegates its stepping to generic_integrator and has no counters of its
-       own. */
-    if (ppr->evolver_perturbations != evolver_type::rk) {
-      options.stats = &call_stats;
-    }
+    options.stats = &call_stats;
     if (ppr->evolver_histograms && (ppr->evolver_perturbations == evolver_type::rkdp45 ||
                                     ppr->evolver_perturbations == evolver_type::tsit5)) {
       options.histograms = &call_histograms;
@@ -2534,9 +2516,7 @@ void PerturbationsModule::perturb_solve(int index_md,
     /* One lock per interval rather than an atomic per step. */
     {
       std::scoped_lock guard(evolver_stats_mutex_);
-      if (options.stats != nullptr) {
-        evolver_stats_.Add(call_stats);
-      }
+      evolver_stats_.Add(call_stats);
       if (options.histograms != nullptr) {
         erk_histograms_.Add(call_histograms);
       }
@@ -4160,7 +4140,7 @@ void PerturbationsModule::perturb_initial_conditions(
  * Evaluate background quantities at \f$ \tau \f$, as well as thermodynamics for scalar mode; infer useful flags and time scales for integrating the perturbations:
  * - check whether tight-coupling approximation is needed.
  * - check whether radiation (photons, massless neutrinos...) perturbations are needed.
- * - choose step of integration: step = ppr->perturb_integration_stepsize * min_time_scale, where min_time_scale = smallest time scale involved in the equations. There are three time scales to compare:
+ * - compare the time scales involved in the equations:
  *     -# that of recombination, \f$ \tau_c = 1/\kappa' \f$
  *     -# Hubble time scale, \f$ \tau_h = a/a' \f$
  *     -# Fourier mode, \f$ \tau_k = 1/k \f$
@@ -4416,141 +4396,6 @@ void PerturbationsModule::perturb_approximations(int index_md,
 }
 
 /**
- * Compute typical timescale over which the perturbation equations
- * vary. Some integrators (e.g. Runge-Kunta) benefit from calling this
- * routine at each step in order to adapt the next step.
- *
- * The legacy rk evolver takes its step from it, through a lambda in perturb_solve().
- *
- * @param tau       Input: conformal time
- * @param timescale Output: perturbation variation timescale (given the approximation used)
- * @param pppaw     Input: fixed parameters (e.g. indices), workspace, approximation used, etc.
- */
-
-void PerturbationsModule::perturb_timescale(double tau,
-                                            double* timescale,
-                                            perturb_parameters_and_workspace* pppaw) {
-  /** Summary: */
-
-  /** - define local variables */
-
-  /* (a) time scale of Fourier mode, \f$ \tau_k = 1/k \f$ */
-  double tau_k;
-  /* (b) time scale of expansion, \f$ \tau_h = a/a' \f$ */
-  double tau_h;
-  /* (c) time scale of recombination, \f$ \tau_{\gamma} = 1/\kappa' \f$ */
-  double tau_c;
-
-  /* various pointers allowing to extract the fields of the
-     parameter_and_workspace input structure */
-  struct perturb_workspace* ppw;
-  double* pvecback;
-  double* pvecthermo;
-
-  /** - extract the fields of the parameter_and_workspace input structure */
-  ppw        = pppaw->ppw;
-  pvecback   = ppw->pvecback.data();
-  pvecthermo = ppw->pvecthermo.data();
-
-  /** - compute Fourier mode time scale = \f$ \tau_k = 1/k \f$ */
-
-  class_test(pppaw->k == 0., "stop to avoid division by zero");
-
-  tau_k = 1. / pppaw->k;
-
-  /** - evaluate background quantities with background_at_tau() and
-      Hubble time scale \f$ \tau_h = a/a' \f$ */
-
-  background_module_->background_at_tau(tau,
-                                        pba->normal_info,
-                                        ppw->inter_mode,
-                                        &(ppw->last_index_back),
-                                        pvecback);
-
-  class_test(pvecback[background_module_->index_bg_H_] *
-                     pvecback[background_module_->index_bg_a_] ==
-                 0.,
-             "aH=0, stop to avoid division by zero");
-
-  tau_h = 1. /
-          (pvecback[background_module_->index_bg_H_] * pvecback[background_module_->index_bg_a_]);
-
-  /** - for scalars modes: */
-
-  if ((ppt->has_scalars) && (pppaw->index_md == index_md_scalars_)) {
-    *timescale = tau_h;
-
-    if ((ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) ||
-        (all_species_.has_ncdm())) {
-      *timescale = std::min(tau_k, *timescale);
-    }
-
-    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
-      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                                      1., /* redshift z=1/a-1 */
-                                                  ppw->inter_mode,
-                                                  &(ppw->last_index_thermo),
-                                                  pvecback,
-                                                  pvecthermo);
-
-      if (pvecthermo[thermodynamics_module_->index_th_dkappa_] != 0.) {
-        /** - -->  compute recombination time scale for photons, \f$ \tau_{\gamma} = 1/ \kappa' \f$ */
-
-        tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_];
-
-        *timescale = std::min(tau_c, *timescale);
-      }
-    }
-  }
-
-  /** - for vector modes: */
-
-  if ((ppt->has_vectors) && (pppaw->index_md == index_md_vectors_)) {
-    *timescale = std::min(tau_h, tau_k);
-
-    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
-      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                                      1., /* redshift z=1/a-1 */
-                                                  ppw->inter_mode,
-                                                  &(ppw->last_index_thermo),
-                                                  pvecback,
-                                                  pvecthermo);
-
-      if (pvecthermo[thermodynamics_module_->index_th_dkappa_] != 0.) {
-        /** - -->  compute recombination time scale for photons, \f$ \tau_{\gamma} = 1/ \kappa' \f$ */
-
-        tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_];
-
-        *timescale = std::min(tau_c, *timescale);
-      }
-    }
-  }
-
-  /** - for tensor modes: */
-
-  if ((ppt->has_tensors) && (pppaw->index_md == index_md_tensors_)) {
-    *timescale = std::min(tau_h, tau_k);
-
-    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
-      thermodynamics_module_->thermodynamics_at_z(1. / pvecback[background_module_->index_bg_a_] -
-                                                      1., /* redshift z=1/a-1 */
-                                                  ppw->inter_mode,
-                                                  &(ppw->last_index_thermo),
-                                                  pvecback,
-                                                  pvecthermo);
-
-      if (pvecthermo[thermodynamics_module_->index_th_dkappa_] != 0.) {
-        /** - --> compute recombination time scale for photons, \f$ \tau_{\gamma} = 1/ \kappa' \f$ */
-
-        tau_c = 1. / pvecthermo[thermodynamics_module_->index_th_dkappa_];
-
-        *timescale = std::min(tau_c, *timescale);
-      }
-    }
-  }
-}
-
-/**
  * Compute metric perturbations (those not integrated over time) using Einstein equations
  *
  * @param index_md   Input: index of mode under consideration (scalar/.../tensor)
@@ -4745,12 +4590,6 @@ void PerturbationsModule::perturb_einstein(
       // from Hu and White:
       ppw->pvecmetric[ppw->index_mt_hv_prime_prime] =
           -2. * a_prime_over_a * y[ppw->pv->index_pt_hv_prime] - 3. * ppw->vector_source_pi / k2;
-
-      // what we suspect:
-      //ppw->pvecmetric[ppw->index_mt_hv_prime_prime] = -2.*a_prime_over_a*y[ppw->pv->index_pt_hv_prime] - 3.*ppw->vector_source_pi;
-
-      // if we use the other equation:
-      //ppw->pvecmetric[ppw->index_mt_hv_prime] = -2./k/ (1.-2.*pba->K/k2) * 3. * ppw->vector_source_v;
     }
   }
 
@@ -4939,19 +4778,6 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 /**
  * Compute the source functions (three terms for temperature, one for
  * E or B modes, etc.)
- *
- * This is one of the few functions in the code which is passed to
- * the generic_integrator() routine. Since generic_integrator()
- * should work with functions passed from various modules, the format
- * of the arguments is a bit special:
- *
- * - fixed parameters and workspaces are passed through a generic
- * pointer.  generic_integrator() doesn't know the content of this
- * pointer.
- *
- * - the error management is a bit special: errors are not written as
- * usual to a module error_message buffer, but to a generic error_message passed
- * in the list of arguments.
  *
  * @param tau                      Input: conformal time
  * @param y                        Input: vector of perturbations
@@ -5651,14 +5477,6 @@ void PerturbationsModule::perturb_print_variables(double tau,
  * For each mode (scalar/vector/tensor) and each wavenumber k, this
  * function computes the derivative of all values in the vector of
  * perturbed variables to be integrated.
- *
- * This is one of the few functions in the code which is passed to the generic_integrator() routine.
- * Since generic_integrator() should work with functions passed from various modules, the format of the arguments
- * is a bit special:
- * - fixed parameters and workspaces are passed through a generic pointer.
- *   generic_integrator() doesn't know what the content of this pointer is.
- * - errors are not written as usual in a module error_message buffer, but in a generic
- *   error_message passed in the list of arguments.
  *
  * @param tau                      Input: conformal time
  * @param y                        Input: vector of perturbations

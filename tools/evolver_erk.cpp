@@ -2,11 +2,14 @@
 
 #include <cmath>
 
+#include "evolver_erk_impl.h"
+
 /**
- * Out-of-line state for the templated explicit-RK driver in
- * evolver_erk_impl.h: the process-wide controller configuration and the
- * cross-thread step counters. Everything numerical lives in the header so the
- * tableaux stay constexpr at the point of use.
+ * The explicit embedded Runge-Kutta evolvers, each binding one tableau to the
+ * templated driver in evolver_erk_impl.h, and the driver's out-of-line step
+ * recording. Everything numerical lives in the header so the tableaux stay
+ * constexpr at the point of use; tsit5 and rkdp45 therefore differ in their
+ * coefficients and nothing else.
  */
 
 namespace {
@@ -39,3 +42,29 @@ void Record(
 }
 
 }  // namespace erk_detail
+
+static constexpr std::initializer_list<EvolverFeature> kErkFeatures =
+    {EvolverFeature::ErkController,
+     EvolverFeature::Stats,
+     EvolverFeature::Histograms,
+     EvolverFeature::AbsTol};
+
+void evolver_rkdp45(EvolverDerivs derivs,
+                    double x_ini,
+                    double x_end,
+                    double* y,
+                    int y_size,
+                    const EvolverOptions& options) {
+  EvolverOptionsCheck(options, "evolver_rkdp45", x_ini, kErkFeatures);
+  evolver_erk_run<ErkDormandPrince45>(derivs, x_ini, x_end, y, y_size, options);
+}
+
+void evolver_tsit5(EvolverDerivs derivs,
+                   double x_ini,
+                   double x_end,
+                   double* y,
+                   int y_size,
+                   const EvolverOptions& options) {
+  EvolverOptionsCheck(options, "evolver_tsit5", x_ini, kErkFeatures);
+  evolver_erk_run<ErkTsitouras54>(derivs, x_ini, x_end, y, y_size, options);
+}

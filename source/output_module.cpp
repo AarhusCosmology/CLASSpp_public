@@ -35,34 +35,6 @@ OutputModule::OutputModule(InputModulePtr input_module,
   output_init();
 }
 
-void OutputModule::output_total_cl_at_l(int l, double* cl) {
-  if (ple->has_lensed_cls) {
-    lensing_module_->lensing_cl_at_l(l, cl);
-  }
-  else {
-    std::vector<std::vector<double>> cl_md_ic_storage(spectra_module_->md_size_);
-    std::vector<double*> cl_md_ic(spectra_module_->md_size_, nullptr);
-
-    std::vector<std::vector<double>> cl_md_storage(spectra_module_->md_size_);
-    std::vector<double*> cl_md(spectra_module_->md_size_, nullptr);
-
-    for (int index_md = 0; index_md < spectra_module_->md_size_; index_md++) {
-      if (spectra_module_->md_size_ > 1) {
-        cl_md_storage[index_md].resize(spectra_module_->ct_size_);
-        cl_md[index_md] = cl_md_storage[index_md].data();
-      }
-
-      if (spectra_module_->ic_size_[index_md] > 1) {
-        cl_md_ic_storage[index_md].resize(spectra_module_->ic_ic_size_[index_md] *
-                                          spectra_module_->ct_size_);
-        cl_md_ic[index_md] = cl_md_ic_storage[index_md].data();
-      }
-    }
-
-    spectra_module_->spectra_cl_at_l(static_cast<double>(l), cl, cl_md.data(), cl_md_ic.data());
-  }
-}
-
 /**
  * This routine writes the output in files.
  *

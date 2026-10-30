@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "dei_rkck.h"
 #include "thread_pool.h"
 
 #ifdef _WIN32

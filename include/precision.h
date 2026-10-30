@@ -17,10 +17,9 @@ class FileContent;  // forward decl for precision::parse
  * list of evolver types for integrating perturbations over time
  */
 enum class evolver_type {
-  rk,     /* Runge-Kutta integrator */
-  ndf15,  /* stiff integrator */
-  rkdp45, /* Dormand-Prince 4(5) explicit adaptive integrator */
-  etd     /* exponential Rosenbrock (ETDRK4, Cox-Matthews); integrates a species-reported
+  ndf15 = 1, /* stiff integrator. 0 was the legacy fixed-step Cash-Karp rk, now removed */
+  rkdp45,    /* Dormand-Prince 4(5) explicit adaptive integrator */
+  etd        /* exponential Rosenbrock (ETDRK4, Cox-Matthews); integrates a species-reported
              Jacobian DIAGONAL exactly, so a diagonal stiffness stops limiting
              the step at explicit cost. Available on the background and the
              perturbations; species that report no diagonal get the explicit
@@ -186,10 +185,6 @@ struct precision {
    * Minimum amount of cdm to allow calculations in synchronous gauge comoving with cdm.
    */
   double Omega0_cdm_min_synchronous = 1.e-10;
-  /*
-   * Currently unused parameter.
-   */
-  //class_precision_parameter(safe_phi_scf,double,0.0)
   /**
    * Big Bang Nucleosynthesis file path. The file specifies the predictions for
    * \f$ Y_\mathrm{He} \f$ for given \f$ \omega_b \f$ and \f$ N_\mathrm{eff} \f$.
@@ -466,11 +461,6 @@ struct precision {
   double curvature_ini = 1.0; /**< initial condition for curvature for adiabatic */
   double entropy_ini   = 1.0; /**< initial condition for entropy perturbation for isocurvature */
   double gw_ini        = 1.0; /**< initial condition for tensor metric perturbation h */
-
-  /**
-   * default step \f$ d \tau \f$ in perturbation integration, in units of the timescale involved in the equations (usually, the min of \f$ 1/k \f$, \f$ 1/aH \f$, \f$ 1/\dot{\kappa} \f$)
-   */
-  double perturb_integration_stepsize = 0.5;
 
   /**
    * default step \f$ d \tau \f$ for sampling the source function, in units of the timescale involved in the sources: \f$ (\dot{\kappa}- \ddot{\kappa}/\dot{\kappa})^{-1} \f$

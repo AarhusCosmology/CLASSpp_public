@@ -14,9 +14,7 @@
 #include "background_module.h"
 #include "bbn_solver.h"
 #include "evolver_erk.h"
-#include "evolver_ndf15.h"
-#include "evolver_rkdp45.h"
-#include "evolver_tsit5.h"
+#include "evolver_options.h"
 #include "hyrec_model.h"
 #include "recfast_model.h"
 
@@ -2534,15 +2532,6 @@ void ThermodynamicsModule::thermodynamics_reionization(recombination* preco,
     preio->reionization_parameters[preio->index_reio_first_xe] =
         preio->reionization_parameters[preio->index_reio_first_xe + 1];
 
-    /* if we want to model only hydrogen reionization and neglect both helium reionization */
-    //preio->reionization_parameters[preio->index_reio_first_xe] = 1.;
-
-    /* if we want to model only hydrogen + first helium reionization and neglect second helium reionization */
-    //preio->reionization_parameters[preio->index_reio_first_xe] = 1. + YHe_/(_not4_*(1.-YHe_));
-
-    /* if we want to model hydrogen + two helium reionization */
-    //preio->reionization_parameters[preio->index_reio_first_xe] = 1. + 2.*YHe_/(_not4_*(1.-YHe_));
-
     /* pass step sharpness parameter */
     class_test(pth->many_tanh_width <= 0,
                "many_tanh_width must be strictly positive, you passed %e",
@@ -3371,15 +3360,6 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   std::vector<int> used_in_output_full(_RECFAST_INTEG_SIZE_, 1);
   std::vector<int> used_in_output_helium(2, 1);
 
-  /* RECFAST's recombination ODE is stiff. The implicit ndf15 (default) and the adaptive
-     rkdp45 both handle it; the explicit Cash-Karp rk does not (it yields an unphysical
-     history and trips the z_rec sanity check). When rk is requested, fall back to rkdp45
-     for the recombination integration only, leaving the user's evolver choice intact for
-     the background and perturbation modules. */
-  /* Options carry ONLY what the chosen evolver honours; anything else is now an
-     error rather than a silent ignore. Recombination never supplies a Jacobian
-     diagonal or a timescale, so the only evolver-specific field in play here is
-     the explicit-RK controller. */
   auto recfast_derivs = [this, &tpaw](double minus_z, double* y_x, double* dy_x) {
     thermodynamics_recfast_derivs(minus_z, y_x, dy_x, &tpaw);
   };
@@ -3391,31 +3371,17 @@ void ThermodynamicsModule::thermodynamics_recombination_integrate(recombination*
   EvolverOptions options;
   options.rtol = ppr->tol_thermo_integration;
 
-  auto generic_evolver = &evolver_ndf15;
-  if (ppr->evolver_thermodynamics == evolver_type::rkdp45) {
-    generic_evolver = &evolver_rkdp45;
-    options.erk     = ppr->erk_controller_config();
-  }
-  else if (ppr->evolver_thermodynamics == evolver_type::tsit5) {
-    generic_evolver = &evolver_tsit5;
-    options.erk     = ppr->erk_controller_config();
-  }
-  else if (ppr->evolver_thermodynamics == evolver_type::rk) {
-    generic_evolver = &evolver_rkdp45;
-    options.erk     = ppr->erk_controller_config();
+  /* RECFAST's stiffness is not diagonal in the sense ETD exploits, and recombination
+     reports no diagonal, so ETD would be explicit RK4 on a stiff system. */
+  evolver_type type = ppr->evolver_thermodynamics;
+  if (type == evolver_type::etd) {
+    type = evolver_type::rkdp45;
     printf(
-        "\nWarning: evolver=rk cannot integrate the stiff RECFAST system; using rkdp45 for "
-        "recombination instead.\n");
+        "\nWarning: evolver=etd does not apply to recombination; using rkdp45 for it "
+        "instead.\n");
   }
-  else if (ppr->evolver_thermodynamics == evolver_type::etd) {
-    // RECFAST's stiffness is not diagonal in the sense ETD exploits, and no species
-    // reports a diagonal here, so ETD would be explicit Heun on a stiff system.
-    generic_evolver = &evolver_rkdp45;
-    options.erk     = ppr->erk_controller_config();
-    printf(
-        "\nWarning: evolver=etd applies to the background only; using rkdp45 for "
-        "recombination instead.\n");
-  }
+  const Evolver generic_evolver =
+      SelectEvolver(type, options, ppr->erk_controller_config(), nullptr);
 
   /** - Fill all analytic RECFAST regimes directly on the requested sampling. */
 

@@ -48,19 +48,16 @@ void array_spline_table_line_to_line(const double* x, /* vector of size n_lines 
                                      int index_ddydx2,
                                      short spline_mode);
 
+/* Cubic-spline second derivatives. Each wrapper splines every curve of a table in its own
+   layout: `columns` takes y_array[index_y * x_size + index_x], `lines` takes
+   y_array[index_x * y_size + index_y], and the other two a column of a line-major array.
+   With two points the spline is natural whatever spline_mode says. */
 void array_spline_table_columns(const double* x,
                                 int x_size,
                                 const double* y_array,
                                 int y_size,
                                 double* ddy_array,
                                 short spline_mode);
-
-void array_spline_table_columns2(const double* x,
-                                 int x_size,
-                                 const double* y_array,
-                                 int y_size,
-                                 double* ddy_array,
-                                 short spline_mode);
 
 void array_spline_table_lines(const double* x,
                               int x_size,
@@ -170,9 +167,6 @@ void array_interpolate_two_arrays_one_column(
     int n_lines, /** must be the same for array_x and array_y */
     double x,
     double* result);
-
-void array_interpolate_cubic_equal(
-    double x0, double dx, const double* yarray, int Nx, double x, double* result);
 
 void array_interpolate_parabola(double x1,
                                 double x2,

@@ -704,6 +704,19 @@ class TestReviewRegressions(TestClass):
             self.cosmo.compute()
         self.assertIn(message, str(ctx.exception))
 
+    def test_capitalised_yes_switches_on_extra_transfers(self):
+        """'Nbody gauge transfer functions' and 'extra metric transfer functions'
+        searched their value for "y" twice and never for "Y", so 'Yes' was read as
+        no and the columns were silently missing. Every other yes/no flag takes
+        either case."""
+        self.cosmo.set(dict(self.verbose, **{'output': 'dTk,vTk',
+                                             'Nbody gauge transfer functions': 'Yes',
+                                             'extra metric transfer functions': 'Yes'}))
+        self.cosmo.compute()
+        transfers = self.cosmo.get_transfer()
+        for column in ('k2gamma_Nb', 'H_T_Nb_prime', 'h_prime'):
+            self.assertIn(column, transfers)
+
     def _assert_scenarios_match(self, scenario, reference_scenario, reference_name):
         self.scenario = dict(reference_scenario)
         self.name = self._testMethodName

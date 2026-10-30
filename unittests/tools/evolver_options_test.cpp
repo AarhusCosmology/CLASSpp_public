@@ -18,8 +18,6 @@
 
 #include "evolver_etd.h"
 #include "evolver_ndf15.h"
-#include "evolver_rkck.h"
-#include "evolver_rkdp45.h"
 
 namespace {
 
@@ -30,9 +28,6 @@ void decay_derivs(double /*x*/, double* y, double* dy) {
 }
 void decay_diagonal(double /*x*/, double* /*y*/, double* diag) {
   diag[0] = -1.0;
-}
-void decay_timescale(double /*x*/, double* timescale) {
-  *timescale = 1.0;
 }
 void no_output(double /*x*/, double* /*y*/, double* /*dy*/, int /*index_x*/) {}
 
@@ -120,12 +115,6 @@ void test_features_are_rejected_where_unsupported() {
     void (*apply)(EvolverOptions&);
   };
   const Case cases[] = {
-      {"Timescale",
-       EvolverFeature::Timescale,
-       [](EvolverOptions& o) {
-         o.evaluate_timescale      = decay_timescale;
-         o.timestep_over_timescale = 0.1;
-       }},
       {"Diagonal",
        EvolverFeature::Diagonal,
        [](EvolverOptions& o) { o.derivs_diagonal = decay_diagonal; }},
@@ -143,18 +132,6 @@ void test_features_are_rejected_where_unsupported() {
     /* ...and accepted by one that honours exactly this. */
     assert(!Rejects(options, "honours-it", {c.feature}));
   }
-
-  /* An evolver that honours the timescale pair REQUIRES it: rk takes its whole
-     step size from there and calls the function without a null check. So an
-     unset pair fails too, not only a half-set one. */
-  assert(Rejects(Baseline(sampling), "rk", {EvolverFeature::Timescale}));
-
-  EvolverOptions half     = Baseline(sampling);
-  half.evaluate_timescale = decay_timescale;
-  assert(Rejects(half, "rk", {EvolverFeature::Timescale}));
-
-  half.timestep_over_timescale = 0.1;
-  assert(!Rejects(half, "rk", {EvolverFeature::Timescale}));
 }
 
 /* And the real evolvers must declare what they actually consume. */
@@ -343,15 +320,6 @@ void test_out_of_range_values() {
     options.max_order      = good;
     assert(!Rejects(options, "ndf15", {EvolverFeature::MaxOrder}));
   }
-
-  /* A negative step factor sends rk backwards while its loop still asks for
-     x1 < x_end, i.e. away from the endpoint; NaN passes any `!= 0` test. */
-  for (double bad : {-0.1, 0.0, std::nan("")}) {
-    EvolverOptions options          = Baseline(sampling);
-    options.evaluate_timescale      = decay_timescale;
-    options.timestep_over_timescale = bad;
-    assert(Rejects(options, "rk", {EvolverFeature::Timescale}));
-  }
 }
 
 /** Non-finite inputs must be rejected in a build with -ffast-math.
@@ -380,11 +348,6 @@ void test_non_finite_inputs_are_rejected() {
     EvolverOptions bad_abstol = Baseline(sampling);
     bad_abstol.abstol         = bad;
     assert(Rejects(bad_abstol, "any", {EvolverFeature::AbsTol}));
-
-    EvolverOptions bad_step          = Baseline(sampling);
-    bad_step.evaluate_timescale      = decay_timescale;
-    bad_step.timestep_over_timescale = bad;
-    assert(Rejects(bad_step, "rk", {EvolverFeature::Timescale}));
   }
 
   /* And a non-finite integration start, which the reachability check compares
@@ -392,25 +355,17 @@ void test_non_finite_inputs_are_rejected() {
   assert(Rejects(Baseline(sampling), "any", {}, nan_value));
 }
 
-/** abstol is feature-gated, not universal.
- *
- *  The legacy rk builds its error scale inside generic_integrator from
- *  _TINY_ = 1e-30, a different quantity that cannot be swapped for abstol
- *  without changing results. So rather than let abstol be silently ignored
- *  there -- the failure this whole struct exists to prevent -- setting a
- *  non-default value with that evolver is an error. */
+/** abstol is feature-gated, not universal: the default passes an evolver that does
+ *  not declare it, a non-default value does not. */
 void test_abstol_is_feature_gated() {
   const std::vector<double> sampling = {0.0, 1.0};
 
-  EvolverOptions options          = Baseline(sampling);
-  options.evaluate_timescale      = decay_timescale;
-  options.timestep_over_timescale = 0.1;
-  /* The default passes everywhere, so existing callers are unaffected. */
-  assert(!Rejects(options, "rk", {EvolverFeature::Timescale}));
+  EvolverOptions options = Baseline(sampling);
+  assert(!Rejects(options, "honours-nothing", {}));
 
   options.abstol = 1e-8;
-  assert(Rejects(options, "rk", {EvolverFeature::Timescale}));
-  assert(!Rejects(options, "ndf15", {EvolverFeature::Timescale, EvolverFeature::AbsTol}));
+  assert(Rejects(options, "honours-nothing", {}));
+  assert(!Rejects(options, "ndf15", {EvolverFeature::AbsTol}));
 }
 
 }  // namespace

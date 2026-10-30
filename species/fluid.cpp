@@ -511,12 +511,7 @@ std::vector<Named> FluidSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   // ── PPF flag + sound-speed param ──────────────────────────────────────────
   bool use_ppf              = true;
   double c_gamma_over_c_fld = 0.4;
-  if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
-    const std::string& ppf_str = *ppf_opt;
-    use_ppf = (ppf_str.find('y') != std::string::npos || ppf_str.find('Y') != std::string::npos)
-                  ? true
-                  : false;
-  }
+  use_ppf                   = ctx.pfc->get_yes("use_ppf", use_ppf);
   if (use_ppf) {
     c_gamma_over_c_fld = ctx.pfc->get_or("c_gamma_over_c_fld", c_gamma_over_c_fld);
   }
@@ -648,12 +643,9 @@ std::vector<Named> FluidSpecies::CreatePhenoAxion(const SpeciesBuildContext& ctx
              "pheno_axion needs a positive fluid density: Omega_fld / Omega_fld_ac must be > 0");
 
   // ── PPF is meaningless here; cs2 is derived, not an input ──────────────────
-  if (auto ppf_opt = ctx.pfc->get<std::string>("use_ppf")) {
-    class_test_severe(ppf_opt->find("y") != std::string::npos ||
-                          ppf_opt->find("Y") != std::string::npos,
-                      "use_ppf = yes is incompatible with pheno_axion (w > -1 always; the GDM "
-                      "sound speed requires the true fluid equations)");
-  }
+  class_test_severe(ctx.pfc->get_yes("use_ppf"),
+                    "use_ppf = yes is incompatible with pheno_axion (w > -1 always; the GDM "
+                    "sound speed requires the true fluid equations)");
   class_test_severe(ctx.pfc->get<double>("cs2_fld").has_value(),
                     "cs2_fld is not an input for pheno_axion (the sound speed is the GDM "
                     "formula derived from n, a_c and Theta_initial_fld)");

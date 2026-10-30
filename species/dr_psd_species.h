@@ -203,9 +203,8 @@ class DrPsdSpecies : public NCDMBaseSpecies {
   double BackgroundAIni(double a_proposed, double /*tol*/) const override {
     return a_proposed;  // massless: always relativistic, no early-start constraint
   }
-  void CheckUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const override {}
-  bool IsUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const override {
-    return true;
+  double DeviationFromRadiation(const double* /*pvecback*/) const override {
+    return 0.;
   }
 
   // ── Reduced-moment perturbation representation (dr_reduced_moments) ─────────

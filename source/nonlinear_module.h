@@ -68,10 +68,6 @@ class NonlinearModule : public BaseModule {
   static double ExtrapolateMaxScaled(
       double k, double k_max, double k_previous, double source_max, double source_previous);
 
-  // Deprecated:
-  void nonlinear_sigma_at_z(
-      double R, double z, int index_pk, double k_per_decade, double* result) const;
-
   int k_size_ = 0;           /**< k_size = total number of k values */
   std::vector<double> ln_k_; /**< ln_k[index_k] = list of log(k) values */
 

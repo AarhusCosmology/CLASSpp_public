@@ -46,7 +46,7 @@ void evolver_erk_run(EvolverDerivs derivs,
      documents as the safety factor should not be silently ignored by the shipped
      controller. */
 
-  /* Contract (shared with evolver_rk): x_sampling is a non-null array of
+  /* Contract: x_sampling is a non-null array of
      output points, and tolerance > 0 (threshold below divides by it). */
   class_test(x_sampling == nullptr, "%s requires a non-null x_sampling array", Tab::kName);
   class_test(tolerance <= 0., "%s requires tolerance > 0 (got %e)", Tab::kName, tolerance);

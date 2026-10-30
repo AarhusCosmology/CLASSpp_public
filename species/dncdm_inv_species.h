@@ -318,9 +318,6 @@ class DNCDMInvSpecies : public DNCDMSector {
   void set_table_max_dlna(double dlna) {
     table_max_dlna_ = dlna;
   }
-  double table_max_dlna() const {
-    return table_max_dlna_;
-  }
   /** True once the tabulated operator exists and may be used on the hot path.
    *
    *  The table is built whenever the reduction is on. The matrix-free path survives

@@ -6,6 +6,12 @@
 #include "common.h"
 #include "evolver_options.h"  // EvolverDerivs
 
+/* Adaptive Cash-Karp over one interval, for the inflation module, which sizes each
+   interval itself and calls this ~1600 times per mode. It is not an evolver_*: rkdp45 in
+   its place (2026-10, PR #493) cost 2.0-2.5x the whole run on the axion-monodromy
+   potential at f = 2e-3 and 5e-4, and still 2.3x at matched accuracy. Mostly because
+   its first trial step is capped well below the interval the caller sized; with that
+   cap lifted it was still 1.75x. */
 struct generic_integrator_workspace {
   int n = 0;
 

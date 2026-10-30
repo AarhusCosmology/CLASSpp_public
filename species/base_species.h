@@ -638,10 +638,6 @@ class BaseSpecies {
                                  const perturb_workspace* /*ppw*/,
                                  int* /*used_in_sources*/) const {}
 
-  virtual void MarkVectorUsedInSources(const PerturbLayout& /*layout*/,
-                                       const perturb_workspace* /*ppw*/,
-                                       int* /*used_in_sources*/) const {}
-
   virtual void MarkTensorUsedInSources(const PerturbLayout& /*layout*/,
                                        const perturb_workspace* /*ppw*/,
                                        int* /*used_in_sources*/) const {}
@@ -700,14 +696,12 @@ class BaseSpecies {
     return 0.;
   }
 
-  /** Initial-time ultra-relativistic check (throws via class_test on failure).
-   *  Default no-op; NCDM checks |w-1/3|; composites forward to children. */
-  virtual void CheckUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const {}
-
-  /** Initial-time ultra-relativistic predicate. Default true; NCDM checks
-   *  |w-1/3| <= tol; composites AND over children. */
-  virtual bool IsUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const {
-    return true;
+  /** |w - 1/3|: how far this species is from ultra-relativistic, for the perturbations'
+   *  initial time, which must come while every non-cold relic is still relativistic.
+   *  Default 0 (no such constraint); NCDM computes it; composites take the max over
+   *  their children. */
+  virtual double DeviationFromRadiation(const double* /*pvecback*/) const {
+    return 0.;
   }
 
   /**
@@ -840,7 +834,7 @@ class BaseSpecies {
    * A virtual rather than a dynamic_cast in the collection: the answer belongs to the
    * class that knows it, and a chain of downcasts silently omits whatever was added
    * last. That is not a missed optimisation — answering false skips
-   * CheckUltraRelativisticAtIc, so the tau_ini bisection stops requiring a massive
+   * DeviationFromRadiation, so the tau_ini bisection stops requiring a massive
    * parent to be relativistic at its initial conditions, and two representations of
    * one model start at different initial times for no physical reason.
    *

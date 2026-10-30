@@ -2,11 +2,13 @@
 #define __PARSER__
 
 #include <functional>
+#include <initializer_list>
 #include <map>
 #include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common.h"
@@ -69,6 +71,36 @@ class FileContent {
   }
   /** Overload so a string-literal fallback does not deduce T = const char*. */
   std::string get_or(const std::string& name, const char* fallback) const;
+
+  /** A yes/no flag as CLASS has always read it: @p fallback if @p name is absent,
+   *  otherwise whether its value contains 'y' or 'Y'. */
+  bool get_yes(const std::string& name, bool fallback = false) const;
+
+  /** A strict yes/no flag: a value containing 'y' or 'Y' is yes, else one containing
+   *  'n' or 'N' is no, else an error. std::nullopt if @p name is absent. */
+  std::optional<bool> get_yes_no(const std::string& name) const;
+
+  /** Set @p choice from the value of @p name, one of a fixed set of spellings (several
+   *  may map to the same choice). Left unchanged if @p name is absent; an error naming
+   *  the spellings if the value is none of them. */
+  template <class E>
+  void read_choice(const std::string& name,
+                   E& choice,
+                   std::initializer_list<std::pair<const char*, E>> spellings) const {
+    const auto value = get<std::string>(name);
+    if (!value) {
+      return;
+    }
+    std::string allowed;
+    for (const auto& [spelling, option] : spellings) {
+      if (*value == spelling) {
+        choice = option;
+        return;
+      }
+      allowed += (allowed.empty() ? "'" : ", '") + std::string(spelling) + "'";
+    }
+    class_stop_severe("%s = '%s' is not one of %s", name.c_str(), value->c_str(), allowed.c_str());
+  }
 
   /** Mark every parameter as unread (used before a shooting iteration). */
   void mark_all_unread() const {

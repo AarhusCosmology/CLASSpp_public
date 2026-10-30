@@ -51,11 +51,11 @@ static void test_per_module_is_independent() {
   assert(p.evolver_perturbations == evolver_type::ndf15);
 
   FileContent fc2;
-  fc2.set("evolver_perturbations", "0");  // rk
+  fc2.set("evolver_perturbations", "3");  // etd
   const precision p2 = parsed(fc2);
   assert(p2.evolver_background == evolver_type::ndf15);
   assert(p2.evolver_thermodynamics == evolver_type::ndf15);
-  assert(p2.evolver_perturbations == evolver_type::rk);
+  assert(p2.evolver_perturbations == evolver_type::etd);
 }
 
 // Naming the whole family is equivalent to the blanket key.
@@ -115,6 +115,25 @@ static void test_mixing_is_rejected() {
   assert(rejects("evolver_perturbations"));
 }
 
+// A value that names no evolver is rejected, including 0, the removed fixed-step rk;
+// read unchecked it would become an enum value no dispatch handles.
+static void test_unknown_evolver_is_rejected() {
+  for (const char* value : {"0", "5", "-1"}) {
+    for (const char* key : {"evolver", "evolver_perturbations"}) {
+      FileContent fc;
+      fc.set(key, value);
+      bool rejected = false;
+      try {
+        parsed(fc);
+      }
+      catch (const std::invalid_argument&) {
+        rejected = true;
+      }
+      assert(rejected);
+    }
+  }
+}
+
 int main() {
   test_default_is_ndf15();
   test_blanket_sets_all();
@@ -122,6 +141,7 @@ int main() {
   test_full_family_matches_blanket();
   test_tsit5_is_parsed();
   test_mixing_is_rejected();
+  test_unknown_evolver_is_rejected();
   std::printf("precision evolver test passed\n");
   return 0;
 }

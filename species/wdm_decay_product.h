@@ -155,9 +155,8 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   double BackgroundAIni(double a_proposed, double /*tol*/) const override {
     return a_proposed;  // empty at early times; no relativistic-start constraint
   }
-  void CheckUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const override {}
-  bool IsUltraRelativisticAtIc(const double* /*pvecback*/, double /*tol*/) const override {
-    return true;
+  double DeviationFromRadiation(const double* /*pvecback*/) const override {
+    return 0.;
   }
   void PrintNeffInfo() const override;
   void PrintMassInfo() const override;

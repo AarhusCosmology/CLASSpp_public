@@ -171,8 +171,9 @@ class NCDMBaseSpecies : public BaseSpecies {
   double TensorMasslessRelativisticRho(const double* pvecback) const override {
     return 3. * P(pvecback);
   }
-  void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override;
-  bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override;
+  double DeviationFromRadiation(const double* pvecback) const override {
+    return fabs(P(pvecback) / Rho(pvecback) - 1. / 3.);
+  }
   void WarnIfNonlinearUnreliable(double m_ev_threshold) const override;
   std::vector<double> FreeStreamingWavenumbers() const override;
 

@@ -116,567 +116,150 @@ void array_integrate_spline_table_line_to_line(const double* x_array,
   }
 }
 
-void array_spline(double* array,
-                  int n_columns,
-                  int n_lines,
-                  int index_x, /** from 0 to (n_columns-1) */
-                  int index_y,
-                  int index_ddydx2,
+namespace {
+
+/* Second derivatives of m cubic splines through the same n abscissae, solved together:
+   the tridiagonal sweep runs along the points and the inner loop over the curves, so a
+   table is traversed in the order it is stored. Point i of curve j is x[i * x_stride],
+   y[i * y_line + j * y_curve]; its second derivative goes to ddy[i * dd_line + j * dd_curve].
+   These strides cover every layout of the wrappers below. */
+void spline_block(const double* x,
+                  int x_stride,
+                  int n,
+                  const double* y,
+                  int y_line,
+                  int y_curve,
+                  double* ddy,
+                  int dd_line,
+                  int dd_curve,
+                  int m,
                   short spline_mode) {
-  int i;
-  int k;
-  double p;
-  double qn;
-  double sig;
-  double un;
-  std::vector<double> vec_u(n_lines - 1);
-  double* u = vec_u.data();
-  double dy_first;
-  double dy_last;
+  const auto X  = [x, x_stride](int i) { return x[i * x_stride]; };
+  const auto Y  = [y, y_line, y_curve](int i, int j) { return y[i * y_line + j * y_curve]; };
+  const auto DD = [ddy, dd_line, dd_curve](int i, int j) -> double& {
+    return ddy[i * dd_line + j * dd_curve];
+  };
 
-  class_test(n_lines < 3, "n_lines=%d, while routine needs n_lines >= 3");
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    *(array + 0 * n_columns + index_ddydx2) = u[0] = 0.0;
+  class_test(n < 2, "a spline needs at least two points, got %d", n);
+  /* estimating the end derivatives takes three points */
+  const bool natural = (spline_mode == _SPLINE_NATURAL_) || (n == 2);
+  class_test(!natural && spline_mode != _SPLINE_EST_DERIV_,
+             "Spline mode not identified: %d",
+             spline_mode);
+  if (!natural) {
+    class_test(X(2) - X(0) == 0. || X(1) - X(0) == 0. || X(2) - X(1) == 0.,
+               "x[0]=%g, x[1]=%g, x[2]=%g: repeated abscissa",
+               X(0),
+               X(1),
+               X(2));
   }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      dy_first = ((*(array + 2 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) *
-                      (*(array + 2 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) *
-                      (*(array + 1 * n_columns + index_y) - *(array + 0 * n_columns + index_y)) -
-                  (*(array + 1 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) *
-                      (*(array + 1 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) *
-                      (*(array + 2 * n_columns + index_y) - *(array + 0 * n_columns + index_y))) /
-                 ((*(array + 2 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) *
-                  (*(array + 1 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) *
-                  (*(array + 2 * n_columns + index_x) - *(array + 1 * n_columns + index_x)));
 
-      *(array + 0 * n_columns + index_ddydx2) = -0.5;
+  std::vector<double> u((n - 1) * m); /* u[i * m + j] */
 
-      u[0] = (3. / (*(array + 1 * n_columns + index_x) - *(array + 0 * n_columns + index_x))) *
-             ((*(array + 1 * n_columns + index_y) - *(array + 0 * n_columns + index_y)) /
-                  (*(array + 1 * n_columns + index_x) - *(array + 0 * n_columns + index_x)) -
-              dy_first);
+  for (int j = 0; j < m; j++) {
+    if (natural) {
+      DD(0, j) = 0.;
+      u[j]     = 0.;
     }
     else {
-      class_stop("Spline mode not identified: %d", spline_mode);
+      const double dy_first = ((X(2) - X(0)) * (X(2) - X(0)) * (Y(1, j) - Y(0, j)) -
+                               (X(1) - X(0)) * (X(1) - X(0)) * (Y(2, j) - Y(0, j))) /
+                              ((X(2) - X(0)) * (X(1) - X(0)) * (X(2) - X(1)));
+      DD(0, j)              = -0.5;
+      u[j] = (3. / (X(1) - X(0))) * ((Y(1, j) - Y(0, j)) / (X(1) - X(0)) - dy_first);
     }
   }
 
-  for (i = 1; i < n_lines - 1; i++) {
-    sig = (*(array + i * n_columns + index_x) - *(array + (i - 1) * n_columns + index_x)) /
-          (*(array + (i + 1) * n_columns + index_x) - *(array + (i - 1) * n_columns + index_x));
-
-    p = sig * *(array + (i - 1) * n_columns + index_ddydx2) + 2.0;
-    *(array + i * n_columns + index_ddydx2) = (sig - 1.0) / p;
-    u[i] = (*(array + (i + 1) * n_columns + index_y) - *(array + i * n_columns + index_y)) /
-               (*(array + (i + 1) * n_columns + index_x) - *(array + i * n_columns + index_x)) -
-           (*(array + i * n_columns + index_y) - *(array + (i - 1) * n_columns + index_y)) /
-               (*(array + i * n_columns + index_x) - *(array + (i - 1) * n_columns + index_x));
-    u[i] =
-        (6.0 * u[i] /
-             (*(array + (i + 1) * n_columns + index_x) - *(array + (i - 1) * n_columns + index_x)) -
-         sig * u[i - 1]) /
-        p;
-  }
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    qn = 0.;
-    un = 0.;
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      dy_last = ((*(array + (n_lines - 3) * n_columns + index_x) -
-                  *(array + (n_lines - 1) * n_columns + index_x)) *
-                     (*(array + (n_lines - 3) * n_columns + index_x) -
-                      *(array + (n_lines - 1) * n_columns + index_x)) *
-                     (*(array + (n_lines - 2) * n_columns + index_y) -
-                      *(array + (n_lines - 1) * n_columns + index_y)) -
-                 (*(array + (n_lines - 2) * n_columns + index_x) -
-                  *(array + (n_lines - 1) * n_columns + index_x)) *
-                     (*(array + (n_lines - 2) * n_columns + index_x) -
-                      *(array + (n_lines - 1) * n_columns + index_x)) *
-                     (*(array + (n_lines - 3) * n_columns + index_y) -
-                      *(array + (n_lines - 1) * n_columns + index_y))) /
-                ((*(array + (n_lines - 3) * n_columns + index_x) -
-                  *(array + (n_lines - 1) * n_columns + index_x)) *
-                 (*(array + (n_lines - 2) * n_columns + index_x) -
-                  *(array + (n_lines - 1) * n_columns + index_x)) *
-                 (*(array + (n_lines - 3) * n_columns + index_x) -
-                  *(array + (n_lines - 2) * n_columns + index_x)));
-
-      qn = 0.5;
-      un = (3. / (*(array + (n_lines - 1) * n_columns + index_x) -
-                  *(array + (n_lines - 2) * n_columns + index_x))) *
-           (dy_last - (*(array + (n_lines - 1) * n_columns + index_y) -
-                       *(array + (n_lines - 2) * n_columns + index_y)) /
-                          (*(array + (n_lines - 1) * n_columns + index_x) -
-                           *(array + (n_lines - 2) * n_columns + index_x)));
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
+  for (int i = 1; i < n - 1; i++) {
+    const double sig = (X(i) - X(i - 1)) / (X(i + 1) - X(i - 1));
+    for (int j = 0; j < m; j++) {
+      const double p    = sig * DD(i - 1, j) + 2.0;
+      DD(i, j)          = (sig - 1.0) / p;
+      const double diff = (Y(i + 1, j) - Y(i, j)) / (X(i + 1) - X(i)) -
+                          (Y(i, j) - Y(i - 1, j)) / (X(i) - X(i - 1));
+      u[i * m + j]      = (6.0 * diff / (X(i + 1) - X(i - 1)) - sig * u[(i - 1) * m + j]) / p;
     }
   }
 
-  *(array + (n_lines - 1) * n_columns + index_ddydx2) =
-      (un - qn * u[n_lines - 2]) / (qn * *(array + (n_lines - 2) * n_columns + index_ddydx2) + 1.0);
+  const int l = n - 1;
+  for (int j = 0; j < m; j++) {
+    double qn = 0.;
+    double un = 0.;
+    if (!natural) {
+      const double dy_last = ((X(l - 2) - X(l)) * (X(l - 2) - X(l)) * (Y(l - 1, j) - Y(l, j)) -
+                              (X(l - 1) - X(l)) * (X(l - 1) - X(l)) * (Y(l - 2, j) - Y(l, j))) /
+                             ((X(l - 2) - X(l)) * (X(l - 1) - X(l)) * (X(l - 2) - X(l - 1)));
+      qn                   = 0.5;
+      un = (3. / (X(l) - X(l - 1))) * (dy_last - (Y(l, j) - Y(l - 1, j)) / (X(l) - X(l - 1)));
+    }
+    DD(l, j) = (un - qn * u[(l - 1) * m + j]) / (qn * DD(l - 1, j) + 1.0);
+  }
 
-  for (k = n_lines - 2; k >= 0; k--) {
-    *(array + k * n_columns + index_ddydx2) = *(array + k * n_columns + index_ddydx2) *
-                                                  *(array + (k + 1) * n_columns + index_ddydx2) +
-                                              u[k];
+  for (int i = n - 2; i >= 0; i--) {
+    for (int j = 0; j < m; j++) {
+      DD(i, j) = DD(i, j) * DD(i + 1, j) + u[i * m + j];
+    }
   }
 }
 
-void array_spline_table_line_to_line(const double* x, /* vector of size n_lines */
+}  // namespace
+
+void array_spline(double* array,
+                  int n_columns,
+                  int n_lines,
+                  int index_x,
+                  int index_y,
+                  int index_ddydx2,
+                  short spline_mode) {
+  spline_block(array + index_x,
+               n_columns,
+               n_lines,
+               array + index_y,
+               n_columns,
+               0,
+               array + index_ddydx2,
+               n_columns,
+               0,
+               1,
+               spline_mode);
+}
+
+void array_spline_table_line_to_line(const double* x,
                                      int n_lines,
                                      double* array,
                                      int n_columns,
                                      int index_y,
                                      int index_ddydx2,
                                      short spline_mode) {
-  int i;
-  int k;
-  double p;
-  double qn;
-  double sig;
-  double un;
-  std::vector<double> vec_u(n_lines - 1);
-  double* u = vec_u.data();
-  double dy_first;
-  double dy_last;
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    *(array + 0 * n_columns + index_ddydx2) = u[0] = 0.0;
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      dy_first = ((x[2] - x[0]) * (x[2] - x[0]) *
-                      (*(array + 1 * n_columns + index_y) - *(array + 0 * n_columns + index_y)) -
-                  (x[1] - x[0]) * (x[1] - x[0]) *
-                      (*(array + 2 * n_columns + index_y) - *(array + 0 * n_columns + index_y))) /
-                 ((x[2] - x[0]) * (x[1] - x[0]) * (x[2] - x[1]));
-      *(array + 0 * n_columns + index_ddydx2) = -0.5;
-      u[0] = (3. / (x[1] - x[0])) *
-             ((*(array + 1 * n_columns + index_y) - *(array + 0 * n_columns + index_y)) /
-                  (x[1] - x[0]) -
-              dy_first);
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
-    }
-  }
-
-  for (i = 1; i < n_lines - 1; i++) {
-    sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
-
-    p = sig * *(array + (i - 1) * n_columns + index_ddydx2) + 2.0;
-    *(array + i * n_columns + index_ddydx2) = (sig - 1.0) / p;
-    u[i] = (*(array + (i + 1) * n_columns + index_y) - *(array + i * n_columns + index_y)) /
-               (x[i + 1] - x[i]) -
-           (*(array + i * n_columns + index_y) - *(array + (i - 1) * n_columns + index_y)) /
-               (x[i] - x[i - 1]);
-    u[i] = (6.0 * u[i] / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
-  }
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    qn = 0.;
-    un = 0.;
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      dy_last = ((x[n_lines - 3] - x[n_lines - 1]) * (x[n_lines - 3] - x[n_lines - 1]) *
-                     (*(array + (n_lines - 2) * n_columns + index_y) -
-                      *(array + (n_lines - 1) * n_columns + index_y)) -
-                 (x[n_lines - 2] - x[n_lines - 1]) * (x[n_lines - 2] - x[n_lines - 1]) *
-                     (*(array + (n_lines - 3) * n_columns + index_y) -
-                      *(array + (n_lines - 1) * n_columns + index_y))) /
-                ((x[n_lines - 3] - x[n_lines - 1]) * (x[n_lines - 2] - x[n_lines - 1]) *
-                 (x[n_lines - 3] - x[n_lines - 2]));
-      qn      = 0.5;
-      un      = (3. / (x[n_lines - 1] - x[n_lines - 2])) *
-                (dy_last - (*(array + (n_lines - 1) * n_columns + index_y) -
-                            *(array + (n_lines - 2) * n_columns + index_y)) /
-                               (x[n_lines - 1] - x[n_lines - 2]));
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
-    }
-  }
-
-  *(array + (n_lines - 1) * n_columns + index_ddydx2) =
-      (un - qn * u[n_lines - 2]) / (qn * *(array + (n_lines - 2) * n_columns + index_ddydx2) + 1.0);
-
-  for (k = n_lines - 2; k >= 0; k--) {
-    *(array + k * n_columns + index_ddydx2) = *(array + k * n_columns + index_ddydx2) *
-                                                  *(array + (k + 1) * n_columns + index_ddydx2) +
-                                              u[k];
-  }
+  spline_block(x,
+               1,
+               n_lines,
+               array + index_y,
+               n_columns,
+               0,
+               array + index_ddydx2,
+               n_columns,
+               0,
+               1,
+               spline_mode);
 }
 
-void array_spline_table_lines(const double* x, /* vector of size x_size */
+void array_spline_table_lines(const double* x,
                               int x_size,
-                              const double* y_array, /* array of size x_size*y_size with elements
-						  y_array[index_x*y_size+index_y] */
+                              const double* y_array,
                               int y_size,
-                              double* ddy_array, /* array of size x_size*y_size */
+                              double* ddy_array,
                               short spline_mode) {
-  std::vector<double> vec_u((x_size - 1) * y_size);
-  std::vector<double> vec_p(y_size);
-  std::vector<double> vec_qn(y_size);
-  std::vector<double> vec_un(y_size);
-  double* u  = vec_u.data();
-  double* p  = vec_p.data();
-  double* qn = vec_qn.data();
-  double* un = vec_un.data();
-  double sig;
-  int index_x;
-  int index_y;
-  double dy_first;
-  double dy_last;
-
-  if (x_size == 2) {
-    spline_mode =
-        _SPLINE_NATURAL_;  // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
-  }
-
-  index_x = 0;
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    for (index_y = 0; index_y < y_size; index_y++) {
-      ddy_array[index_x * y_size + index_y] = u[index_x * y_size + index_y] = 0.0;
-    }
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      for (index_y = 0; index_y < y_size; index_y++) {
-        dy_first = ((x[2] - x[0]) * (x[2] - x[0]) *
-                        (y_array[1 * y_size + index_y] - y_array[0 * y_size + index_y]) -
-                    (x[1] - x[0]) * (x[1] - x[0]) *
-                        (y_array[2 * y_size + index_y] - y_array[0 * y_size + index_y])) /
-                   ((x[2] - x[0]) * (x[1] - x[0]) * (x[2] - x[1]));
-
-        ddy_array[index_x * y_size + index_y] = -0.5;
-
-        u[index_x * y_size + index_y] =
-            (3. / (x[1] - x[0])) *
-            ((y_array[1 * y_size + index_y] - y_array[0 * y_size + index_y]) / (x[1] - x[0]) -
-             dy_first);
-      }
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
-    }
-  }
-
-  for (index_x = 1; index_x < x_size - 1; index_x++) {
-    sig = (x[index_x] - x[index_x - 1]) / (x[index_x + 1] - x[index_x - 1]);
-
-    for (index_y = 0; index_y < y_size; index_y++) {
-      p[index_y] = sig * ddy_array[(index_x - 1) * y_size + index_y] + 2.0;
-
-      ddy_array[index_x * y_size + index_y] = (sig - 1.0) / p[index_y];
-
-      u[index_x * y_size + index_y] =
-          (y_array[(index_x + 1) * y_size + index_y] - y_array[index_x * y_size + index_y]) /
-              (x[index_x + 1] - x[index_x]) -
-          (y_array[index_x * y_size + index_y] - y_array[(index_x - 1) * y_size + index_y]) /
-              (x[index_x] - x[index_x - 1]);
-
-      u[index_x * y_size + index_y] = (6.0 * u[index_x * y_size + index_y] /
-                                           (x[index_x + 1] - x[index_x - 1]) -
-                                       sig * u[(index_x - 1) * y_size + index_y]) /
-                                      p[index_y];
-    }
-  }
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    for (index_y = 0; index_y < y_size; index_y++) {
-      qn[index_y] = un[index_y] = 0.0;
-    }
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      for (index_y = 0; index_y < y_size; index_y++) {
-        dy_last = ((x[x_size - 3] - x[x_size - 1]) * (x[x_size - 3] - x[x_size - 1]) *
-                       (y_array[(x_size - 2) * y_size + index_y] -
-                        y_array[(x_size - 1) * y_size + index_y]) -
-                   (x[x_size - 2] - x[x_size - 1]) * (x[x_size - 2] - x[x_size - 1]) *
-                       (y_array[(x_size - 3) * y_size + index_y] -
-                        y_array[(x_size - 1) * y_size + index_y])) /
-                  ((x[x_size - 3] - x[x_size - 1]) * (x[x_size - 2] - x[x_size - 1]) *
-                   (x[x_size - 3] - x[x_size - 2]));
-
-        qn[index_y] = 0.5;
-
-        un[index_y] = (3. / (x[x_size - 1] - x[x_size - 2])) *
-                      (dy_last - (y_array[(x_size - 1) * y_size + index_y] -
-                                  y_array[(x_size - 2) * y_size + index_y]) /
-                                     (x[x_size - 1] - x[x_size - 2]));
-      }
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
-    }
-  }
-
-  index_x = x_size - 1;
-
-  for (index_y = 0; index_y < y_size; index_y++) {
-    ddy_array[index_x * y_size + index_y] =
-        (un[index_y] - qn[index_y] * u[(index_x - 1) * y_size + index_y]) /
-        (qn[index_y] * ddy_array[(index_x - 1) * y_size + index_y] + 1.0);
-  }
-
-  for (index_x = x_size - 2; index_x >= 0; index_x--) {
-    for (index_y = 0; index_y < y_size; index_y++) {
-      ddy_array[index_x * y_size + index_y] = ddy_array[index_x * y_size + index_y] *
-                                                  ddy_array[(index_x + 1) * y_size + index_y] +
-                                              u[index_x * y_size + index_y];
-    }
-  }
+  spline_block(x, 1, x_size, y_array, y_size, 1, ddy_array, y_size, 1, y_size, spline_mode);
 }
 
-void array_spline_table_columns(const double* x, /* vector of size x_size */
+void array_spline_table_columns(const double* x,
                                 int x_size,
-                                const double* y_array, /* array of size x_size*y_size with elements
-					  y_array[index_y*x_size+index_x] */
+                                const double* y_array,
                                 int y_size,
-                                double* ddy_array, /* array of size x_size*y_size */
+                                double* ddy_array,
                                 short spline_mode) {
-  std::vector<double> vec_u((x_size - 1) * y_size);
-  std::vector<double> vec_p(y_size);
-  std::vector<double> vec_qn(y_size);
-  std::vector<double> vec_un(y_size);
-  double* u  = vec_u.data();
-  double* p  = vec_p.data();
-  double* qn = vec_qn.data();
-  double* un = vec_un.data();
-  double sig;
-  int index_x;
-  int index_y;
-  double dy_first;
-  double dy_last;
-
-  if (x_size == 2) {
-    spline_mode =
-        _SPLINE_NATURAL_;  // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ at least 3 x-values are needed.
-  }
-
-  index_x = 0;
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    for (index_y = 0; index_y < y_size; index_y++) {
-      ddy_array[index_y * x_size + index_x] = 0.0;
-      u[index_x * y_size + index_y]         = 0.0;
-    }
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      class_test(x[2] - x[0] == 0., "x[2]=%g, x[0]=%g, stop to avoid seg fault", x[2], x[0]);
-      class_test(x[1] - x[0] == 0., "x[1]=%g, x[0]=%g, stop to avoid seg fault", x[1], x[0]);
-      class_test(x[2] - x[1] == 0., "x[2]=%g, x[1]=%g, stop to avoid seg fault", x[2], x[1]);
-
-      for (index_y = 0; index_y < y_size; index_y++) {
-        dy_first = ((x[2] - x[0]) * (x[2] - x[0]) *
-                        (y_array[index_y * x_size + 1] - y_array[index_y * x_size + 0]) -
-                    (x[1] - x[0]) * (x[1] - x[0]) *
-                        (y_array[index_y * x_size + 2] - y_array[index_y * x_size + 0])) /
-                   ((x[2] - x[0]) * (x[1] - x[0]) * (x[2] - x[1]));
-
-        ddy_array[index_y * x_size + index_x] = -0.5;
-
-        u[index_x * y_size + index_y] =
-            (3. / (x[1] - x[0])) *
-            ((y_array[index_y * x_size + 1] - y_array[index_y * x_size + 0]) / (x[1] - x[0]) -
-             dy_first);
-      }
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
-    }
-  }
-
-  for (index_x = 1; index_x < x_size - 1; index_x++) {
-    sig = (x[index_x] - x[index_x - 1]) / (x[index_x + 1] - x[index_x - 1]);
-
-    for (index_y = 0; index_y < y_size; index_y++) {
-      p[index_y] = sig * ddy_array[index_y * x_size + (index_x - 1)] + 2.0;
-
-      ddy_array[index_y * x_size + index_x] = (sig - 1.0) / p[index_y];
-
-      u[index_x * y_size + index_y] =
-          (y_array[index_y * x_size + (index_x + 1)] - y_array[index_y * x_size + index_x]) /
-              (x[index_x + 1] - x[index_x]) -
-          (y_array[index_y * x_size + index_x] - y_array[index_y * x_size + (index_x - 1)]) /
-              (x[index_x] - x[index_x - 1]);
-
-      u[index_x * y_size + index_y] = (6.0 * u[index_x * y_size + index_y] /
-                                           (x[index_x + 1] - x[index_x - 1]) -
-                                       sig * u[(index_x - 1) * y_size + index_y]) /
-                                      p[index_y];
-    }
-  }
-
-  if (spline_mode == _SPLINE_NATURAL_) {
-    for (index_y = 0; index_y < y_size; index_y++) {
-      qn[index_y] = un[index_y] = 0.0;
-    }
-  }
-  else {
-    if (spline_mode == _SPLINE_EST_DERIV_) {
-      for (index_y = 0; index_y < y_size; index_y++) {
-        dy_last = ((x[x_size - 3] - x[x_size - 1]) * (x[x_size - 3] - x[x_size - 1]) *
-                       (y_array[index_y * x_size + (x_size - 2)] -
-                        y_array[index_y * x_size + (x_size - 1)]) -
-                   (x[x_size - 2] - x[x_size - 1]) * (x[x_size - 2] - x[x_size - 1]) *
-                       (y_array[index_y * x_size + (x_size - 3)] -
-                        y_array[index_y * x_size + (x_size - 1)])) /
-                  ((x[x_size - 3] - x[x_size - 1]) * (x[x_size - 2] - x[x_size - 1]) *
-                   (x[x_size - 3] - x[x_size - 2]));
-
-        qn[index_y] = 0.5;
-
-        un[index_y] = (3. / (x[x_size - 1] - x[x_size - 2])) *
-                      (dy_last - (y_array[index_y * x_size + (x_size - 1)] -
-                                  y_array[index_y * x_size + (x_size - 2)]) /
-                                     (x[x_size - 1] - x[x_size - 2]));
-      }
-    }
-    else {
-      class_stop("Spline mode not identified: %d", spline_mode);
-    }
-  }
-
-  index_x = x_size - 1;
-
-  for (index_y = 0; index_y < y_size; index_y++) {
-    ddy_array[index_y * x_size + index_x] =
-        (un[index_y] - qn[index_y] * u[(index_x - 1) * y_size + index_y]) /
-        (qn[index_y] * ddy_array[index_y * x_size + (index_x - 1)] + 1.0);
-  }
-
-  for (index_x = x_size - 2; index_x >= 0; index_x--) {
-    for (index_y = 0; index_y < y_size; index_y++) {
-      ddy_array[index_y * x_size + index_x] = ddy_array[index_y * x_size + index_x] *
-                                                  ddy_array[index_y * x_size + (index_x + 1)] +
-                                              u[index_x * y_size + index_y];
-    }
-  }
-}
-
-void array_spline_table_columns2(const double* x, /* vector of size x_size */
-                                 int x_size,
-                                 const double* y_array, /* array of size x_size*y_size with elements
-					  y_array[index_y*x_size+index_x] */
-                                 int y_size,
-                                 double* ddy_array, /* array of size x_size*y_size */
-                                 short spline_mode) {
-  std::vector<double> vec_u((x_size - 1) * y_size);
-  std::vector<double> vec_p(y_size);
-  std::vector<double> vec_qn(y_size);
-  std::vector<double> vec_un(y_size);
-  double* u  = vec_u.data();
-  double* p  = vec_p.data();
-  double* qn = vec_qn.data();
-  double* un = vec_un.data();
-  double sig;
-  int index_x;
-  int index_y;
-  double dy_first;
-  double dy_last;
-
-  if (x_size == 2) {
-    spline_mode =
-        _SPLINE_NATURAL_;  // in the case of only 2 x-values, only the natural spline method is appropriate, for _SPLINE_EST_DERIV_ 3 x-values are needed.
-  }
-
-#pragma omp parallel shared(x,               \
-                                x_size,      \
-                                y_array,     \
-                                y_size,      \
-                                ddy_array,   \
-                                spline_mode, \
-                                p,           \
-                                qn,          \
-                                un,          \
-                                u) private(index_y, index_x, sig, dy_first, dy_last)
-  {
-#pragma omp for schedule(dynamic)
-
-    for (index_y = 0; index_y < y_size; index_y++) {
-      if (spline_mode == _SPLINE_NATURAL_) {
-        ddy_array[index_y * x_size + 0] = 0.0;
-        u[0 * y_size + index_y]         = 0.0;
-      }
-      else {
-        dy_first = ((x[2] - x[0]) * (x[2] - x[0]) *
-                        (y_array[index_y * x_size + 1] - y_array[index_y * x_size + 0]) -
-                    (x[1] - x[0]) * (x[1] - x[0]) *
-                        (y_array[index_y * x_size + 2] - y_array[index_y * x_size + 0])) /
-                   ((x[2] - x[0]) * (x[1] - x[0]) * (x[2] - x[1]));
-
-        ddy_array[index_y * x_size + 0] = -0.5;
-
-        u[0 * y_size + index_y] = (3. / (x[1] - x[0])) *
-                                  ((y_array[index_y * x_size + 1] - y_array[index_y * x_size + 0]) /
-                                       (x[1] - x[0]) -
-                                   dy_first);
-      }
-
-      for (index_x = 1; index_x < x_size - 1; index_x++) {
-        sig = (x[index_x] - x[index_x - 1]) / (x[index_x + 1] - x[index_x - 1]);
-
-        p[index_y] = sig * ddy_array[index_y * x_size + (index_x - 1)] + 2.0;
-
-        ddy_array[index_y * x_size + index_x] = (sig - 1.0) / p[index_y];
-
-        u[index_x * y_size + index_y] =
-            (y_array[index_y * x_size + (index_x + 1)] - y_array[index_y * x_size + index_x]) /
-                (x[index_x + 1] - x[index_x]) -
-            (y_array[index_y * x_size + index_x] - y_array[index_y * x_size + (index_x - 1)]) /
-                (x[index_x] - x[index_x - 1]);
-
-        u[index_x * y_size + index_y] = (6.0 * u[index_x * y_size + index_y] /
-                                             (x[index_x + 1] - x[index_x - 1]) -
-                                         sig * u[(index_x - 1) * y_size + index_y]) /
-                                        p[index_y];
-      }
-
-      if (spline_mode == _SPLINE_NATURAL_) {
-        qn[index_y] = un[index_y] = 0.0;
-      }
-      else {
-        dy_last = ((x[x_size - 3] - x[x_size - 1]) * (x[x_size - 3] - x[x_size - 1]) *
-                       (y_array[index_y * x_size + (x_size - 2)] -
-                        y_array[index_y * x_size + (x_size - 1)]) -
-                   (x[x_size - 2] - x[x_size - 1]) * (x[x_size - 2] - x[x_size - 1]) *
-                       (y_array[index_y * x_size + (x_size - 3)] -
-                        y_array[index_y * x_size + (x_size - 1)])) /
-                  ((x[x_size - 3] - x[x_size - 1]) * (x[x_size - 2] - x[x_size - 1]) *
-                   (x[x_size - 3] - x[x_size - 2]));
-
-        qn[index_y] = 0.5;
-
-        un[index_y] = (3. / (x[x_size - 1] - x[x_size - 2])) *
-                      (dy_last - (y_array[index_y * x_size + (x_size - 1)] -
-                                  y_array[index_y * x_size + (x_size - 2)]) /
-                                     (x[x_size - 1] - x[x_size - 2]));
-      }
-
-      index_x = x_size - 1;
-
-      ddy_array[index_y * x_size + index_x] =
-          (un[index_y] - qn[index_y] * u[(index_x - 1) * y_size + index_y]) /
-          (qn[index_y] * ddy_array[index_y * x_size + (index_x - 1)] + 1.0);
-
-      for (index_x = x_size - 2; index_x >= 0; index_x--) {
-        ddy_array[index_y * x_size + index_x] = ddy_array[index_y * x_size + index_x] *
-                                                    ddy_array[index_y * x_size + (index_x + 1)] +
-                                                u[index_x * y_size + index_y];
-      }
-    }
-  }
+  spline_block(x, 1, x_size, y_array, 1, x_size, ddy_array, 1, x_size, y_size, spline_mode);
 }
 
 void array_integrate_all_spline(const double* array,
@@ -1132,39 +715,6 @@ void array_interpolate_two_arrays_one_column(
 
   *result = array_y[index_y * n_lines + inf] * (1. - weight) +
             weight * array_y[index_y * n_lines + sup];
-}
-
-/**
- * cubic interpolation of array with equally space abscisses
- */
-
-void array_interpolate_cubic_equal(
-    double x0, double dx, const double* yarray, int Nx, double x, double* result) {
-  int i;
-  double frac;
-
-  class_test((dx > 0 && (x < x0 || x > x0 + dx * (Nx - 1))),
-             "x=%e out of range [%e %e]",
-             x,
-             x0,
-             x0 + dx * (Nx - 1));
-
-  class_test((dx < 0 && (x > x0 || x < x0 + dx * (Nx - 1))),
-             "x=%e out of range [%e %e]",
-             x,
-             x0 + dx * (Nx - 1),
-             x0);
-
-  i       = static_cast<int>(floor((x - x0) / dx));
-  i       = std::max(i, 1);
-  i       = std::min(i, Nx - 3);
-  frac    = (x - x0) / dx - i;
-  yarray += i - 1;
-
-  *result = -yarray[0] * frac * (1. - frac) * (2. - frac) / 6. +
-            yarray[1] * (1. + frac) * (1. - frac) * (2. - frac) / 2. +
-            yarray[2] * (1. + frac) * frac * (2. - frac) / 2. +
-            yarray[3] * (1. + frac) * frac * (frac - 1.) / 6.;
 }
 
 void array_interpolate_parabola(double x1,

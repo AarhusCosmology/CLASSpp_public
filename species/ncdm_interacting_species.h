@@ -66,10 +66,6 @@ class NCDMInteractingSpecies : public NCDMSpecies {
   /** Damping coefficient for l = 2 under the ncdm fluid approximation. */
   double AlphaFluid() const;
 
-  double GetGeff() const {
-    return G_eff_;
-  }
-
  private:
   double G_eff_              = 0.0;
   bool use_alpha_correction_ = false;

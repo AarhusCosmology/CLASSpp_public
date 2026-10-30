@@ -297,7 +297,6 @@ class PerturbationsModule : public BaseModule {
   void perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);
   void perturb_einstein(int index_md, double k, double tau, double* y, perturb_workspace* ppw);
   void perturb_total_stress_energy(int index_md, double k, double* y, perturb_workspace* ppw);
-  void perturb_timescale(double tau, double* timescale, perturb_parameters_and_workspace* pppaw);
   void perturb_sources(
       double tau, double* y, double* dy, int index_tau, perturb_parameters_and_workspace* pppaw);
   void perturb_print_variables(double tau,

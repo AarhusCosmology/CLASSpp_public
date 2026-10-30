@@ -233,18 +233,12 @@ class CompositeSpecies : public BaseSpecies {
     }
     return sum;
   }
-  void CheckUltraRelativisticAtIc(const double* pvecback, double tol) const override {
+  double DeviationFromRadiation(const double* pvecback) const override {
+    double deviation = 0.;
     for (const auto& c : children_) {
-      c->CheckUltraRelativisticAtIc(pvecback, tol);
+      deviation = std::max(deviation, c->DeviationFromRadiation(pvecback));
     }
-  }
-  bool IsUltraRelativisticAtIc(const double* pvecback, double tol) const override {
-    for (const auto& c : children_) {
-      if (!c->IsUltraRelativisticAtIc(pvecback, tol)) {
-        return false;
-      }
-    }
-    return true;
+    return deviation;
   }
   void WarnIfNonlinearUnreliable(double m_ev_threshold) const override {
     for (const auto& c : children_) {

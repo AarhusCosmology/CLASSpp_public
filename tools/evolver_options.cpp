@@ -3,7 +3,10 @@
 #include <algorithm>
 
 #include "errors.h"
+#include "evolver_etd.h"
+#include "evolver_ndf15.h"
 #include "nonfinite.h"
+#include "precision.h"
 
 namespace {
 
@@ -76,32 +79,12 @@ void EvolverOptionsCheck(const EvolverOptions& options,
                       what);
   };
 
-  reject(EvolverFeature::Timescale,
-         options.evaluate_timescale.has_value() || options.timestep_over_timescale != 0.,
-         "evaluate_timescale / timestep_over_timescale");
   reject(EvolverFeature::Diagonal, options.derivs_diagonal.has_value(), "derivs_diagonal");
   reject(EvolverFeature::MaxOrder, options.max_order != 0, "max_order");
   reject(EvolverFeature::AbsTol, options.abstol != kEvolverDefaultAbsTol, "a non-default abstol");
   reject(EvolverFeature::ErkController, options.erk.has_value(), "erk");
   reject(EvolverFeature::Stats, options.stats != nullptr, "stats");
   reject(EvolverFeature::Histograms, options.histograms != nullptr, "histograms");
-
-  /* An evolver that honours the timescale pair does not merely accept it, it
-     REQUIRES it: the legacy rk takes its whole step size from there. So both
-     must be SET, not merely set together. */
-  if (Honours(honoured, EvolverFeature::Timescale)) {
-    class_test_severe(!options.evaluate_timescale.has_value(),
-                      "%s takes its step size from evaluate_timescale, so it is required.",
-                      evolver_name);
-    /* A negative factor would send the step backwards while the loop condition
-       still asks for x1 < x_end, i.e. away from the endpoint, forever. NaN needs
-       IsNonFinite rather than the comparison -- see the note on rtol above. */
-    class_test_severe(IsNonFinite(options.timestep_over_timescale) ||
-                          !(options.timestep_over_timescale > 0.),
-                      "%s needs a positive, finite timestep_over_timescale, got %g",
-                      evolver_name,
-                      options.timestep_over_timescale);
-  }
 
   /* Order is used to index five-element coefficient arrays. */
   if (Honours(honoured, EvolverFeature::MaxOrder)) {
@@ -110,4 +93,26 @@ void EvolverOptionsCheck(const EvolverOptions& options,
                       evolver_name,
                       options.max_order);
   }
+}
+
+Evolver SelectEvolver(evolver_type type,
+                      EvolverOptions& options,
+                      const ErkControllerConfig& erk,
+                      const EvolverDiagonal* diagonal) {
+  switch (type) {
+    case evolver_type::ndf15:
+      return &evolver_ndf15;
+    case evolver_type::rkdp45:
+      options.erk = erk;
+      return &evolver_rkdp45;
+    case evolver_type::tsit5:
+      options.erk = erk;
+      return &evolver_tsit5;
+    case evolver_type::etd:
+      if (diagonal != nullptr) {
+        options.derivs_diagonal = *diagonal;
+      }
+      return &evolver_etd;
+  }
+  class_stop_severe("unknown evolver type %d", static_cast<int>(type));
 }

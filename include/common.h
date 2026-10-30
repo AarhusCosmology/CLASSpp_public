@@ -64,9 +64,6 @@ using LensingModulePtr        = std::shared_ptr<const LensingModule>;
 #define _QUADRATURE_MAX_BG_ \
   800 /**< maximum allowed number of abssices in quadrature integral estimation */
 
-#define _TOLVAR_ \
-  100. /**< The minimum allowed variation is the machine precision times this number */
-
 #define _HUGE_ 1.e99
 
 #define _EPSILON_ 1.e-10
@@ -105,14 +102,6 @@ inline int index_symmetric_matrix(int i1, int i2, int N) {
   {                                                                      \
     if (condition)                                                       \
       fprintf(file, "%*.*e ", _COLUMNWIDTH_, _OUTPUTPRECISION_, output); \
-  }
-
-#define class_fprintf_double_or_default(file, output, condition, defaultvalue) \
-  {                                                                            \
-    if (condition)                                                             \
-      fprintf(file, "%*.*e ", _COLUMNWIDTH_, _OUTPUTPRECISION_, output);       \
-    else                                                                       \
-      fprintf(file, "%*.*e ", _COLUMNWIDTH_, _OUTPUTPRECISION_, defaultvalue); \
   }
 
 #define class_fprintf_int(file, output, condition)                \

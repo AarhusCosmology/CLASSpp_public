@@ -137,9 +137,6 @@ set(CLASS_TOOLS_FILES
   tools/evolver_etd.cpp
   tools/evolver_ndf15.cpp
   tools/evolver_options.cpp
-  tools/evolver_rkck.cpp
-  tools/evolver_rkdp45.cpp
-  tools/evolver_tsit5.cpp
   tools/nonfinite.cpp
   tools/exceptions.cpp
   tools/hyperspherical.cpp

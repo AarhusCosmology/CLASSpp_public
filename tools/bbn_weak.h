@@ -48,13 +48,6 @@ class BbnWeakRates {
    *  @param T_nu_mev     neutrino temperature */
   void Rates(double T_gamma_mev, double T_nu_mev, double* lambda_np, double* lambda_pn) const;
 
-  /** The vacuum decay rate this object reproduces, s^-1. Equals 1/tau_n by
-   *  construction; exposed so a test can confirm the normalization rather than
-   *  trust it. */
-  double FreeDecayRate() const {
-    return 1.0 / tau_n_;
-  }
-
  private:
   double tau_n_;
   double norm_;           /**< K, s^-1: 1 / (tau_n * vacuum phase-space integral) */

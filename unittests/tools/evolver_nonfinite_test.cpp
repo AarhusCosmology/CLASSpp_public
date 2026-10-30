@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 
-#include "evolver_rkdp45.h"
+#include "evolver_options.h"
 #include "nonfinite.h"
 
 namespace {

@@ -38,10 +38,6 @@ class ThermodynamicsModule : public BaseModule {
                            const double* pvecback,
                            double* pvecthermo) const;
 
-  const thermo* GetThermodynamics() const {
-    return pth;
-  }
-
   double tau_ini_ =
       0.0; /**< initial conformal time at which thermodynamical variables have been be integrated */
   double YHe_ = 0.0;

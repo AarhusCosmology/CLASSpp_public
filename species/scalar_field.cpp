@@ -583,23 +583,16 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
   }
 
   // ── attractor_ic_scf (y/n string) ────────────────────────────────────────
-  bool attractor_ic_scf    = true;
-  double phi_ini_scf       = 1.;
-  double phi_prime_ini_scf = 1.;
-  if (auto attr_opt = ctx.pfc->get<std::string>("attractor_ic_scf")) {
-    const std::string& attr_str = *attr_opt;
-    if (attr_str.find('y') != std::string::npos || attr_str.find('Y') != std::string::npos) {
-      attractor_ic_scf = true;
-    }
-    else {
-      attractor_ic_scf = false;
-      class_test_severe(scf_parameters.size() < 2,
-                        "Since you are not using attractor initial conditions, you must specify "
-                        "phi and its derivative phi' as the last two entries in scf_parameters. "
-                        "See explanatory.ini for more details.");
-      phi_ini_scf       = scf_parameters[scf_parameters.size() - 2];
-      phi_prime_ini_scf = scf_parameters[scf_parameters.size() - 1];
-    }
+  const bool attractor_ic_scf = ctx.pfc->get_yes("attractor_ic_scf", true);
+  double phi_ini_scf          = 1.;
+  double phi_prime_ini_scf    = 1.;
+  if (!attractor_ic_scf) {
+    class_test_severe(scf_parameters.size() < 2,
+                      "Since you are not using attractor initial conditions, you must specify "
+                      "phi and its derivative phi' as the last two entries in scf_parameters. "
+                      "See explanatory.ini for more details.");
+    phi_ini_scf       = scf_parameters[scf_parameters.size() - 2];
+    phi_prime_ini_scf = scf_parameters[scf_parameters.size() - 1];
   }
 
   auto species = std::make_unique<ScalarFieldSpecies>(*ctx.pba,
@@ -657,12 +650,10 @@ std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ct
   const double theta = *theta_opt;
 
   // A (1-cos)^n potential has no exponential attractor: frozen ICs are forced.
-  if (auto attr = ctx.pfc->get<std::string>("attractor_ic_scf")) {
-    class_test_severe(attr->find("y") != std::string::npos || attr->find("Y") != std::string::npos,
-                      "attractor_ic_scf = yes is incompatible with scf_potential = axion "
-                      "(frozen ICs phi = Theta_initial_scf * f_axion, phi' = 0 are set "
-                      "automatically)");
-  }
+  class_test_severe(ctx.pfc->get_yes("attractor_ic_scf"),
+                    "attractor_ic_scf = yes is incompatible with scf_potential = axion "
+                    "(frozen ICs phi = Theta_initial_scf * f_axion, phi' = 0 are set "
+                    "automatically)");
   class_test_severe(ctx.pfc->get<std::vector<double>>("scf_parameters").has_value(),
                     "scf_parameters is not used with scf_potential = axion; "
                     "give m_axion, f_axion, n_axion, Theta_initial_scf instead");

@@ -125,6 +125,9 @@ cdef ClassConstants constvals
 #   G_eff_today, gamma_PPN_minus_1              -- scalar-tensor: Cavendish Newton constant
 #                                                  over the action's, and gamma_PPN - 1,
 #                                                  today, for a massless field.
+# Derived distances also offered in units of Mpc/h, under the name with '_h' appended.
+_H_SCALED_DISTANCES = frozenset(('rs_rec_h', 'ds_rec_h', 'ra_rec_h', 'da_rec_h', 'ds_d_h', 'rs_d_h'))
+
 _SPECIES_DERIVED_FIELDS = frozenset((
     'f_peak', 'a_peak', 'z_peak',
     'a_c', 'n_axion', 'm_fld', 'alpha_fld', 'omega_axion',
@@ -408,8 +411,7 @@ cdef class PyCosmology:
             return True
     property Omega_nu:
         def __get__(self):
-            ibg = deref(self._cosmo()).GetBackgroundModule()
-            return deref(ibg).GetOmega0NcdmTot()
+            return self._background().GetOmega0NcdmTot()
     property nonlinear_method:
         def __get__(self):
             return self.nl().method
@@ -453,44 +455,48 @@ cdef class PyCosmology:
     # the InputModule instance on first use; fetching through GetInputModule()
     # on every access is the only way a cached pointer cannot go stale.
     cdef const precision* pr(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).precision_
+        return &deref(deref(self._cosmo()).GetInputModule()).precision_
 
     cdef const background* ba(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).background_
+        return &deref(deref(self._cosmo()).GetInputModule()).background_
 
     cdef const thermo* th(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).thermodynamics_
+        return &deref(deref(self._cosmo()).GetInputModule()).thermodynamics_
 
     cdef const perturbs* pt(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).perturbations_
+        return &deref(deref(self._cosmo()).GetInputModule()).perturbations_
 
     cdef const primordial* pm(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).primordial_
+        return &deref(deref(self._cosmo()).GetInputModule()).primordial_
 
     cdef const nonlinear* nl(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).nonlinear_
+        return &deref(deref(self._cosmo()).GetInputModule()).nonlinear_
 
     cdef const transfers* tr(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).transfers_
+        return &deref(deref(self._cosmo()).GetInputModule()).transfers_
 
     cdef const spectra* sp(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).spectra_
+        return &deref(deref(self._cosmo()).GetInputModule()).spectra_
 
     cdef const lensing* le(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).lensing_
+        return &deref(deref(self._cosmo()).GetInputModule()).lensing_
 
     cdef const output* op(self) except NULL:
-        input_module = deref(self._cosmo()).GetInputModule()
-        return &deref(input_module).output_
+        return &deref(deref(self._cosmo()).GetInputModule()).output_
+
+    # The computed modules, each built on first use: a caller asking for one
+    # thermodynamics number must not pay for the perturbations.
+    cdef const BackgroundModule* _background(self) except NULL:
+        return deref(self._cosmo()).GetBackgroundModule().get()
+
+    cdef const ThermodynamicsModule* _thermo(self) except NULL:
+        return deref(self._cosmo()).GetThermodynamicsModule().get()
+
+    cdef const PrimordialModule* _primordial(self) except NULL:
+        return deref(self._cosmo()).GetPrimordialModule().get()
+
+    cdef const NonlinearModule* _nonlinear(self) except NULL:
+        return deref(self._cosmo()).GetNonlinearModule().get()
 
     cdef _update_fc_from_pars(self):
         cdef:
@@ -736,8 +742,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.pk_general(k, z, deref(nonlinear_module).index_pk_m_, self._pk_output_default())
+        return self.pk_general(k, z, self._nonlinear().index_pk_m_, self._pk_output_default())
 
     # Gives the cdm+b pk for a given (k,z)
     cpdef pk_cb(self, double k, double z):
@@ -750,8 +755,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.pk_general(k, z, deref(nonlinear_module).index_pk_cluster_, self._pk_output_default())
+        return self.pk_general(k, z, self._nonlinear().index_pk_cluster_, self._pk_output_default())
 
     # Gives the total matter pk for a given (k,z)
     cpdef pk_lin(self, double k, double z):
@@ -764,8 +768,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.pk_general(k, z, deref(nonlinear_module).index_pk_m_, pk_linear)
+        return self.pk_general(k, z, self._nonlinear().index_pk_m_, pk_linear)
 
     # Gives the cdm+b pk for a given (k,z)
     cpdef pk_cb_lin(self,double k,double z):
@@ -778,8 +781,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.pk_general(k, z, deref(nonlinear_module).index_pk_cluster_, pk_linear)
+        return self.pk_general(k, z, self._nonlinear().index_pk_cluster_, pk_linear)
 
     cdef get_pk_general(self, double[:,:,::1] k, double[::1] z, Py_ssize_t k_size, Py_ssize_t z_size, Py_ssize_t mu_size, Py_ssize_t index_pk, pk_outputs linear_or_nonlinear):
         cdef:
@@ -802,23 +804,19 @@ cdef class PyCosmology:
 
     cpdef get_pk(self, double[:,:,::1] k, double[::1] z, Py_ssize_t k_size, Py_ssize_t z_size, Py_ssize_t mu_size):
         """ Fast function to get the power spectrum on a k and z array """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_m_, self._pk_output_default())
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._nonlinear().index_pk_m_, self._pk_output_default())
 
     cpdef get_pk_cb(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the power spectrum on a k and z array """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_cluster_, self._pk_output_default())
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._nonlinear().index_pk_cluster_, self._pk_output_default())
 
     cpdef get_pk_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_m_, pk_linear)
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._nonlinear().index_pk_m_, pk_linear)
 
     cpdef get_pk_cb_lin(self, double[:,:,::1] k, double[::1] z, int k_size, int z_size, int mu_size):
         """ Fast function to get the linear power spectrum on a k and z array """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.get_pk_general(k, z, k_size, z_size, mu_size, deref(nonlinear_module).index_pk_cluster_, pk_linear)
+        return self.get_pk_general(k, z, k_size, z_size, mu_size, self._nonlinear().index_pk_cluster_, pk_linear)
 
     def _z_grid_for_output(self):
         """The redshifts P(k,z) and T_i(k,z) are tabulated at, decreasing to 0.
@@ -1020,8 +1018,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.sigma_general(R, z, deref(nonlinear_module).index_pk_m_, h_units)
+        return self.sigma_general(R, z, self._nonlinear().index_pk_m_, h_units)
 
     # Gives sigma(R, z) for a given (R, z)
     cpdef sigma_cb(self, double R, double z, bint h_units=False):
@@ -1038,8 +1035,7 @@ cdef class PyCosmology:
             because otherwise a segfault will occur
 
         """
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        return self.sigma_general(R, z, deref(nonlinear_module).index_pk_cluster_, h_units)
+        return self.sigma_general(R, z, self._nonlinear().index_pk_cluster_, h_units)
 
     def effective_f_sigma8(self, z, z_step=0.1):
         """
@@ -1089,49 +1085,39 @@ cdef class PyCosmology:
 
 
     cpdef age(self):
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        return deref(background_module).age_
+        return self._background().age_
 
     cpdef h(self):
         return self.ba().h
 
     cpdef n_s(self):
-        primordial_module = deref(self._cosmo()).GetPrimordialModule()
-        return deref(primordial_module).n_s_
+        return self._primordial().n_s_
 
     cpdef A_s(self):
-        primordial_module = deref(self._cosmo()).GetPrimordialModule()
-        return deref(primordial_module).A_s_
+        return self._primordial().A_s_
 
     cpdef tau_reio(self):
-        thm = deref(self._cosmo()).GetThermodynamicsModule()
-        return deref(thm).tau_reionization_
+        return self._thermo().tau_reionization_
 
     cpdef Omega_m(self):
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        return deref(background_module).Omega0_m_
+        return self._background().Omega0_m_
 
     cpdef Omega_r(self):
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        return deref(background_module).Omega0_r_
+        return self._background().Omega0_r_
 
     cpdef theta_s_100(self):
-        thm = deref(self._cosmo()).GetThermodynamicsModule()
-        return 100.*deref(thm).rs_rec_/deref(thm).ra_rec_
+        return 100.*self._thermo().rs_rec_/self._thermo().ra_rec_
 
     cpdef theta_star_100(self):
-        thm = deref(self._cosmo()).GetThermodynamicsModule()
-        return 100.*deref(thm).rs_star_/deref(thm).ra_star_
+        return 100.*self._thermo().rs_star_/self._thermo().ra_star_
 
     cpdef theta_d_100(self):
         if (self.th().compute_damping_scale == constvals.sFALSE):
             raise CosmoSevereError(r"Photon damping scale has not been computed - you must add 'compute damping scale':'yes'.")
-        thm = deref(self._cosmo()).GetThermodynamicsModule()
-        return 100.*deref(thm).rd_rec_/deref(thm).ra_rec_
+        return 100.*self._thermo().rd_rec_/self._thermo().ra_rec_
 
     cpdef Omega_Lambda(self):
-        bam = deref(self._cosmo()).GetBackgroundModule()
-        return deref(bam).GetOmega0Species(b"Lambda")
+        return self._background().GetOmega0Species(b"Lambda")
 
     cpdef Omega_g(self):
         return self.ba().Omega0_g
@@ -1143,36 +1129,28 @@ cdef class PyCosmology:
         return self.ba().Omega0_b*self.ba().h*self.ba().h
 
     cpdef Neff(self):
-        bam = deref(self._cosmo()).GetBackgroundModule()
-        return deref(bam).Neff_
+        return self._background().Neff_
 
     cpdef f_idr_drmd(self):
-        bam = deref(self._cosmo()).GetBackgroundModule()
-        return deref(bam).f_idr_drmd()
+        return self._background().f_idr_drmd()
 
     cpdef z_dec_drmd(self):
-        bam = deref(self._cosmo()).GetBackgroundModule()
-        return deref(bam).z_dec_drmd()
+        return self._background().z_dec_drmd()
 
     cpdef k_eq(self):
-        bam = deref(self._cosmo()).GetBackgroundModule()
-        return deref(bam).a_eq_*deref(bam).H_eq_
+        return self._background().a_eq_*self._background().H_eq_
 
     cpdef sigma8(self):
-        nlm = deref(self._cosmo()).GetNonlinearModule()
-        return deref(nlm).GetSigma8(deref(nlm).index_pk_m_)
+        return self._nonlinear().GetSigma8(self._nonlinear().index_pk_m_)
 
     cpdef sigma8_cb(self):
-        nlm = deref(self._cosmo()).GetNonlinearModule()
-        return deref(nlm).GetSigma8(deref(nlm).index_pk_cluster_)
+        return self._nonlinear().GetSigma8(self._nonlinear().index_pk_cluster_)
 
     cpdef rs_drag(self):
-        thm = deref(self._cosmo()).GetThermodynamicsModule()
-        return deref(thm).rs_d_
+        return self._thermo().rs_d_
 
     cpdef z_reio(self):
-        thm = deref(self._cosmo()).GetThermodynamicsModule()
-        return deref(thm).z_reionization_
+        return self._thermo().z_reionization_
 
     cdef get_background_value_at_z(self, double z, int index_bg):
         cdef:
@@ -1777,244 +1755,202 @@ cdef class PyCosmology:
 
         derived = {}
         for name in names:
-            if name == 'h':
+            # rs_rec_h = rs_rec * h, and likewise for the other distances below
+            key, scale = name, 1.
+            if name in _H_SCALED_DISTANCES:
+                key, scale = name[:-2], self.ba().h
+            if key == 'h':
                 value = self.ba().h
-            elif name == 'H0':
+            elif key == 'H0':
                 value = self.ba().h*100
-            elif name == 'Omega0_lambda' or name == 'Omega_Lambda':
-                bam_l = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(bam_l).GetOmega0Species(b"Lambda")
-            elif name == 'Omega0_fld':
-                bam_f = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(bam_f).GetOmega0Species(b"Fluid")
-            elif name == 'age':
+            elif key == 'Omega0_lambda' or key == 'Omega_Lambda':
+                value = self._background().GetOmega0Species(b"Lambda")
+            elif key == 'Omega0_fld':
+                value = self._background().GetOmega0Species(b"Fluid")
+            elif key == 'age':
                 value = self.age()
-            elif name == 'conformal_age':
-                background_module = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(background_module).conformal_age_
+            elif key == 'conformal_age':
+                value = self._background().conformal_age_
             #TODO: Need to wrap NCDM class to get the masses
-            #elif name == 'm_ncdm_in_eV':
+            #elif key == 'm_ncdm_in_eV':
             #    value = self.ba().m_ncdm_in_eV[0]
-            elif name == 'm_ncdm_tot':
+            elif key == 'm_ncdm_tot':
                 # TODO: Is this really what we want??
-                ibg = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(ibg).GetOmega0NcdmTot()*self.ba().h*self.ba().h*93.14
-            elif name == 'Neff':
+                value = self._background().GetOmega0NcdmTot()*self.ba().h*self.ba().h*93.14
+            elif key == 'Neff':
                 value = self.Neff()
-            elif name == 'Omega_m':
+            elif key == 'Omega_m':
                 value = self.Omega_m()
-            elif name == 'omega_m':
+            elif key == 'omega_m':
                 value = self.Omega_m()/self.ba().h/self.ba().h
-            elif name == 'Omega_g':
+            elif key == 'Omega_g':
                 value = self.ba().Omega0_g
-            elif name == 'xi_idr':
-                bam_xi_idr = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(bam_xi_idr).GetSpeciesParam(b"IDM_DR_IDR", b"T_idr")/self.ba().T_cmb
-            elif name == 'N_dg':
-                bam_idr = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(bam_idr).GetOmega0Species(b"IDR")/self.ba().Omega0_g*8./7.*pow(11./4.,4./3.)
-            elif name == 'Gamma_0_nadm':
-                bam_idr2 = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(bam_idr2).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")*(4./3.)*(self.ba().h*self.ba().h*deref(bam_idr2).GetOmega0Species(b"IDR"))
-            elif name == 'a_dark':
-                bam_a_dark = deref(self._cosmo()).GetBackgroundModule()
-                value = deref(bam_a_dark).GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")
-            elif name == 'tau_reio':
+            elif key == 'xi_idr':
+                value = self._background().GetSpeciesParam(b"IDM_DR_IDR", b"T_idr")/self.ba().T_cmb
+            elif key == 'N_dg':
+                value = self._background().GetOmega0Species(b"IDR")/self.ba().Omega0_g*8./7.*pow(11./4.,4./3.)
+            elif key == 'Gamma_0_nadm':
+                bam = self._background()
+                value = bam.GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")*(4./3.)*(self.ba().h*self.ba().h*bam.GetOmega0Species(b"IDR"))
+            elif key == 'a_dark':
+                value = self._background().GetSpeciesParam(b"IDM_DR_IDR", b"a_idm_dr")
+            elif key == 'tau_reio':
                 value = self.tau_reio()
-            elif name == 'z_reio':
+            elif key == 'z_reio':
                 value = self.z_reio()
-            elif name == 'z_rec':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).z_rec_
-            elif name == 'tau_rec':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).tau_rec_
-            elif name == 'rs_rec':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).rs_rec_
-            elif name == 'rs_rec_h':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).rs_rec_*self.ba().h
-            elif name == 'ds_rec':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_rec_
-            elif name == 'ds_rec_h':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_rec_*self.ba().h
-            elif name == 'ra_rec':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ra_rec_
-            elif name == 'ra_rec_h':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ra_rec_*self.ba().h
-            elif name == 'da_rec':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).da_rec_
-            elif name == 'da_rec_h':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).da_rec_*self.ba().h
-            elif name == 'z_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).z_star_
-            elif name == 'tau_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).tau_star_
-            elif name == 'rs_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).rs_star_
-            elif name == 'ds_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_star_
-            elif name == 'ra_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ra_star_
-            elif name == 'da_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).da_star_
-            elif name == 'rd_star':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).rd_star_
-            elif name == 'z_d':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).z_d_
-            elif name == 'tau_d':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).tau_d_
-            elif name == 'ds_d':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_d_
-            elif name == 'ds_d_h':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).ds_d_*self.ba().h
-            elif name == 'rs_d':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).rs_d_
-            elif name == 'rs_d_h':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                rs_d = deref(thermodynamics_module).rs_d_
-                value = rs_d*self.ba().h
-            elif name == '100*theta_s':
+            elif key == 'z_rec':
+                value = self._thermo().z_rec_
+            elif key == 'tau_rec':
+                value = self._thermo().tau_rec_
+            elif key == 'rs_rec':
+                value = self._thermo().rs_rec_
+            elif key == 'ds_rec':
+                value = self._thermo().ds_rec_
+            elif key == 'ra_rec':
+                value = self._thermo().ra_rec_
+            elif key == 'da_rec':
+                value = self._thermo().da_rec_
+            elif key == 'z_star':
+                value = self._thermo().z_star_
+            elif key == 'tau_star':
+                value = self._thermo().tau_star_
+            elif key == 'rs_star':
+                value = self._thermo().rs_star_
+            elif key == 'ds_star':
+                value = self._thermo().ds_star_
+            elif key == 'ra_star':
+                value = self._thermo().ra_star_
+            elif key == 'da_star':
+                value = self._thermo().da_star_
+            elif key == 'rd_star':
+                value = self._thermo().rd_star_
+            elif key == 'z_d':
+                value = self._thermo().z_d_
+            elif key == 'tau_d':
+                value = self._thermo().tau_d_
+            elif key == 'ds_d':
+                value = self._thermo().ds_d_
+            elif key == 'rs_d':
+                value = self._thermo().rs_d_
+            elif key == '100*theta_s':
                 value = self.theta_s_100()
-            elif name == '100*theta_star':
+            elif key == '100*theta_star':
                 value = self.theta_star_100()
-            elif name == '100*theta_d':
+            elif key == '100*theta_d':
                 value = self.theta_d_100()
-            elif name == 'YHe':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).YHe_
-            elif name in ('D_H', 'He3_H', 'Li7_H', 'Li6_H', 'eta10'):
+            elif key == 'YHe':
+                value = self._thermo().YHe_
+            elif key in ('D_H', 'He3_H', 'Li7_H', 'Li6_H', 'eta10'):
                 # Primordial abundances from the solved BBN network. The
                 # interpolation table yields Y_He alone, so asking for these
                 # without 'YHe = network' is a request the run cannot answer;
                 # say so rather than returning a zero that looks like a result.
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                if not deref(thermodynamics_module).bbn_network_ran_:
+                thm = self._thermo()
+                if not thm.bbn_network_ran_:
                     raise CosmoSevereError(
                         "%s is only computed by the solved BBN network. Set "
                         "'YHe' to 'network' to obtain it; the sBBN interpolation "
-                        "table provides Y_He only." % name)
-                if name == 'D_H':
-                    value = deref(thermodynamics_module).DoverH_
-                elif name == 'He3_H':
-                    value = deref(thermodynamics_module).He3overH_
-                elif name == 'Li7_H':
-                    value = deref(thermodynamics_module).Li7overH_
-                elif name == 'Li6_H':
-                    value = deref(thermodynamics_module).Li6overH_
+                        "table provides Y_He only." % key)
+                if key == 'D_H':
+                    value = thm.DoverH_
+                elif key == 'He3_H':
+                    value = thm.He3overH_
+                elif key == 'Li7_H':
+                    value = thm.Li7overH_
+                elif key == 'Li6_H':
+                    value = thm.Li6overH_
                 else:
-                    value = deref(thermodynamics_module).bbn_eta10_
-            elif name == 'n_e':
-                thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-                value = deref(thermodynamics_module).n_e_
-            elif name == 'A_s':
+                    value = thm.bbn_eta10_
+            elif key == 'n_e':
+                value = self._thermo().n_e_
+            elif key == 'A_s':
                 value = self.A_s()
-            elif name == 'ln10^{10}A_s':
+            elif key == 'ln10^{10}A_s':
                 value = log(1.e10*self.A_s())
-            elif name == 'n_s':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).n_s_
-            elif name == 'alpha_s':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).alpha_s_
-            elif name == 'beta_s':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).beta_s_
-            elif name == 'r':
+            elif key == 'n_s':
+                value = self._primordial().n_s_
+            elif key == 'alpha_s':
+                value = self._primordial().alpha_s_
+            elif key == 'beta_s':
+                value = self._primordial().beta_s_
+            elif key == 'r':
                 # This is at the pivot scale
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).r_
-            elif name == 'r_0002':
+                value = self._primordial().r_
+            elif key == 'r_0002':
                 # at k_pivot = 0.002/Mpc
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                r = deref(primordial_module).r_
-                n_s = deref(primordial_module).n_s_
-                n_t = deref(primordial_module).n_t_
-                alpha_s = deref(primordial_module).alpha_s_
-                value = r*(0.002/self.pm().k_pivot)**(n_t - n_s - 1 + 0.5*alpha_s*log(0.002/self.pm().k_pivot))
-            elif name == 'n_t':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).n_t_
-            elif name == 'alpha_t':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).alpha_t_
-            elif name == 'V_0':
+                prm = self._primordial()
+                value = prm.r_*(0.002/self.pm().k_pivot)**(prm.n_t_ - prm.n_s_ - 1 + 0.5*prm.alpha_s_*log(0.002/self.pm().k_pivot))
+            elif key == 'n_t':
+                value = self._primordial().n_t_
+            elif key == 'alpha_t':
+                value = self._primordial().alpha_t_
+            elif key == 'V_0':
                 value = self.pm().V0
-            elif name == 'V_1':
+            elif key == 'V_1':
                 value = self.pm().V1
-            elif name == 'V_2':
+            elif key == 'V_2':
                 value = self.pm().V2
-            elif name == 'V_3':
+            elif key == 'V_3':
                 value = self.pm().V3
-            elif name == 'V_4':
+            elif key == 'V_4':
                 value = self.pm().V4
-            elif name == 'epsilon_V':
+            elif key in ('epsilon_V', 'eta_V', 'ksi_V^2'):
                 epsilons = self.get_slowroll_parameters()
                 eps1, eps2, eps23 = epsilons
-                value = eps1*((1. - eps1/3. + eps2/6.)/(1. - eps1/3.))**2
-            elif name == 'eta_V':
-                epsilons = self.get_slowroll_parameters()
-                eps1, eps2, eps23 = epsilons
-                value = (2.*eps1 - eps2/2. - 2./3.*eps1**2 + 5./6.*eps1*eps2 - eps2**2/12. - eps23/6.)/(1. - eps1/3.)
-            elif name == 'ksi_V^2':
-                epsilons = self.get_slowroll_parameters()
-                eps1, eps2, eps23 = epsilons
-                value = 2.*(1. - eps1/3. + eps2/6.)*(2.*eps1**2 - 3./2.*eps1*eps2 + eps23/4.)/(1. - eps1/3.)**2
-            elif name == 'exp_m_2_tau_As':
+                if key == 'epsilon_V':
+                    value = eps1*((1. - eps1/3. + eps2/6.)/(1. - eps1/3.))**2
+                elif key == 'eta_V':
+                    value = (2.*eps1 - eps2/2. - 2./3.*eps1**2 + 5./6.*eps1*eps2 - eps2**2/12. - eps23/6.)/(1. - eps1/3.)
+                else:
+                    value = 2.*(1. - eps1/3. + eps2/6.)*(2.*eps1**2 - 3./2.*eps1*eps2 + eps23/4.)/(1. - eps1/3.)**2
+            elif key == 'exp_m_2_tau_As':
                 value = exp(-2*self.tau_reio())*self.A_s()
-            elif name == 'phi_min':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).phi_min_
-            elif name == 'phi_max':
-                primordial_module = deref(self._cosmo()).GetPrimordialModule()
-                value = deref(primordial_module).phi_max_
-            elif name == 'sigma8':
+            elif key == 'phi_min':
+                value = self._primordial().phi_min_
+            elif key == 'phi_max':
+                value = self._primordial().phi_max_
+            elif key == 'sigma8':
                 value = self.sigma8()
-            elif name == 'sigma8_cb':
+            elif key == 'sigma8_cb':
                 value = self.sigma8_cb()
-            elif name == 'k_eq':
+            elif key == 'k_eq':
                 value = self.k_eq()
-            elif name == 'z_dec_drmd':
+            elif key == 'z_dec_drmd':
                 value = self.z_dec_drmd()
-            elif name == 'f_idr_drmd':
+            elif key == 'f_idr_drmd':
                 value = self.f_idr_drmd()
-            elif '.' in name and name.rpartition('.')[2] in _SPECIES_DERIVED_FIELDS:
-                instance, _, field = name.rpartition('.')
-                background_module = deref(self._cosmo()).GetBackgroundModule()
-                if not deref(background_module).HasSpecies(instance.encode('utf-8')):
+            elif '.' in key and key.rpartition('.')[2] in _SPECIES_DERIVED_FIELDS:
+                instance, _, field = key.rpartition('.')
+                bam = self._background()
+                if not bam.HasSpecies(instance.encode('utf-8')):
                     raise CosmoSevereError(
                         "%s is not a derived parameter of this cosmology: it has "
-                        "no species '%s'" % (name, instance))
-                if not deref(background_module).HasSpeciesParam(
-                        instance.encode('utf-8'), field.encode('utf-8')):
+                        "no species '%s'" % (key, instance))
+                if not bam.HasSpeciesParam(instance.encode('utf-8'), field.encode('utf-8')):
                     raise CosmoSevereError(
                         "%s is not a derived parameter of this cosmology: species "
-                        "'%s' does not report '%s'" % (name, instance, field))
-                value = deref(background_module).GetSpeciesParam(
-                    instance.encode('utf-8'), field.encode('utf-8'))
+                        "'%s' does not report '%s'" % (key, instance, field))
+                value = bam.GetSpeciesParam(instance.encode('utf-8'), field.encode('utf-8'))
             else:
                 raise CosmoSevereError("%s was not recognized as a derived parameter" % name)
-            derived[name] = value
+            derived[name] = value*scale
         return derived
+
+    cdef _nonlinear_scales(self, double[::1] z, Py_ssize_t z_size, bint cb):
+        cdef:
+            Py_ssize_t index_z
+            double k_nl_val
+            double k_nl_cb_val
+            double[:] k_nl
+
+        k_nl_arr = np.empty(z_size, np.double)
+        k_nl = k_nl_arr
+        nonlinear_module = self._nonlinear()
+        for index_z in range(z_size):
+            nonlinear_module.nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
+            k_nl[index_z] = k_nl_cb_val if cb else k_nl_val
+
+        return k_nl_arr
 
     cpdef nonlinear_scale(self, double[::1] z, Py_ssize_t z_size):
         """
@@ -2030,29 +1966,14 @@ cdef class PyCosmology:
         z_size : int
                 Size of the redshift array
         """
-        cdef:
-            Py_ssize_t index_z
-            double k_nl_val
-            double k_nl_cb_val
-            double[:] k_nl
-
-        k_nl_arr = np.empty(z_size, np.double)
-        k_nl = k_nl_arr
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        for index_z in range(z_size):
-            deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
-            k_nl[index_z] = k_nl_val
-
-        return k_nl_arr
+        return self._nonlinear_scales(z, z_size, False)
 
     cpdef nonlinear_scale_cb(self, double[::1] z, Py_ssize_t z_size):
         """
-
         nonlinear_scale_cb(z, z_size)
 
-        Return the nonlinear scale for all the redshift specified in z, of size
-
-        z_size
+        Return the nonlinear scale of the cdm+baryon spectrum for all the
+        redshift specified in z, of size z_size
 
         Parameters
         ----------
@@ -2061,20 +1982,7 @@ cdef class PyCosmology:
         z_size : int
                 Size of the redshift array
         """
-        cdef:
-            Py_ssize_t index_z
-            double k_nl_val
-            double k_nl_cb_val
-            double[:] k_nl_cb
-
-        k_nl_cb_arr = np.empty(z_size, np.double)
-        k_nl_cb = k_nl_cb_arr
-        nonlinear_module = deref(self._cosmo()).GetNonlinearModule()
-        for index_z in range(z_size):
-            deref(nonlinear_module).nonlinear_k_nl_at_z(z[index_z], &k_nl_val, &k_nl_cb_val)
-            k_nl_cb[index_z] = k_nl_cb_val
-
-        return k_nl_cb_arr
+        return self._nonlinear_scales(z, z_size, True)
 
     def __call__(self, ctx):
         """
@@ -2143,5 +2051,4 @@ cdef class PyCosmology:
         return self.ba().Omega0_k
 
     cpdef Omega0_cdm(self):
-        bam = deref(self._cosmo()).GetBackgroundModule()
-        return deref(bam).GetOmega0Species(b"CDM")
+        return self._background().GetOmega0Species(b"CDM")

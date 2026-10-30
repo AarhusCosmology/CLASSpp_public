@@ -1,6 +1,8 @@
 #include "parser.h"
 
 #include <cassert>
+#include <optional>
+#include <stdexcept>
 
 static void test_instances_with_basic() {
   FileContent fc;
@@ -26,7 +28,6 @@ static void test_instances_with_basic() {
   assert(!fc.was_read("nu3.type"));
 }
 
-#include <stdexcept>
 #include <string>
 
 #include "species/species_input.h"
@@ -116,6 +117,45 @@ static void test_get_parse_error_throws() {
     threw = true;
   }
   assert(threw);
+}
+
+template <class F>
+static bool throws(F f) {
+  try {
+    f();
+  }
+  catch (const std::exception&) {
+    return true;
+  }
+  return false;
+}
+
+static void test_yes_no_flags() {
+  FileContent fc;
+  fc.set("a", "yes");
+  fc.set("b", "No");
+  fc.set("c", "ok"); /* neither a y nor an n */
+  assert(fc.get_yes("a"));
+  assert(!fc.get_yes("b", true));     /* present without a 'y' */
+  assert(fc.get_yes("absent", true)); /* absent: the fallback */
+  assert(fc.get_yes_no("a") == std::optional<bool>(true));
+  assert(fc.get_yes_no("b") == std::optional<bool>(false));
+  assert(!fc.get_yes_no("absent").has_value());
+  assert(throws([&] { (void) fc.get_yes_no("c"); }));
+}
+
+static void test_read_choice() {
+  enum class Shape { round, square };
+  FileContent fc;
+  fc.set("shape", "square");
+  fc.set("bad", "triangle");
+  Shape shape = Shape::round;
+  fc.read_choice("absent", shape, {{"square", Shape::square}});
+  assert(shape == Shape::round);
+  fc.read_choice("shape", shape, {{"round", Shape::round}, {"square", Shape::square}});
+  assert(shape == Shape::square);
+  assert(fc.was_read("shape"));
+  assert(throws([&] { fc.read_choice("bad", shape, {{"round", Shape::round}}); }));
 }
 
 static void test_dot_baryons_translation() {
@@ -268,6 +308,8 @@ int main() {
   test_species_input_required_throws();
   test_get_typed();
   test_get_parse_error_throws();
+  test_yes_no_flags();
+  test_read_choice();
   test_dot_baryons_translation();
   test_dot_name_is_ignored();
   test_dot_fluid_full_set();

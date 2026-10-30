@@ -32,16 +32,6 @@ struct spectra {
 
   //@{
 
-  struct nonlinear* pnl = nullptr; /**< a pointer to the nonlinear structure is
-                            stored in the spectra structure. This odd,
-                            unusual and unelegant feature has been
-                            introduced in v2.8 in order to keep in use
-                            some deprecated functions spectra_pk_...()
-                            that are now pointing at new function
-                            nonlinear_pk_...(). In the future, if the
-                            deprecated functions are removed, it will
-                            be possible to remove also this pointer. */
-
   short spectra_verbose =
       0; /**< flag regulating the amount of information sent to standard output (none if set to zero) */
 

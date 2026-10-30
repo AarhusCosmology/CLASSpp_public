@@ -92,12 +92,6 @@ class DCDMSpecies : public BaseSpecies {
                                      const PerturbSwitchContext& ctx) const override;
 
   void RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) override;
-  int transfer_delta_index() const {
-    return index_tp_delta_;
-  }
-  int transfer_theta_index() const {
-    return index_tp_theta_;
-  }
 
   void FillSources(const BaseSpecies::PerturbLayout& base,
                    const double* y,

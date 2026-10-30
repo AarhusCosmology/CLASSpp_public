@@ -45,8 +45,7 @@
  * 5(4) pairs) are in docs/superpowers/specs/2026-08-06-etdrk4-perturbations-design.md.
  *
  * `derivs_diagonal` may be null, in which case the diagonal is taken as zero
- * throughout. minimum_variation, evaluate_timescale and timestep_over_timescale are
- * part of the shared CLASS evolver signature and unused here, as in rkdp45.
+ * throughout.
  */
 /** Exponential time differencing (ETDRK4).
  *

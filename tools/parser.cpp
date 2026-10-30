@@ -226,6 +226,26 @@ std::string FileContent::get_or(const std::string& name, const char* fallback) c
   return {fallback};
 }
 
+bool FileContent::get_yes(const std::string& name, bool fallback) const {
+  const auto value = get<std::string>(name);
+  return value ? (value->find_first_of("yY") != std::string::npos) : fallback;
+}
+
+std::optional<bool> FileContent::get_yes_no(const std::string& name) const {
+  const auto value = get<std::string>(name);
+  if (!value) {
+    return std::nullopt;
+  }
+  if (value->find_first_of("yY") != std::string::npos) {
+    return true;
+  }
+  class_test_severe(value->find_first_of("nN") == std::string::npos,
+                    "incomprehensible input '%s' for the field '%s': expected yes or no",
+                    value->c_str(),
+                    name.c_str());
+  return false;
+}
+
 /* static */ bool FileContent::parse_line(const std::string& line,
                                           std::string& name,
                                           std::string& value) {

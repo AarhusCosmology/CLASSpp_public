@@ -28,14 +28,6 @@ class LensingModule : public BaseModule {
   void lensing_addback_cl_tt(const double* cl_tt);
   void lensing_addback_cl_te(const double* cl_te);
   void lensing_addback_cl_ee_bb(const double* cl_ee, const double* cl_bb);
-  int lensing_X000(double* mu, int num_mu, int lmax, double* sigma2, double** X000);
-  int lensing_Xp000(double* mu, int num_mu, int lmax, double* sigma2, double** Xp000);
-  int lensing_X220(double* mu, int num_mu, int lmax, double* sigma2, double** X220);
-  int lensing_X022(double* mu, int num_mu, int lmax, double* sigma2, double** X022);
-  int lensing_Xp022(double* mu, int num_mu, int lmax, double* sigma2, double** Xp022);
-  int lensing_X121(double* mu, int num_mu, int lmax, double* sigma2, double** X121);
-  int lensing_X132(double* mu, int num_mu, int lmax, double* sigma2, double** X132);
-  int lensing_X242(double* mu, int num_mu, int lmax, double* sigma2, double** X242);
 
   /** @name - information on number of type of C_l's (TT, TE...) */
 

@@ -112,33 +112,6 @@ class SpectraModule : public BaseModule {
                           const double* limber_integration_weights,
                           double* transfer_ic1,
                           double* transfer_ic2);
-  int spectra_k_and_tau();
-  /* deprecated functions (since v2.8) */
-  void spectra_pk_at_z(enum linear_or_logarithmic mode,
-                       double z,
-                       double* output_tot,
-                       double* output_ic,
-                       double* output_cb_tot,
-                       double* output_cb_ic);
-  void spectra_pk_at_k_and_z(
-      double k, double z, double* pk, double* pk_ic, double* pk_cb, double* pk_cb_ic);
-  void spectra_pk_nl_at_z(enum linear_or_logarithmic mode,
-                          double z,
-                          double* output_tot,
-                          double* output_cb_tot);
-  void spectra_pk_nl_at_k_and_z(double k, double z, double* pk_tot, double* pk_cb_tot);
-  void spectra_fast_pk_at_kvec_and_zvec(double* kvec,
-                                        int kvec_size,
-                                        double* zvec,
-                                        int zvec_size,
-                                        double* pk_tot_out,
-                                        double* pk_cb_tot_out,
-                                        int nonlinear);
-  void spectra_sigma(double R, double z, double* sigma);
-  void spectra_sigma_cb(double R, double z, double* sigma_cb);
-  /* deprecated functions (since v2.1) */
-  void spectra_tk_at_z(double z, double* output);
-  void spectra_tk_at_k_and_z(double k, double z, double* output);
 
   PerturbationsModulePtr perturbations_module_;
   PrimordialModulePtr primordial_module_;

@@ -85,11 +85,7 @@ class BbnRates {
 inline constexpr double kReaclibT9Max = 10.0;
 
 inline constexpr double kMeVPerT9 = 8.617333262e-2; /* k_B * 10^9 K, in MeV */
-inline constexpr double kT9PerMeV = 1.0 / kMeVPerT9;
 
 constexpr double MeVFromT9(double T9) {
   return T9 * kMeVPerT9;
-}
-constexpr double T9FromMeV(double T) {
-  return T * kT9PerMeV;
 }

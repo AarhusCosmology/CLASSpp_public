@@ -704,20 +704,20 @@ void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
   /** - Spline it for interpolation along k */
 
   if (has_pk_m_) {
-    array_spline_table_columns2(ln_k_.data(),
-                                k_size_,
-                                ln_pk_table.data(),
-                                zvec_size,
-                                ddln_pk_table.data(),
-                                _SPLINE_NATURAL_);
+    array_spline_table_columns(ln_k_.data(),
+                               k_size_,
+                               ln_pk_table.data(),
+                               zvec_size,
+                               ddln_pk_table.data(),
+                               _SPLINE_NATURAL_);
   }
   if (has_pk_cb_) {
-    array_spline_table_columns2(ln_k_.data(),
-                                k_size_,
-                                ln_pk_cb_table.data(),
-                                zvec_size,
-                                ddln_pk_cb_table.data(),
-                                _SPLINE_NATURAL_);
+    array_spline_table_columns(ln_k_.data(),
+                               k_size_,
+                               ln_pk_cb_table.data(),
+                               zvec_size,
+                               ddln_pk_cb_table.data(),
+                               _SPLINE_NATURAL_);
   }
 
   /** - Construct ln(kvec): */
@@ -2247,50 +2247,6 @@ void NonlinearModule::nonlinear_sigmas(double R,
   }
 
   /** - free allocated array */
-}
-
-/**
- * This routine computes the variance of density fluctuations in a
- * sphere of radius R at redshift z, sigma(R,z) for one given pk type (_m, _cb).
- *
- * Try to use instead nonlinear_sigmas_at_z(). This function is just
- * maintained for compatibility with the deprecated function
- * spectra_sigma()
- *
- * The integral is performed until the maximum value of k_max defined
- * in the perturbation module. Here there is not automatic checking
- * that k_max is large enough for the result to be well
- * converged. E.g. to get an accurate sigma8 at R = 8 Mpc/h, the user
- * should pass at least about P_k_max_h/Mpc = 1.
- *
- * @param z            Input: redshift
- * @param index_pk     Input: type of pk (_m, _cb)
- * @param k_per_decade Input: logarithmic step for the integral (recommended: pass ppr->sigma_k_per_decade)
- * @param result       Output: result
- * @return the error status
- */
-
-void NonlinearModule::nonlinear_sigma_at_z(
-    double R, double z, int index_pk, double k_per_decade, double* result) const {
-  std::vector<double> out_pk(k_size_);
-  std::vector<double> ddout_pk(k_size_);
-
-  /** - get P(k,z) as a function of k, for the right z */
-
-  nonlinear_pk_at_z(logarithmic, pk_linear, z, index_pk, out_pk.data(), nullptr);
-
-  /** - spline it along k */
-
-  array_spline_table_columns(ln_k_.data(),
-                             k_size_,
-                             out_pk.data(),
-                             1,
-                             ddout_pk.data(),
-                             _SPLINE_EST_DERIV_);
-
-  /** - calll the function computing the sigmas */
-
-  nonlinear_sigmas(R, out_pk.data(), ddout_pk.data(), k_size_, k_per_decade, out_sigma, result);
 }
 
 /**

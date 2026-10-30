@@ -768,9 +768,7 @@ void InputModule::WriteParameterFiles() {
 
   /** - eventually write all the read parameters in a file, unread parameters in another file, and warnings about unread parameters */
 
-  if (auto write_parameters = pfc->get<std::string>("write parameters");
-      write_parameters && ((write_parameters->find("y") != std::string::npos) ||
-                           (write_parameters->find("Y") != std::string::npos))) {
+  if (pfc->get_yes("write parameters")) {
     output* pop                   = &output_;
     std::string param_output_name = pop->root + "parameters.ini";
     std::string param_unused_name = pop->root + "unused_parameters";
@@ -807,12 +805,8 @@ void InputModule::WriteParameterFiles() {
 }
 
 void InputModule::RejectUnreadParameters(FileContent& fc) {
-  const auto is_yes = [](const std::optional<std::string>& value) {
-    return value &&
-           ((value->find('y') != std::string::npos) || (value->find('Y') != std::string::npos));
-  };
-  const bool allowed = is_yes(fc.get<std::string>("allow_unread_parameters"));
-  const bool warn    = is_yes(fc.get<std::string>("write warnings"));
+  const bool allowed = fc.get_yes("allow_unread_parameters");
+  const bool warn    = fc.get_yes("write warnings");
 
   const std::vector<std::string> unread = fc.unread_parameters();
   if (unread.empty()) {
@@ -1197,14 +1191,9 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   }
 
   /** - varying fundamental constants, with the keys of class_public */
-  if (auto varconst = pfc->get<std::string>("varying_fundamental_constants")) {
-    class_test_severe(*varconst != "none" && *varconst != "instantaneous",
-                      "varying_fundamental_constants = '%s' must be 'none' or 'instantaneous'",
-                      varconst->c_str());
-    if (*varconst == "instantaneous") {
-      pth->varconst_dep = varconst_instant;
-    }
-  }
+  pfc->read_choice("varying_fundamental_constants",
+                   pth->varconst_dep,
+                   {{"none", varconst_none}, {"instantaneous", varconst_instant}});
   if (pth->varconst_dep != varconst_none) {
     pth->varconst_alpha               = pfc->get_or("varying_alpha", pth->varconst_alpha);
     pth->varconst_me                  = pfc->get_or("varying_me", pth->varconst_me);
@@ -1220,23 +1209,11 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
                pth->varconst_transition_redshift);
   }
 
-  /** - how injected energy is split between deposition channels */
-  if (auto chi_type = pfc->get<std::string>("chi_type")) {
-    bool recognized = false;
-    if (*chi_type == "Galli_2013") {
-      pth->chi_type = deposition_Galli_2013;
-      recognized    = true;
-    }
-    if (*chi_type == "legacy") {
-      pth->chi_type = deposition_legacy;
-      recognized    = true;
-    }
-
-    class_test_severe(!recognized,
-                      "could not identify chi_type value, check that it is one of 'Galli_2013' "
-                      "(the tabulated fractions of Galli et al. 2013, the default) or 'legacy' "
-                      "(the analytic fits CLASS used before, for reproducing older results)");
-  }
+  /** - how injected energy is split between deposition channels: the tabulated fractions
+        of Galli et al. 2013 (the default), or the analytic fits CLASS used before */
+  pfc->read_choice("chi_type",
+                   pth->chi_type,
+                   {{"Galli_2013", deposition_Galli_2013}, {"legacy", deposition_legacy}});
 
   /** - three-zone baryon clumping; read whenever b is given, so b = 0 is an ordinary point */
   if (auto b = pfc->get<double>("baryon_clumping_b")) {
@@ -1252,39 +1229,14 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   }
 
   /** - reionization parametrization */
-  if (auto reio_parametrization = pfc->get<std::string>("reio_parametrization")) {
-    bool recognized = false;
-    if (*reio_parametrization == "reio_none") {
-      pth->reio_parametrization = reio_none;
-      recognized                = true;
-    }
-    if (*reio_parametrization == "reio_camb") {
-      pth->reio_parametrization = reio_camb;
-      recognized                = true;
-    }
-    if (*reio_parametrization == "reio_bins_tanh") {
-      pth->reio_parametrization = reio_bins_tanh;
-      recognized                = true;
-    }
-    if (*reio_parametrization == "reio_half_tanh") {
-      pth->reio_parametrization = reio_half_tanh;
-      recognized                = true;
-    }
-    if (*reio_parametrization == "reio_many_tanh") {
-      pth->reio_parametrization = reio_many_tanh;
-      recognized                = true;
-    }
-    if (*reio_parametrization == "reio_inter") {
-      pth->reio_parametrization = reio_inter;
-      recognized                = true;
-    }
-
-    class_test_severe(
-        !recognized,
-        "could not identify reionization_parametrization value, check that it is one of "
-        "'reio_none', 'reio_camb', 'reio_bins_tanh', 'reio_half_tanh', 'reio_many_tanh', "
-        "'reio_inter'...");
-  }
+  pfc->read_choice("reio_parametrization",
+                   pth->reio_parametrization,
+                   {{"reio_none", reio_none},
+                    {"reio_camb", reio_camb},
+                    {"reio_bins_tanh", reio_bins_tanh},
+                    {"reio_half_tanh", reio_half_tanh},
+                    {"reio_many_tanh", reio_many_tanh},
+                    {"reio_inter", reio_inter}});
 
   /** - reionization parameters if reio_parametrization=reio_camb */
   if ((pth->reio_parametrization == reio_camb) || (pth->reio_parametrization == reio_half_tanh)) {
@@ -1367,42 +1319,13 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
     pth->annihilation_f_halo    = pfc->get_or("annihilation_f_halo", pth->annihilation_f_halo);
     pth->annihilation_z_halo    = pfc->get_or("annihilation_z_halo", pth->annihilation_z_halo);
 
-    if (auto on_the_spot = pfc->get<std::string>("on the spot")) {
-      if ((on_the_spot->find("y") != std::string::npos) ||
-          (on_the_spot->find("Y") != std::string::npos)) {
-        pth->has_on_the_spot = true;
-      }
-      else {
-        if ((on_the_spot->find("n") != std::string::npos) ||
-            (on_the_spot->find("N") != std::string::npos)) {
-          pth->has_on_the_spot = false;
-        }
-        else {
-          class_stop_severe("incomprehensible input '%s' for the field 'on the spot'",
-                            on_the_spot->c_str());
-        }
-      }
-    }
+    pth->has_on_the_spot = pfc->get_yes_no("on the spot").value_or(pth->has_on_the_spot);
   }
 
   pth->decay = pfc->get_or("decay", pth->decay);
 
-  if (auto compute_damping_scale = pfc->get<std::string>("compute damping scale")) {
-    if ((compute_damping_scale->find("y") != std::string::npos) ||
-        (compute_damping_scale->find("Y") != std::string::npos)) {
-      pth->compute_damping_scale = true;
-    }
-    else {
-      if ((compute_damping_scale->find("n") != std::string::npos) ||
-          (compute_damping_scale->find("N") != std::string::npos)) {
-        pth->compute_damping_scale = false;
-      }
-      else {
-        class_stop_severe("incomprehensible input '%s' for the field 'compute damping scale'",
-                          compute_damping_scale->c_str());
-      }
-    }
-  }
+  pth->compute_damping_scale =
+      pfc->get_yes_no("compute damping scale").value_or(pth->compute_damping_scale);
 
   /** (c) define which perturbations and sources should be computed, and down to which scale */
 
@@ -1467,9 +1390,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   }
 
   if (ppt->has_density_transfers) {
-    if (auto extra = pfc->get<std::string>("extra metric transfer functions");
-        extra &&
-        ((extra->find("y") != std::string::npos) || (extra->find("y") != std::string::npos))) {
+    if (pfc->get_yes("extra metric transfer functions")) {
       ppt->has_metricpotential_transfers = true;
     }
   }
@@ -1539,9 +1460,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   if (ppt->has_perturbations) {
     /* perturbed recombination */
-    if (auto perturbed_recombination = pfc->get<std::string>("perturbed recombination");
-        perturbed_recombination && ((perturbed_recombination->find("y") != std::string::npos) ||
-                                    (perturbed_recombination->find("Y") != std::string::npos))) {
+    if (pfc->get_yes("perturbed recombination")) {
       ppt->has_perturbed_recombination = true;
     }
 
@@ -1632,37 +1551,14 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** (d) define the primordial spectrum */
 
-  if (auto P_k_ini_type = pfc->get<std::string>("P_k_ini type")) {
-    bool recognized = false;
-    if (*P_k_ini_type == "analytic_Pk") {
-      ppm->primordial_spec_type = analytic_Pk;
-      recognized                = true;
-    }
-    if (*P_k_ini_type == "two_scales") {
-      ppm->primordial_spec_type = two_scales;
-      recognized                = true;
-    }
-    if (*P_k_ini_type == "inflation_V") {
-      ppm->primordial_spec_type = inflation_V;
-      recognized                = true;
-    }
-    if (*P_k_ini_type == "inflation_H") {
-      ppm->primordial_spec_type = inflation_H;
-      recognized                = true;
-    }
-    if (*P_k_ini_type == "inflation_V_end") {
-      ppm->primordial_spec_type = inflation_V_end;
-      recognized                = true;
-    }
-    if (*P_k_ini_type == "external_Pk") {
-      ppm->primordial_spec_type = external_Pk;
-      recognized                = true;
-    }
-    class_test_severe(!recognized,
-                      "could not identify primordial spectrum type, check that it is one of "
-                      "'analytic_pk', 'two_scales', 'inflation_V', 'inflation_H', "
-                      "'external_Pk'...");
-  }
+  pfc->read_choice("P_k_ini type",
+                   ppm->primordial_spec_type,
+                   {{"analytic_Pk", analytic_Pk},
+                    {"two_scales", two_scales},
+                    {"inflation_V", inflation_V},
+                    {"inflation_H", inflation_H},
+                    {"inflation_V_end", inflation_V_end},
+                    {"external_Pk", external_Pk}});
 
   ppm->k_pivot = pfc->get_or("k_pivot", ppm->k_pivot);
 
@@ -2233,9 +2129,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
     }
   }
 
-  if (auto lensing = pfc->get<std::string>("lensing");
-      lensing &&
-      ((lensing->find("y") != std::string::npos) || (lensing->find("Y") != std::string::npos))) {
+  if (pfc->get_yes("lensing")) {
     if ((ppt->has_scalars) && ((ppt->has_cl_cmb_temperature) || (ppt->has_cl_cmb_polarization)) &&
         (ppt->has_cl_cmb_lensing_potential)) {
       ple->has_lensed_cls = true;
@@ -2302,9 +2196,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** Do we want density and velocity transfer functions in Nbody gauge? */
   if ((ppt->has_density_transfers) || (ppt->has_velocity_transfers)) {
-    if (auto nbody = pfc->get<std::string>("Nbody gauge transfer functions");
-        nbody &&
-        ((nbody->find("y") != std::string::npos) || (nbody->find("y") != std::string::npos))) {
+    if (pfc->get_yes("Nbody gauge transfer functions")) {
       ppt->has_Nbody_gauge_transfers = true;
     }
   }
@@ -2619,11 +2511,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
     pop->root = *root;
   }
 
-  if (auto headers = pfc->get<std::string>("headers");
-      headers &&
-      ((headers->find("y") == std::string::npos) && (headers->find("Y") == std::string::npos))) {
-    pop->write_header = false;
-  }
+  pop->write_header = pfc->get_yes("headers", pop->write_header);
 
   if (auto format = pfc->get<std::string>("format")) {
     if ((format->find("class") != std::string::npos) ||
@@ -2694,24 +2582,15 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
       /* version: 2016 (Mead et al. 2016) or 2020 (Mead et al. 2021), with the spellings that
          class_public documents. They are matched exactly: class_public searches for "20" in
          the string, so it reads, e.g., 2018 as 2020. */
-      if (auto version = pfc->get<std::string>("hmcode_version")) {
-        if ((*version == "2015") || (*version == "2016") || (*version == "15") ||
-            (*version == "16")) {
-          pnl->hmcode_version = HMcodeVersion::v2016;
-        }
-        else if ((*version == "2020") || (*version == "20")) {
-          pnl->hmcode_version = HMcodeVersion::v2020;
-        }
-        else if (*version == "2020_baryonic_feedback") {
-          pnl->hmcode_version = HMcodeVersion::v2020_baryonic_feedback;
-        }
-        else {
-          class_stop_severe(
-              "hmcode_version = '%s' is not one of 2016 (or 2015), 2020, "
-              "2020_baryonic_feedback",
-              version->c_str());
-        }
-      }
+      pfc->read_choice("hmcode_version",
+                       pnl->hmcode_version,
+                       {{"2016", HMcodeVersion::v2016},
+                        {"2015", HMcodeVersion::v2016},
+                        {"16", HMcodeVersion::v2016},
+                        {"15", HMcodeVersion::v2016},
+                        {"2020", HMcodeVersion::v2020},
+                        {"20", HMcodeVersion::v2020},
+                        {"2020_baryonic_feedback", HMcodeVersion::v2020_baryonic_feedback}});
 
       if (pnl->hmcode_version == HMcodeVersion::v2016) {
         auto feedback_model = pfc->get<std::string>("feedback model");
@@ -2922,17 +2801,13 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** - (i.1.) shall we write background quantities in a file? */
 
-  if (auto write_background = pfc->get<std::string>("write background");
-      write_background && ((write_background->find("y") != std::string::npos) ||
-                           (write_background->find("Y") != std::string::npos))) {
+  if (pfc->get_yes("write background")) {
     pop->write_background = true;
   }
 
   /** - (i.2.) shall we write thermodynamics quantities in a file? */
 
-  if (auto write_thermodynamics = pfc->get<std::string>("write thermodynamics");
-      write_thermodynamics && ((write_thermodynamics->find("y") != std::string::npos) ||
-                               (write_thermodynamics->find("Y") != std::string::npos))) {
+  if (pfc->get_yes("write thermodynamics")) {
     pop->write_thermodynamics = true;
   }
 
@@ -2964,9 +2839,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
 
   /** - (i.4.) shall we write primordial spectra in a file? */
 
-  if (auto write_primordial = pfc->get<std::string>("write primordial");
-      write_primordial && ((write_primordial->find("y") != std::string::npos) ||
-                           (write_primordial->find("Y") != std::string::npos))) {
+  if (pfc->get_yes("write primordial")) {
     pop->write_primordial = true;
   }
 
@@ -2987,9 +2860,7 @@ void InputModule::ReadDerived() {  // NOLINT(readability-function-size)
   if ((pnl->method == nl_halofit) && all_species_.contains("Fluid")) {
     const auto& fluid = static_cast<const FluidSpecies&>(*all_species_.at("Fluid"));
     if ((fluid.fluid_eos() == CLP) && (fluid.wa_fld() != 0.)) {
-      if (auto pk_eq = pfc->get<std::string>("pk_eq");
-          pk_eq &&
-          ((pk_eq->find("y") != std::string::npos) || (pk_eq->find("Y") != std::string::npos))) {
+      if (pfc->get_yes("pk_eq")) {
         pnl->has_pk_eq = true;
       }
     }
@@ -3284,7 +3155,6 @@ void precision::parse(const FileContent& fc) {
   read(fc, "curvature_ini", curvature_ini);
   read(fc, "entropy_ini", entropy_ini);
   read(fc, "gw_ini", gw_ini);
-  read(fc, "perturb_integration_stepsize", perturb_integration_stepsize);
   read(fc, "perturb_sampling_stepsize", perturb_sampling_stepsize);
   read(fc,
        "perturbations_sampling_boost_above_age_fraction",
@@ -3331,16 +3201,26 @@ void precision::parse(const FileContent& fc) {
                       "keys 'evolver_background' / 'evolver_thermodynamics' / "
                       "'evolver_perturbations' (each defaulting independently), not both");
 
+    const auto read_evolver = [&fc](const char* name, evolver_type& slot) {
+      read_enum(fc, name, slot);
+      const int value = static_cast<int>(slot);
+      class_test_severe(value < static_cast<int>(evolver_type::ndf15) ||
+                            value > static_cast<int>(evolver_type::tsit5),
+                        "%s = %d is not an evolver: use 1 (ndf15), 2 (rkdp45), 3 (etd) or 4 "
+                        "(tsit5). The fixed-step rk (0) was removed; rkdp45 replaces it.",
+                        name,
+                        value);
+    };
     if (has_blanket) {
       evolver_type all = evolver_background;  // any slot carries the shared default
-      read_enum(fc, "evolver", all);
+      read_evolver("evolver", all);
       evolver_background     = all;
       evolver_thermodynamics = all;
       evolver_perturbations  = all;
     }
     else {
       for (int i = 0; i < 3; ++i) {
-        read_enum(fc, per_module_names[i], *per_module_slots[i]);
+        read_evolver(per_module_names[i], *per_module_slots[i]);
       }
     }
   }

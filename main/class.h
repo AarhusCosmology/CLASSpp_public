@@ -10,7 +10,6 @@
 
 /* tools for class */
 #include "arrays.h"
-#include "dei_rkck.h"
 #include "parser.h"
 #include "quadrature.h"
 

@@ -72,9 +72,6 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
     return has_idr_drmd_;
   }
 
-  int bg_G_over_aH_index() const {
-    return index_bg_G_over_aH_drmd_;
-  }
   double f_idr_drmd() const {
     return f_idr_drmd_;
   }

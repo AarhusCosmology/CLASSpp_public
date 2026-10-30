@@ -171,13 +171,6 @@ class FluidSpecies : public BaseSpecies {
                       const PerturbationsModule& mod,
                       const perturb_workspace* ppw) const override;
 
-  int bg_w_index() const {
-    return index_bg_w_fld_;
-  }
-  int bg_dw_over_da_index() const {
-    return index_bg_dw_over_da_fld_;
-  }
-
  protected:
   const BackgroundModule* bgm_ = nullptr;
   int index_bg_rho_fld_        = -1;

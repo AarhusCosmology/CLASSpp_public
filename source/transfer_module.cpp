@@ -29,51 +29,6 @@ TransferModule::TransferModule(InputModulePtr input_module,
 TransferModule::~TransferModule() = default;
 
 /**
- * Transfer function \f$ \Delta_l^{X} (q) \f$ at a given wavenumber q.
- *
- * For a given mode (scalar, vector, tensor), initial condition, type
- * (temperature, polarization, lensing, etc) and multipole, computes
- * the transfer function for an arbitrary value of q by interpolating
- * between pre-computed values of q. This
- * function can be called from whatever module at whatever time,
- * valid for the lifetime of the module instance.
- *
- * Wavenumbers are called q in this module and k in the perturbation
- * module. In flat universes k=q. In non-flat universes q and k differ
- * through \f$ q2 = k2 + K(1+m)\f$, where m=0,1,2 for scalar, vector,
- * tensor. q should be used throughout the transfer module, excepted
- * when interpolating or manipulating the source functions S(k,tau)
- * calculated in the perturbation module: for a given value of q, this
- * should be done at the corresponding k(q).
- *
- * @param index_md   Input: index of requested mode
- * @param index_ic   Input: index of requested initial condition
- * @param index_tt   Input: index of requested type
- * @param index_l    Input: index of requested multipole
- * @param q          Input: any wavenumber
- * @param transfer_function Output: transfer function
- * @return the error status
- */
-
-void TransferModule::transfer_functions_at_q(
-    int index_md, int index_ic, int index_tt, int index_l, double q, double* transfer_function) {
-  /** Summary: */
-
-  /** - interpolate in pre-computed table using array_interpolate_two() */
-  array_interpolate_two(q_.data(),
-                        1,
-                        0,
-                        transfer_[index_md].data() +
-                            ((index_ic * tt_size_[index_md] + index_tt) * l_size_[index_md] +
-                             index_l) *
-                                q_size_,
-                        q_size_,
-                        q,
-                        transfer_function,
-                        1);
-}
-
-/**
  * This routine initializes the transfers structure, (in particular,
  * computes table of transfer functions \f$ \Delta_l^{X} (q) \f$)
  *
@@ -509,7 +464,7 @@ void TransferModule::transfer_perturbation_source_spline(
                                   [index_ic * perturbations_module_->tp_size_[index_md] + index_tp]
                                       .data();
 
-        array_spline_table_columns2(
+        array_spline_table_columns(
             perturbations_module_->k_[index_md].data(),
             perturbations_module_->k_size_[index_md],
             sources[index_md][index_ic * perturbations_module_->tp_size_[index_md] + index_tp],
