@@ -156,6 +156,10 @@ inline int index_symmetric_matrix(int i1, int i2, int N) {
  * have C language linkage; guarded by __cplusplus so C translation units never
  * see this declaration. */
 int get_number_of_titles(const std::string& titlestring);
+/* The first title that occurs twice in a title string, or "" if every title is
+ * unique. A column's title is its key in classy's dicts and in readers of the
+ * .dat files, so a repeated title silently hides one of the two columns. */
+std::string first_duplicate_title(const std::string& titlestring);
 #endif
 
 #endif

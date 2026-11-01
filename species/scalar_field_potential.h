@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -24,6 +25,9 @@ struct ScalarFieldPotential {
                                           const std::vector<double>& params,
                                           int tuning_index)>
       shooting_guess;
+
+  // What params holds, for the verbose background details.
+  std::string parameter_names;
 };
 
 /** The historical built-in: V = exp(-lambda*phi) * ((phi-B)^alpha + A),

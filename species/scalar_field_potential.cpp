@@ -47,6 +47,7 @@ ScalarFieldPotential DefaultScalarFieldPotential() {
     }
     return {params[tuning_index], 1.0};
   };
+  p.parameter_names = "lambda, alpha, A, B";
   return p;
 }
 
@@ -86,5 +87,6 @@ ScalarFieldPotential AxionScalarFieldPotential() {
     const double m     = std::sqrt(3. * H0 * H0 * omega / (f * f * std::pow(u0, n)));
     return {m, m / (2. * omega)};  // dm/dOmega for m = sqrt(c*Omega)
   };
+  p.parameter_names = "m [1/Mpc], f, n, Theta_initial";
   return p;
 }

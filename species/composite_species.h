@@ -225,6 +225,11 @@ class CompositeSpecies : public BaseSpecies {
       c->PrintMassInfo();
     }
   }
+  void PrintBackgroundDetails(const double* pvecback_today, double rho_crit_today) const override {
+    for (const auto& c : children_) {
+      c->PrintBackgroundDetails(pvecback_today, rho_crit_today);
+    }
+  }
 
   double TensorMasslessRelativisticRho(const double* pvecback) const override {
     double sum = 0.0;

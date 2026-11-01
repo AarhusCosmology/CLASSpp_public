@@ -79,7 +79,9 @@ struct SpeciesBuildContext {
   // Set by ConstructSpecies when running Pass 2 (closure species). Carries the
   // budget-closure value Omega0 that the closure species must adopt instead of
   // reading its Omega from the input file. std::nullopt for Pass 1 and for
-  // non-closure species.
+  // non-closure species. Pass 1 runs every factory, the closure species' too: a
+  // factory builds its closure instance only when this is set, and then nothing
+  // else, so no instance is built twice.
   std::optional<double> omega0_closure_override;
 };
 

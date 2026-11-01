@@ -11,6 +11,7 @@
 #include "parser.h"
 #include "perturbations.h"
 #include "perturbations_module.h"
+#include "species_input.h"
 
 ScalarFieldSpecies::ScalarFieldSpecies(const background& pba,
                                        double omega0_scf,
@@ -20,11 +21,44 @@ ScalarFieldSpecies::ScalarFieldSpecies(const background& pba,
                                        double phi_ini_scf,
                                        double phi_prime_ini_scf,
                                        ScalarFieldPotential potential,
-                                       double beta)
-    : BaseSpecies("ScalarField", EnergyType::Other), pba_(pba), Omega0_scf_(omega0_scf),
-      scf_parameters_(std::move(scf_parameters)), scf_tuning_index_(scf_tuning_index),
-      attractor_ic_scf_(attractor_ic_scf), phi_ini_scf_(phi_ini_scf),
-      phi_prime_ini_scf_(phi_prime_ini_scf), potential_(std::move(potential)), beta_(beta) {}
+                                       double beta,
+                                       std::string instance_name)
+    : BaseSpecies(instance_name.empty() ? "ScalarField" : instance_name, EnergyType::Other),
+      pba_(pba), Omega0_scf_(omega0_scf), scf_parameters_(std::move(scf_parameters)),
+      scf_tuning_index_(scf_tuning_index), attractor_ic_scf_(attractor_ic_scf),
+      phi_ini_scf_(phi_ini_scf), phi_prime_ini_scf_(phi_prime_ini_scf),
+      potential_(std::move(potential)), beta_(beta),
+      column_tag_(instance_name.empty() ? "scf" : std::move(instance_name)) {}
+
+ScalarFieldSpecies::InputKeys ScalarFieldSpecies::InputKeys::Legacy() {
+  return {/*instance_name=*/"",
+          "Omega_scf",
+          "scf_potential",
+          "scf_parameters",
+          "scf_tuning_index",
+          "scf_shooting_parameter",
+          "attractor_ic_scf",
+          "m_axion",
+          "f_axion",
+          "n_axion",
+          "Theta_initial_scf"};
+}
+
+ScalarFieldSpecies::InputKeys ScalarFieldSpecies::InputKeys::Instance(const std::string& name) {
+  // The dot fields drop the legacy key's _scf / _axion suffix, as the ncdm fields do.
+  const std::string p = name + ".";
+  return {name,
+          p + "Omega",
+          p + "potential",
+          p + "parameters",
+          p + "tuning_index",
+          p + "shooting_parameter",
+          p + "attractor_ic",
+          p + "m",
+          p + "f",
+          p + "n",
+          p + "Theta_initial"};
+}
 
 double ScalarFieldSpecies::V_scf(double phi) const {
   return potential_.V(phi, scf_parameters_);
@@ -123,26 +157,53 @@ void ScalarFieldSpecies::FinalizeBackground(double a,
 }
 
 void ScalarFieldSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_scf", 0.);
-  w.Add("(.)p_scf", 0.);
-  w.Add("(.)p_prime_scf", 0.);
-  w.Add("phi_scf", 0.);
-  w.Add("phi'_scf", 0.);
-  w.Add("V_scf", 0.);
-  w.Add("V'_scf", 0.);
-  w.Add("V''_scf", 0.);
+  w.Note(
+      "The units of phi, tau in the derivatives and the potential V are the following:\n"
+      "--> phi is given in units of the reduced Planck mass m_Pl = (8 pi G)^(-1/2)\n"
+      "--> tau in the derivative of V(phi) is given in units of Mpc.\n"
+      "--> the potential V(phi) is given in units of m_Pl^2/Mpc^2.");
+  const std::string& t = column_tag_;
+  w.Add("(.)rho_" + t, 0.);
+  w.Add("(.)p_" + t, 0.);
+  w.Add("(.)p_prime_" + t, 0.);
+  w.Add("phi_" + t, 0.);
+  w.Add("phi'_" + t, 0.);
+  w.Add("V_" + t, 0.);
+  w.Add("V'_" + t, 0.);
+  w.Add("V''_" + t, 0.);
 }
 
 void ScalarFieldSpecies::WriteBackgroundData(const double* pvecback,
                                              BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_scf", Rho(pvecback));
-  w.Add("(.)p_scf", P(pvecback));
-  w.Add("(.)p_prime_scf", pvecback[index_bg_p_prime_scf_]);
-  w.Add("phi_scf", pvecback[index_bg_phi_scf_]);
-  w.Add("phi'_scf", pvecback[index_bg_phi_prime_scf_]);
-  w.Add("V_scf", pvecback[index_bg_V_scf_]);
-  w.Add("V'_scf", pvecback[index_bg_dV_scf_]);
-  w.Add("V''_scf", pvecback[index_bg_ddV_scf_]);
+  const std::string& t = column_tag_;
+  w.Add("(.)rho_" + t, Rho(pvecback));
+  w.Add("(.)p_" + t, P(pvecback));
+  w.Add("(.)p_prime_" + t, pvecback[index_bg_p_prime_scf_]);
+  w.Add("phi_" + t, pvecback[index_bg_phi_scf_]);
+  w.Add("phi'_" + t, pvecback[index_bg_phi_prime_scf_]);
+  w.Add("V_" + t, pvecback[index_bg_V_scf_]);
+  w.Add("V'_" + t, pvecback[index_bg_dV_scf_]);
+  w.Add("V''_" + t, pvecback[index_bg_ddV_scf_]);
+}
+
+void ScalarFieldSpecies::PrintBackgroundDetails(const double* pvecback_today,
+                                                double rho_crit_today) const {
+  if (name() == "ScalarField") {
+    printf("    Scalar field details:\n");
+  }
+  else {
+    printf("    Scalar field '%s' details:\n", name().c_str());
+  }
+  printf("     -> Omega_%s = %g, wished %g\n",
+         column_tag_.c_str(),
+         Rho(pvecback_today) / rho_crit_today,
+         GetOmega0());
+  printf("     -> parameters: [%s] = \n", potential_.parameter_names.c_str());
+  printf("                    [");
+  for (size_t i = 0; i < scf_parameters_.size(); i++) {
+    printf("%s%g", i == 0 ? "" : ", ", scf_parameters_[i]);
+  }
+  printf("]\n");
 }
 
 void ScalarFieldSpecies::RegisterTransferSourceIndices(int& index_tp,
@@ -322,10 +383,10 @@ void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_scf", index_tp_delta_, index_tp_delta_ >= 0);
+      w.Add("d_" + column_tag_, index_tp_delta_, index_tp_delta_ >= 0);
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t__scf", index_tp_theta_, index_tp_theta_ >= 0);
+      w.Add("t__" + column_tag_, index_tp_theta_, index_tp_theta_ >= 0);
     }
   }
 }
@@ -390,8 +451,8 @@ void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
     }
   }
 
-  w.Add("delta_scf", delta_scf, true);
-  w.Add("theta_scf", theta_scf, true);
+  w.Add("delta_" + column_tag_, delta_scf, true);
+  w.Add("theta_" + column_tag_, theta_scf, true);
 }
 
 BaseSpecies::StressEnergyContribution ScalarFieldSpecies::StressEnergy(
@@ -493,10 +554,41 @@ double ScalarFieldSpecies::ComputeShootingResidual(const ShootingResidualContext
 std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx) {
   std::vector<Named> result;
 
+  // ── Dot-syntax instances (#346): "<N>.type = scalar_field", one independent field
+  // per instance, registered under N. They never close the budget, so they are built
+  // in Pass 1 only (ConstructSpecies runs this factory in Pass 1 even when the legacy
+  // field is the closure species); Pass 2, which carries the closure override, builds
+  // the legacy field alone.
+  if (!ctx.omega0_closure_override.has_value()) {
+    for (const auto& name : ctx.pfc->instances_with("type", std::string(kTypeName))) {
+      SpeciesInput input(ctx.pfc, name);
+      (void) input.get<std::string>("type");  // consume "<N>.type"
+      // "ScalarField" is the legacy field's key, "scf" its column tag.
+      class_test_severe(name == "ScalarField" || name == "scf",
+                        "'%s' is reserved for the scalar field configured by the legacy *_scf "
+                        "keys; give the dot-syntax instance another name",
+                        name.c_str());
+      const InputKeys keys    = InputKeys::Instance(name);
+      const double omega0_scf = input.require<double>("Omega");
+      class_test(omega0_scf < 0.,
+                 "%s = %g: a dot-syntax scalar field cannot close the budget; give it "
+                 "Omega > 0, or close with the legacy Omega_scf < 0",
+                 keys.Omega.c_str(),
+                 omega0_scf);
+      if (omega0_scf == 0.) {
+        continue;  // as for the legacy field, Omega = 0 builds no field
+      }
+      for (auto& e : CreateConfigured(ctx, keys, omega0_scf, /*shooting_allowed=*/true)) {
+        result.push_back(std::move(e));
+      }
+    }
+  }
+
+  // ── The legacy field (*_scf keys) ─────────────────────────────────────────
   // When the Type-3 (scf_veta) coupling is active, the Type3 composite owns the
-  // scalar field; the standalone factory must not also build one.
+  // legacy scalar field; the standalone factory must not also build one.
   if (auto veta = ctx.pfc->get<double>("scf_veta"); veta.has_value() && *veta != 0.) {
-    return result;  // the Type3 composite owns the scalar field
+    return result;  // the Type3 composite owns the legacy scalar field
   }
 
   // Decide our Omega0_scf and whether shooting may apply.
@@ -534,39 +626,53 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     return result;
   }
 
-  // ── scf_potential dispatch ────────────────────────────────────────────────
-  if (auto pot_opt = ctx.pfc->get<std::string>("scf_potential")) {
+  for (auto& e : CreateConfigured(ctx, InputKeys::Legacy(), omega0_scf, shooting_allowed)) {
+    result.push_back(std::move(e));
+  }
+  return result;
+}
+
+std::vector<Named> ScalarFieldSpecies::CreateConfigured(const SpeciesBuildContext& ctx,
+                                                        const InputKeys& keys,
+                                                        double omega0_scf,
+                                                        bool shooting_allowed) {
+  std::vector<Named> result;
+
+  // ── potential dispatch ────────────────────────────────────────────────────
+  if (auto pot_opt = ctx.pfc->get<std::string>(keys.potential)) {
     if (*pot_opt == "axion") {
-      return CreateAxion(ctx, omega0_scf);
+      return CreateAxion(ctx, keys, omega0_scf);
     }
-    class_stop_severe(
-        "unknown scf_potential '%s': supported values are 'axion' (absent = historical default)",
-        pot_opt->c_str());
+    class_stop_severe("unknown %s '%s': supported values are 'axion' (absent = historical default)",
+                      keys.potential.c_str(),
+                      pot_opt->c_str());
   }
 
-  // ── scf_parameters (variable-length list) ────────────────────────────────
+  // ── parameters (variable-length list) ────────────────────────────────────
   std::vector<double> scf_parameters;
   try {
-    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>("scf_parameters")) {
+    if (auto scf_params_opt = ctx.pfc->get<std::vector<double>>(keys.parameters)) {
       scf_parameters = *scf_params_opt;
     }
   }
   catch (const std::exception& e) {
-    class_stop_severe("scf_parameters parse error: %s", e.what());
+    class_stop_severe("%s parse error: %s", keys.parameters.c_str(), e.what());
   }
 
-  // ── scf_tuning_index + bounds check ──────────────────────────────────────
+  // ── tuning_index + bounds check ──────────────────────────────────────────
   int scf_tuning_index = 0;
-  scf_tuning_index     = ctx.pfc->get_or("scf_tuning_index", scf_tuning_index);
+  scf_tuning_index     = ctx.pfc->get_or(keys.tuning_index, scf_tuning_index);
   class_test_severe(scf_tuning_index >= static_cast<int>(scf_parameters.size()),
-                    "Tuning index scf_tuning_index = %d is larger than the number of entries "
-                    "%zu in scf_parameters. Check your .ini file.",
+                    "Tuning index %s = %d is larger than the number of entries "
+                    "%zu in %s. Check your .ini file.",
+                    keys.tuning_index.c_str(),
                     scf_tuning_index,
-                    scf_parameters.size());
+                    scf_parameters.size(),
+                    keys.parameters.c_str());
 
-  // scf_shooting_parameter (when present) OVERWRITES the slot at tuning_index.
+  // shooting_parameter (when present) OVERWRITES the slot at tuning_index.
   // This is the resolved value DoShooting writes back into the fc for the final build.
-  if (auto scf_shooting_opt = ctx.pfc->get<double>("scf_shooting_parameter")) {
+  if (auto scf_shooting_opt = ctx.pfc->get<double>(keys.shooting_parameter)) {
     scf_parameters[scf_tuning_index] = *scf_shooting_opt;
   }
 
@@ -582,15 +688,16 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
     }
   }
 
-  // ── attractor_ic_scf (y/n string) ────────────────────────────────────────
-  const bool attractor_ic_scf = ctx.pfc->get_yes("attractor_ic_scf", true);
+  // ── attractor_ic (y/n string) ────────────────────────────────────────────
+  const bool attractor_ic_scf = ctx.pfc->get_yes(keys.attractor_ic, true);
   double phi_ini_scf          = 1.;
   double phi_prime_ini_scf    = 1.;
   if (!attractor_ic_scf) {
     class_test_severe(scf_parameters.size() < 2,
                       "Since you are not using attractor initial conditions, you must specify "
-                      "phi and its derivative phi' as the last two entries in scf_parameters. "
-                      "See explanatory.ini for more details.");
+                      "phi and its derivative phi' as the last two entries in %s. "
+                      "See explanatory.ini for more details.",
+                      keys.parameters.c_str());
     phi_ini_scf       = scf_parameters[scf_parameters.size() - 2];
     phi_prime_ini_scf = scf_parameters[scf_parameters.size() - 1];
   }
@@ -601,16 +708,19 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
                                                       scf_tuning_index,
                                                       attractor_ic_scf,
                                                       phi_ini_scf,
-                                                      phi_prime_ini_scf);
+                                                      phi_prime_ini_scf,
+                                                      DefaultScalarFieldPotential(),
+                                                      /*beta=*/0.,
+                                                      keys.instance_name);
 
-  // Detect guess-driven construction: Omega_scf user-set to >0 but
-  // scf_shooting_parameter absent. The nonzero check matches the historic shooting
-  // condition (a zero target meant "no shooting").
+  // Detect guess-driven construction: Omega user-set to >0 but shooting_parameter
+  // absent. The nonzero check matches the historic shooting condition (a zero target
+  // meant "no shooting").
   if (shooting_allowed) {
-    bool shooting_param_present = ctx.pfc->get<double>("scf_shooting_parameter").has_value();
+    bool shooting_param_present = ctx.pfc->get<double>(keys.shooting_parameter).has_value();
 
     if (!shooting_param_present) {
-      species->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega_scf_val};
+      species->shooting_target_ = {keys.Omega, keys.shooting_parameter, omega0_scf};
       species->needs_shooting_  = true;
 
       std::vector<double> g;
@@ -620,50 +730,66 @@ std::vector<Named> ScalarFieldSpecies::CreateAll(const SpeciesBuildContext& ctx)
       // Seed the guess into this discovery-build species' scf_parameters_[tuning_index]
       // so its ComputeBackground / shooter residual see a valid potential. Do NOT write it
       // into the file content: the fc is user-facing state checked for unread parameters,
-      // and DoShooting writes the *resolved* scf_shooting_parameter back into the fc (which
+      // and DoShooting writes the *resolved* shooting_parameter back into the fc (which
       // the final build then reads). A guess here would never be read.
       species->scf_parameters_[species->scf_tuning_index_] = g[0];
     }
   }
 
-  result.push_back({"ScalarField", std::move(species)});
+  std::string key = species->name();
+  result.push_back({std::move(key), std::move(species)});
   return result;
 }
 
 std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ctx,
+                                                   const InputKeys& keys,
                                                    double omega0_scf) {
   std::vector<Named> result;
 
-  const auto f_opt     = ctx.pfc->get<double>("f_axion");
-  const auto theta_opt = ctx.pfc->get<double>("Theta_initial_scf");
-  const double n       = ctx.pfc->get_or("n_axion", 1.);
+  const auto f_opt     = ctx.pfc->get<double>(keys.f_axion);
+  const auto theta_opt = ctx.pfc->get<double>(keys.Theta_initial);
+  const double n       = ctx.pfc->get_or(keys.n_axion, 1.);
+  const char* pot      = keys.potential.c_str();
   class_test_severe(!f_opt,
-                    "scf_potential = axion requires 'f_axion' (decay constant, reduced-Planck "
-                    "units)");
+                    "%s = axion requires '%s' (decay constant, reduced-Planck units)",
+                    pot,
+                    keys.f_axion.c_str());
   class_test(*f_opt <= 0.,
-             "scf_potential = axion requires f_axion > 0 (decay constant, reduced-Planck units)");
-  class_test_severe(!theta_opt, "scf_potential = axion requires 'Theta_initial_scf'");
+             "%s = axion requires %s > 0 (decay constant, reduced-Planck units)",
+             pot,
+             keys.f_axion.c_str());
+  class_test_severe(!theta_opt, "%s = axion requires '%s'", pot, keys.Theta_initial.c_str());
   class_test(*theta_opt <= 0. || *theta_opt >= _PI_,
-             "scf_potential = axion requires Theta_initial_scf in (0, pi): phi_ini = Theta*f");
-  class_test(n < 1., "n_axion must be >= 1 (V = m^2 f^2 (1-cos(phi/f))^n)");
+             "%s = axion requires %s in (0, pi): phi_ini = Theta*f",
+             pot,
+             keys.Theta_initial.c_str());
+  class_test(n < 1., "%s must be >= 1 (V = m^2 f^2 (1-cos(phi/f))^n)", keys.n_axion.c_str());
   const double f     = *f_opt;
   const double theta = *theta_opt;
 
   // A (1-cos)^n potential has no exponential attractor: frozen ICs are forced.
-  class_test_severe(ctx.pfc->get_yes("attractor_ic_scf"),
-                    "attractor_ic_scf = yes is incompatible with scf_potential = axion "
-                    "(frozen ICs phi = Theta_initial_scf * f_axion, phi' = 0 are set "
-                    "automatically)");
-  class_test_severe(ctx.pfc->get<std::vector<double>>("scf_parameters").has_value(),
-                    "scf_parameters is not used with scf_potential = axion; "
-                    "give m_axion, f_axion, n_axion, Theta_initial_scf instead");
-  ctx.pfc->get<int>("scf_tuning_index");  // consume; the axion branch forces 0
+  class_test_severe(ctx.pfc->get_yes(keys.attractor_ic),
+                    "%s = yes is incompatible with %s = axion "
+                    "(frozen ICs phi = %s * %s, phi' = 0 are set automatically)",
+                    keys.attractor_ic.c_str(),
+                    pot,
+                    keys.Theta_initial.c_str(),
+                    keys.f_axion.c_str());
+  class_test_severe(ctx.pfc->get<std::vector<double>>(keys.parameters).has_value(),
+                    "%s is not used with %s = axion; give %s, %s, %s, %s instead",
+                    keys.parameters.c_str(),
+                    pot,
+                    keys.m_axion.c_str(),
+                    keys.f_axion.c_str(),
+                    keys.n_axion.c_str(),
+                    keys.Theta_initial.c_str());
+  ctx.pfc->get<int>(keys.tuning_index);  // consume; the axion branch forces 0
 
-  std::vector<double> params = {ctx.pfc->get_or("m_axion", 0.), f, n, theta};
+  std::vector<double> params = {ctx.pfc->get_or(keys.m_axion, 0.), f, n, theta};
 
   // Resolved shooting value (written back by DoShooting) wins over any seed.
   bool shooting_param_present = false;
-  if (auto sp = ctx.pfc->get<double>("scf_shooting_parameter")) {
+  if (auto sp = ctx.pfc->get<double>(keys.shooting_parameter)) {
     params[0]              = *sp;
     shooting_param_present = true;
   }
@@ -675,9 +801,11 @@ std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ct
                                                       /*attractor_ic_scf=*/false,
                                                       /*phi_ini_scf=*/theta * f,
                                                       /*phi_prime_ini_scf=*/0.,
-                                                      AxionScalarFieldPotential());
+                                                      AxionScalarFieldPotential(),
+                                                      /*beta=*/0.,
+                                                      keys.instance_name);
   if (!shooting_param_present) {
-    species->shooting_target_ = {"Omega_scf", "scf_shooting_parameter", omega0_scf};
+    species->shooting_target_ = {keys.Omega, keys.shooting_parameter, omega0_scf};
     species->needs_shooting_  = true;
     if (species->scf_parameters_[0] <= 0.) {
       std::vector<double> g;
@@ -686,7 +814,8 @@ std::vector<Named> ScalarFieldSpecies::CreateAxion(const SpeciesBuildContext& ct
       species->scf_parameters_[0] = g[0];
     }
   }
-  result.push_back({"ScalarField", std::move(species)});
+  std::string key = species->name();
+  result.push_back({std::move(key), std::move(species)});
   return result;
 }
 

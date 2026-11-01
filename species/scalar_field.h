@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <string_view>
 
 #include "../species/base_species.h"
@@ -27,7 +28,27 @@ class ScalarFieldSpecies : public BaseSpecies {
                      double phi_ini_scf,
                      double phi_prime_ini_scf,
                      ScalarFieldPotential potential = DefaultScalarFieldPotential(),
-                     double beta                    = 0.);
+                     double beta                    = 0.,
+                     std::string instance_name      = {});
+
+  /** The input keys one field is configured by: the legacy *_scf spelling, or the
+   *  "<N>.<field>" spelling of a dot-syntax instance N. */
+  struct InputKeys {
+    std::string instance_name;  // empty for the legacy field
+    std::string Omega;
+    std::string potential;
+    std::string parameters;
+    std::string tuning_index;
+    std::string shooting_parameter;
+    std::string attractor_ic;
+    std::string m_axion;
+    std::string f_axion;
+    std::string n_axion;
+    std::string Theta_initial;
+
+    static InputKeys Legacy();
+    static InputKeys Instance(const std::string& name);
+  };
 
   double GetOmega0() const override {
     return Omega0_scf_;
@@ -87,6 +108,7 @@ class ScalarFieldSpecies : public BaseSpecies {
 
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
   void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void PrintBackgroundDetails(const double* pvecback_today, double rho_crit_today) const override;
 
   // ── Perturbations ────────────────────────────────────────────────────────
   struct PerturbLayout : BaseSpecies::PerturbLayout {
@@ -134,7 +156,9 @@ class ScalarFieldSpecies : public BaseSpecies {
   // Axion factory branch: scf_potential = axion. params = [m, f, n, Theta_ini],
   // frozen ICs (phi = Theta*f, phi' = 0), always shoots m (tuning index 0)
   // against Omega_scf / the closure value; m_axion is an optional Newton seed.
-  static std::vector<Named> CreateAxion(const SpeciesBuildContext& ctx, double omega0_scf);
+  static std::vector<Named> CreateAxion(const SpeciesBuildContext& ctx,
+                                        const InputKeys& keys,
+                                        double omega0_scf);
 
   // Shared build body for both the standalone factory (beta = 0) and the Type3
   // composite (beta = scf_veta). Constructs the configured ScalarFieldSpecies with
@@ -190,7 +214,20 @@ class ScalarFieldSpecies : public BaseSpecies {
     return index_bg_dV_scf_;
   }
 
+  // Suffix of this field's output columns: "scf" for the legacy field (so
+  // "phi_scf", "d_scf" are unchanged), the instance name N otherwise ("phi_N").
+  const std::string& column_tag() const {
+    return column_tag_;
+  }
+
  private:
+  // One field from its keys, Omega already resolved: the body CreateAll runs for
+  // the legacy field and for each dot-syntax instance.
+  static std::vector<Named> CreateConfigured(const SpeciesBuildContext& ctx,
+                                             const InputKeys& keys,
+                                             double omega0_scf,
+                                             bool shooting_allowed);
+
   double V_scf(double phi) const;
   double dV_scf(double phi) const;
   double ddV_scf(double phi) const;
@@ -220,4 +257,5 @@ class ScalarFieldSpecies : public BaseSpecies {
   double phi_ini_scf_       = 1.;
   double phi_prime_ini_scf_ = 1.;
   double beta_              = 0.;
+  std::string column_tag_;
 };

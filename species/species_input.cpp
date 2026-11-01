@@ -48,7 +48,8 @@ struct SingleInstanceSpec {
 
 // Module-owned: which named species are single-instance, and how each clean
 // dot-field maps to its legacy key. Keyed by the species' canonical kTypeName.
-// ScalarField is intentionally absent (reserved for a multi-instance future).
+// ScalarField is absent: it is multi-instance (#346), and ScalarFieldSpecies::CreateAll
+// reads its <N>.* fields itself.
 const std::vector<SingleInstanceSpec>& SingleInstanceTable() {
   static const std::vector<SingleInstanceSpec> table = {
       {PhotonsSpecies::kTypeName, {{"Omega", "Omega_g"}, {"T_cmb", "T_cmb"}}},

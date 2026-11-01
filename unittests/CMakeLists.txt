@@ -1,9 +1,13 @@
 # C++ unit tests. They mirror the source tree: unittests/source/foo_test.cpp tests
 # source/foo.*, and so on for species/ and tools/. A new test needs one class_unit_test
-# line here and its target in TEST_TARGETS in the Makefile.
+# line here and nothing else: each test joins the unit-tests target, which `make test`
+# builds before it runs ctest.
+
+add_custom_target(unit-tests)
 
 function(class_unit_test name source)
   add_executable(${name} ${source})
+  add_dependencies(unit-tests ${name})
   target_link_libraries(${name} PRIVATE classpp)
   # These tests assert on values; keep their assert()s live even under
   # RelWithDebInfo/Release (which add -DNDEBUG). -UNDEBUG re-enables asserts for
@@ -38,6 +42,7 @@ class_unit_test(test-composite-classification species/composite_classification_t
 class_unit_test(test-composite-layout species/composite_layout_test.cpp)
 class_unit_test(test-type3-coupling species/type3_coupling_test.cpp)
 class_unit_test(test-axion-scf-factory species/axion_scf_factory_test.cpp)
+class_unit_test(test-scf-multi-instance species/scalar_field_multi_instance_test.cpp)
 class_unit_test(test-axion-ede-fluid species/axion_ede_fluid_test.cpp)
 class_unit_test(test-fluid-closure species/fluid_closure_test.cpp)
 class_unit_test(test-dark-energy-budget source/dark_energy_budget_test.cpp)

@@ -427,6 +427,15 @@ void PerturbationsModule::perturb_output_titles(file_format output_format,
     }
     class_store_columntitle(titles, "-T_tot/k2", true);
   }
+
+  // Species title their columns after their instance names (d_<N>, t__<N>); see
+  // background_output_titles for why a repeated title is an error.
+  const std::string duplicate = first_duplicate_title(titles);
+  class_test_severe(!duplicate.empty(),
+                    "two transfer-function columns are titled '%s'. A species instance's name "
+                    "makes its column titles; rename the instance so they do not repeat another "
+                    "column's",
+                    duplicate.c_str());
 }
 
 /**
@@ -2610,7 +2619,13 @@ void PerturbationsModule::perturb_prepare_k_output() {
       class_store_columntitle(scalar_titles_, "delta_Tb", ppt->has_perturbed_recombination);
       class_store_columntitle(scalar_titles_, "delta_chi", ppt->has_perturbed_recombination);
 
-      number_of_scalar_titles_ = get_number_of_titles(scalar_titles_);
+      number_of_scalar_titles_    = get_number_of_titles(scalar_titles_);
+      const std::string duplicate = first_duplicate_title(scalar_titles_);
+      class_test_severe(!duplicate.empty(),
+                        "two k_output_values columns are titled '%s'. A species instance's name "
+                        "makes its column titles (delta_<N>, ...); rename the instance so they do "
+                        "not repeat another column's",
+                        duplicate.c_str());
     }
 
     if (ppt->has_tensors) {
@@ -2635,7 +2650,12 @@ void PerturbationsModule::perturb_prepare_k_output() {
         }
       }
 
-      number_of_tensor_titles_ = get_number_of_titles(tensor_titles_);
+      number_of_tensor_titles_    = get_number_of_titles(tensor_titles_);
+      const std::string duplicate = first_duplicate_title(tensor_titles_);
+      class_test_severe(!duplicate.empty(),
+                        "two tensor k_output_values columns are titled '%s'; rename the species "
+                        "instance whose name makes them repeat",
+                        duplicate.c_str());
     }
   }
 }

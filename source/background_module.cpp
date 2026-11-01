@@ -19,7 +19,6 @@
 #include "../species/idm_drmd_idr_drmd_species.h"
 #include "../species/modified_gravity.h"
 #include "../species/ncdm_species.h"
-#include "../species/scalar_field.h"
 #include "../species/ultra_relativistic.h"
 #include "bisection.h"
 #include "evolver_erk.h"
@@ -860,24 +859,12 @@ void BackgroundModule::background_solve_evolver() {
         printf("     -> no decoupling occurred.\n");
       }
     }
-    if (all_species_.contains("ScalarField")) {
-      const auto& scf = static_cast<const ScalarFieldSpecies&>(*all_species_.at("ScalarField"));
-      printf("    Scalar field details:\n");
-      printf("     -> Omega_scf = %g, wished %g\n",
-             scf.Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-             scf.GetOmega0());
-      if (all_species_.contains("Lambda")) {
-        printf("     -> Omega_Lambda = %g, wished %g\n",
-               all_species_.at("Lambda")->Rho(pvecback.data()) / pvecback[index_bg_rho_crit_],
-               all_species_.at("Lambda")->GetOmega0());
-      }
-      printf("     -> parameters: [lambda, alpha, A, B] = \n");
-      printf("                    [");
-      const auto& scf_params = scf.scf_parameters();
-      for (size_t i = 0; i < scf_params.size() - 1; i++) {
-        printf("%.3f, ", scf_params[i]);
-      }
-      printf("%.3f]\n", scf_params[scf_params.size() - 1]);
+    // Species details (one block per scalar field), from today's row of the
+    // background table: pvecback is the evolver's workspace, last filled at
+    // whatever time the evolver evaluated last (it printed Omega_scf = inf).
+    const double* bg_today = background_table_.data() + (bt_size_ - 1) * bg_size_;
+    for (const auto& [key, sp] : all_species_) {
+      sp->PrintBackgroundDetails(bg_today, bg_today[index_bg_rho_crit_]);
     }
   }
 
@@ -1070,6 +1057,25 @@ void BackgroundModule::background_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "(.)p_tot_prime", true);
   class_store_columntitle(titles, "gr.fac. D", true);
   class_store_columntitle(titles, "gr.fac. f", true);
+
+  // A species names its columns after its instance name (phi_<N>, (.)rho_<N>), so an
+  // instance called b or tot would repeat (.)rho_b or (.)rho_tot, and classy's dict, keyed
+  // by title, would silently return one column for the other.
+  const std::string duplicate = first_duplicate_title(titles);
+  class_test_severe(!duplicate.empty(),
+                    "two background columns are titled '%s'. A species instance's name makes its "
+                    "column titles; rename the instance so they do not repeat another column's",
+                    duplicate.c_str());
+}
+
+std::vector<std::string> BackgroundModule::background_output_notes() const {
+  std::string titles;
+  std::vector<std::string> notes;
+  BackgroundColumnWriter writer(titles, &notes);
+  for (const auto& [name, sp] : all_species_) {
+    sp->WriteBackgroundColumnTitles(writer);
+  }
+  return notes;
 }
 
 void BackgroundModule::background_output_data(int number_of_titles, double* data) const {

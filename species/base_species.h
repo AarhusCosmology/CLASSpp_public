@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -31,7 +32,8 @@ class ThermodynamicsModule;  // forward declaration
  */
 class BackgroundColumnWriter {
  public:
-  explicit BackgroundColumnWriter(std::string& titles) : titles_(&titles) {}
+  explicit BackgroundColumnWriter(std::string& titles, std::vector<std::string>* notes = nullptr)
+      : titles_(&titles), notes_(notes) {}
   BackgroundColumnWriter(double* dataptr, int& storeidx)
       : dataptr_(dataptr), storeidx_(&storeidx) {}
 
@@ -51,10 +53,22 @@ class BackgroundColumnWriter {
     Add(title.c_str(), value, condition);
   }
 
+  /** A note on the units or meaning of the columns a species writes, for the header of
+   *  background.dat, one header line per line of the note. Title mode only, and only when the
+   *  caller asked for notes. A note several species give (every scalar field gives the
+   *  same one) is kept once. */
+  void Note(const std::string& note) {
+    if (titles_ != nullptr && notes_ != nullptr &&
+        std::find(notes_->begin(), notes_->end(), note) == notes_->end()) {
+      notes_->push_back(note);
+    }
+  }
+
  private:
-  std::string* titles_ = nullptr;
-  double* dataptr_     = nullptr;
-  int* storeidx_       = nullptr;
+  std::string* titles_             = nullptr;
+  std::vector<std::string>* notes_ = nullptr;
+  double* dataptr_                 = nullptr;
+  int* storeidx_                   = nullptr;
 };
 struct perturbs;  // forward declaration
 
@@ -689,6 +703,12 @@ class BaseSpecies {
   /** Verbose mass/omega line (background_verbose). Default no-op; NCDM prints;
    *  composites forward to children. */
   virtual void PrintMassInfo() const {}
+  /** Details printed once the background table is built (background_verbose > 2).
+   *  @p pvecback_today is today's row of the table, @p rho_crit_today the critical
+   *  density in it. Default no-op; the scalar field prints its Omega and potential
+   *  parameters; composites forward to children. */
+  virtual void PrintBackgroundDetails(const double* /*pvecback_today*/,
+                                      double /*rho_crit_today*/) const {}
 
   /** Contribution to the tensor-mode "relativistic" density in the massless
    *  approximation. Default 0; NCDM returns 3*P; composites sum. */

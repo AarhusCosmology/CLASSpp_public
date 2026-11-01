@@ -1,73 +1,7 @@
 # Thin convenience shim. The build system is CMakeLists.txt; see README.md.
 BUILD_DIR ?= build/cmake
 
-# The C++ unit tests, as unittests/CMakeLists.txt declares them; keep the two in step.
-TEST_TARGETS := \
-	test-evolver-options \
-	test-evolver-selection \
-	test-bbn-plasma \
-	test-bbn-rates \
-	test-bbn-weak \
-	test-bbn-solver \
-	test-parser \
-	test-precision-evolver \
-	test-errors \
-	test-tca-ic-guard \
-	test-shooting \
-	test-unread-parameters \
-	test-deposition \
-	test-hyrec \
-	test-recfast \
-	test-baryon-clumping \
-	test-limber-point \
-	test-nonlinear-extrapolation \
-	test-perturbation-support \
-	test-transfer-neglect \
-	test-lensing-extrapolation \
-	test-nonlinear-threads \
-	test-free-streaming-cutoff \
-	test-acoustic-spline \
-	test-bessel-table-cache \
-	test-wigner-d \
-	test-hermite-evaluate \
-	test-bisection \
-	test-function-ref \
-	test-quadrature \
-	test-asymptotic-extrapolation \
-	test-spline-integral \
-	test-decay-kernel \
-	test-reduced-operator \
-	test-evolver-erk \
-	test-evolver-erk-config \
-	test-evolver-etd \
-	test-evolver-nonfinite \
-	test-photons \
-	test-tensor-tca \
-	test-species-types \
-	test-scf-potential \
-	test-cdm-coupled \
-	test-scf-beta \
-	test-composite-classification \
-	test-composite-layout \
-	test-type3-coupling \
-	test-axion-scf-factory \
-	test-axion-ede-fluid \
-	test-fluid-closure \
-	test-dark-energy-budget \
-	test-dcdm-wdm \
-	test-axion-ncdm \
-	test-dncdm-switch-copy \
-	test-dncdm-inv \
-	test-dncdm-proxy \
-	test-dr-psd \
-	test-limber-closure \
-	test-max-multipole \
-	test-ncdm-family \
-	test-species-budget \
-	test-species-instances \
-	test-scalar-tensor
-
-.PHONY: all class class_profiled classy classy-pip-dev test clean $(TEST_TARGETS)
+.PHONY: all class class_profiled classy classy-pip-dev test clean
 
 # The real parallelism happens inside `cmake --build --parallel`; serialize
 # the shim targets so `make -j class class_profiled` cannot run two CMake
@@ -79,13 +13,18 @@ all: class
 $(BUILD_DIR)/CMakeCache.txt:
 	cmake -S . -B $(BUILD_DIR)
 
-class class_profiled $(TEST_TARGETS): $(BUILD_DIR)/CMakeCache.txt
+class class_profiled: $(BUILD_DIR)/CMakeCache.txt
 	cmake --build $(BUILD_DIR) --target $@ --parallel
 
-# Single cmake invocation so `make -j test` cannot race parallel builds
-# of the same build directory.
+# One unit test, e.g. `make test-parser`: any target unittests/CMakeLists.txt declares.
+test-%: $(BUILD_DIR)/CMakeCache.txt
+	cmake --build $(BUILD_DIR) --target $@ --parallel
+
+# Every unit test unittests/CMakeLists.txt declares (its unit-tests target), in a
+# single cmake invocation so `make -j test` cannot race parallel builds of the
+# same build directory.
 test: $(BUILD_DIR)/CMakeCache.txt
-	cmake --build $(BUILD_DIR) --target $(TEST_TARGETS) --parallel
+	cmake --build $(BUILD_DIR) --target unit-tests --parallel
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
 # Builds + installs classy via pip (scikit-build-core -> CMake), then recreates

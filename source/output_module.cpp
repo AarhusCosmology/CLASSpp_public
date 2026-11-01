@@ -6,6 +6,9 @@
 #include "output_module.h"
 
 #include <algorithm>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "background_module.h"
 #include "lensing_module.h"
@@ -789,14 +792,13 @@ void OutputModule::output_background() {
             "# All densities are multiplied by (8piG/3) (below, shortcut notation (.) for this "
             "factor) \n");
     fprintf(backfile, "# Densities are in units [Mpc^-2] while all distances are in [Mpc]. \n");
-    if (all_species_.contains("ScalarField")) {
-      fprintf(backfile,
-              "# The units of phi, tau in the derivatives and the potential V are the "
-              "following:\n");
-      fprintf(backfile,
-              "# --> phi is given in units of the reduced Planck mass m_Pl = (8 pi G)^(-1/2)\n");
-      fprintf(backfile, "# --> tau in the derivative of V(phi) is given in units of Mpc.\n");
-      fprintf(backfile, "# --> the potential V(phi) is given in units of m_Pl^2/Mpc^2.\n");
+    // The species' own notes on their columns (the scalar field's units of phi and V).
+    for (const auto& note : background_module_->background_output_notes()) {
+      std::istringstream lines(note);
+      std::string line;
+      while (std::getline(lines, line)) {
+        fprintf(backfile, "# %s\n", line.c_str());
+      }
     }
   }
 

@@ -94,9 +94,9 @@ void test_unit() {
   // ── A real species type that no factory reads from N.type ──
   {
     FileContent fc;
-    fc.set("x.type", "scalar_field");
+    fc.set("x.type", "nede");
     const std::string msg = CheckMessage(fc);
-    assert(Has(msg, "species type 'scalar_field' cannot be declared"));
+    assert(Has(msg, "species type 'nede' cannot be declared"));
     assert(Has(msg, "legacy input keys"));
   }
 
@@ -187,8 +187,8 @@ void test_input_module() {
   // ── A species type that no factory reads from N.type ──
   {
     FileContent fc = Quiet();
-    fc.set("x.type", "scalar_field");
-    assert(Has(BuildMessage(fc), "species type 'scalar_field' cannot be declared"));
+    fc.set("x.type", "nede");
+    assert(Has(BuildMessage(fc), "species type 'nede' cannot be declared"));
   }
 
   // ── The type line misspelled: previously the species was silently absent ──

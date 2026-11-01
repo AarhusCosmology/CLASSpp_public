@@ -467,12 +467,14 @@ void InputModule::ConstructSpecies() {
 
   const std::string_view closure_name = ClosureSpeciesName(pba->closure_species);
 
-  // Pass 1: build every non-closure species, summing Omega0 contributions.
+  // Pass 1: run every factory without the closure override, summing Omega0
+  // contributions. A factory builds its closure instance only when handed the
+  // override, so here the closure species' factory builds just the instances that
+  // do not close the budget: none for Lambda or the fluid, whose closure is the
+  // absence of their Omega key, and the dot-syntax fields beside a legacy closure
+  // scalar field (#346). Pass 2 builds the closure instance.
   double omega0_sum = 0.0;
   for (const auto& entry : kAllSpeciesFactories) {
-    if (entry.name == closure_name) {
-      continue;
-    }
     auto produced = entry.create_all(ctx);
     for (auto& e : produced) {
       omega0_sum += e.species->GetOmega0();
@@ -494,8 +496,9 @@ void InputModule::ConstructSpecies() {
       printf(" -> matched budget equations by adjusting %s = %e\n", name_for_msg, closure_value);
     }
 
-    // Pass 2: build the closure species. Override is consumed by its CreateAll
-    // and cleared afterward so subsequent callers (shooting guess, etc.) don't see it.
+    // Pass 2: build the closure instance. The override is consumed by its CreateAll,
+    // which then builds that instance alone, and cleared afterward so subsequent
+    // callers (shooting guess, etc.) don't see it.
     ctx.omega0_closure_override = closure_value;
     for (const auto& entry : kAllSpeciesFactories) {
       if (entry.name != closure_name) {

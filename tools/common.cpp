@@ -2,6 +2,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -54,4 +55,21 @@ int get_number_of_titles(const std::string& titlestring) {
     }
   }
   return number_of_titles;
+}
+
+std::string first_duplicate_title(const std::string& titlestring) {
+  std::set<std::string> seen;
+  size_t start = 0;
+  while (start < titlestring.size()) {
+    size_t end = titlestring.find('\t', start);
+    if (end == std::string::npos) {
+      end = titlestring.size();
+    }
+    std::string title = titlestring.substr(start, end - start);
+    if (!title.empty() && !seen.insert(title).second) {
+      return title;
+    }
+    start = end + 1;
+  }
+  return {};
 }
