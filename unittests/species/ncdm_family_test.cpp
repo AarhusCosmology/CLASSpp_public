@@ -53,15 +53,13 @@ int main() {
     assert(v && *v == "3");
   }
 
-  // ── Every consumer type contributes (greybody, self-interacting, decay_dr) ──
+  // ── Every consumer type contributes (greybody, self-interacting) ──
   {
     FileContent fc;
     fc.set("gb.type", "ncdm_greybody");
     fc.set("gb.fluid_approximation", "2");
     fc.set("si.type", "ncdm_self_interacting");
     fc.set("si.fluid_approximation", "2");
-    fc.set("dn.type", "ncdm_decay_dr");
-    fc.set("dn.fluid_approximation", "2");
     SynthesiseNcdmFluidApproximation(&fc);
     auto v = fc.get<std::string>("ncdm_fluid_approximation");
     assert(v && *v == "2");
@@ -103,6 +101,23 @@ int main() {
     FileContent fc;
     fc.set("ddm.type", "dcdm_wdm");
     fc.set("ddm.fluid_approximation", "2");
+    assert(SynthesisThrows(fc));
+  }
+
+  // ── ncdm_decay_dr: the parent never becomes a fluid (#136), so the key is
+  //    rejected, also when a consumer instance sets the same value ──
+  {
+    FileContent fc;
+    fc.set("dn.type", "ncdm_decay_dr");
+    fc.set("dn.fluid_approximation", "2");
+    assert(SynthesisThrows(fc));
+  }
+  {
+    FileContent fc;
+    fc.set("nu.type", "ncdm_standard");
+    fc.set("nu.fluid_approximation", "2");
+    fc.set("dn.type", "ncdm_decay_dr");
+    fc.set("dn.fluid_approximation", "2");
     assert(SynthesisThrows(fc));
   }
 

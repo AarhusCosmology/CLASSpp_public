@@ -25,6 +25,14 @@
 bool IsNonFinite(double x);
 
 /**
+ * Index of the first non-finite entry of x[0..n-1], or -1 if all are finite.
+ *
+ * Same TU and same reason as IsNonFinite. One out-of-line call per vector rather
+ * than one per entry, for the evolvers that check a whole state at once.
+ */
+int FirstNonFinite(const double* x, int n);
+
+/**
  * True when advancing t by h cannot change t, i.e. `t + h == t` in IEEE-754.
  *
  * SAME REASON FOR LIVING HERE as IsNonFinite: it must be compiled WITHOUT

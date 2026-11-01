@@ -104,16 +104,6 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                       name.c_str());
   }
 
-  // No NCDM fluid approximation for the coupled trio: the kernel collision
-  // operator needs the full Boltzmann hierarchy on every species. Unsupported-
-  // feature-combination check (mirrors the use_psd_file guard in
-  // axion_ncdm_species.cpp:44) — severe, not a numeric-value rejection.
-  class_test_severe(in.get<std::string>("fluid_approximation").has_value(),
-                    "species '%s': inverse decays require the full Boltzmann hierarchy; remove "
-                    "'%s.fluid_approximation'",
-                    name.c_str(),
-                    name.c_str());
-
   // The parent must be a single momentum grid: its f-per-bin variable and its
   // ComputeMomenta integration share one grid (design §5). qm_auto with differing
   // tol_ncdm/tol_ncdm_bg breaks this — pin momenta_bins_bg == momenta_bins.
@@ -127,8 +117,7 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
 
   // Kernel boundary (#385): KappaStoredToBare assumes the parent's stored f is a
   // single deg_H-suppressed Fermi-Dirac; a file-based PSD (arbitrary shape) has no
-  // such reading. Structural (key-presence) check, mirrors the fluid_approximation
-  // guard above.
+  // such reading. Structural (key-presence) check.
   class_test_severe(parent->UsesPsdFile(),
                     "species '%s': inverse decays require an analytic (non-file) parent PSD; "
                     "remove '%s.use_psd_file' (the kernel boundary's bare-occupation reading "
@@ -1732,11 +1721,8 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
       pidot_phi =
           a4 *
           boson_->StressEnergy(*my.child_layouts[kBoson], pv, dyc, pvecback, ppw).rho_plus_p_shear;
-      // The PARENT'S DOES NOT: DNCDMSpecies::RescaledPerturbations reads
-      // ppw->pv->y[index_pt] directly (dncdm_species.cpp), ignoring the y argument.
-      // That is harmless on the RHS, where the two are the same vector, but it means
-      // parent_->StressEnergy(..., dy_coll, ...) would silently return the ordinary
-      // Π_H rather than its rate.
+      // The parent's is not evaluated on dy_coll: its StressEnergy normalises by
+      // rho+p and the exp(lnN) rescaling, which are not the collision vector's.
       //
       // Rescale instead. Π_H = norm · Σ_q dq q⁴/ε · y₂ with a y-INDEPENDENT norm (the
       // 2/3, (ρ+p), the exp(lnN) rescaling and the ρ+p normalisation all factor out),
@@ -1754,7 +1740,7 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
         const double wq   = parent_->dq()[i] * q * q * q * q / eps;
         const int i2      = p_lay.index_per_q[i] + 2;
         num              += wq * dyc[i2];
-        den              += wq * pv->y[i2];
+        den              += wq * y[i2];  // the vector pi_H was contracted from
       }
       // pi_H/den is the y-independent norm and stays well conditioned even at a zero
       // crossing of den, because pi_H carries the same vanishing factor.
@@ -1811,11 +1797,10 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     double m_den[kLMomentMax + 1] = {0.};
     double m_can[kLMomentMax + 1] = {0.};
     if (!w.IsTitleMode()) {
-      const perturb_vector* pv = ppw->pv.get();
-      const double* pvecback   = ppw->pvecback.data();
-      const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
-      auto* scratch = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
+      const double* pvecback = ppw->pvecback.data();
+      const double a         = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+      const auto& my         = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
+      auto* scratch          = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
       if (scratch != nullptr && !scratch->dy_coll.empty()) {
         const double* dyc = scratch->dy_coll.data();
         const double aM2  = a * a * parent_->GetMass() * parent_->GetMass();
@@ -1825,24 +1810,20 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
           const NCDMBaseSpecies::PerturbLayout* lay;
           const std::vector<double>* q;
           const std::vector<double>* dq;
-          const double* state;  // NOT the same vector for all three -- see below
+          const double* state;  // the vector this leg's pi was contracted from
           double a2m2;
           double pi;    // that species' a4Pi contribution
           double norm;  // pi / raw l=2 moment
         };
-        // ⚠ THE THREE LEGS READ DIFFERENT STATE VECTORS, and it is not optional.
-        // DNCDMSpecies::RescaledPerturbations reads ppw->pv->y directly and IGNORES the
-        // y it is handed, so pi_H is built from pv->y; the daughters' StressEnergy
-        // contracts the y it is given, so pi_l and pi_phi are built from `y`. Each norm
-        // N_i must be calibrated on whichever vector its own pi_i came from. Using one
-        // vector for all three is wrong by 0.7% on the parent or 0.7-1.4% on the
-        // daughters depending on which you pick -- silently, and only in the COLLISION
-        // term, because the moments themselves agree to 5e-13 either way.
-        Leg legs[3] =
-            {{&parent_layout(my), &parent_->q(), &parent_->dq(), pv->y.data(), aM2, pi_H, 0.},
-             {&fermion_layout(my), &fermion_->q(), &fermion_->dq(), y, 0., pi_l, 0.},
-             {&boson_layout(my), &boson_->q(), &boson_->dq(), y, 0., pi_phi, 0.}};
-        auto raw = [&](const Leg& L, const double* vec, int l) {
+        // Each norm N_i must be calibrated on the vector its own pi_i was contracted
+        // from. All three StressEnergy calls now contract the `y` they are handed
+        // (DNCDMSpecies::RescaledPerturbations used to read ppw->pv->y instead, which
+        // differs from `y` here by ~0.7%, and is stale on the RHS -- #136), so all
+        // three legs use `y`.
+        Leg legs[3] = {{&parent_layout(my), &parent_->q(), &parent_->dq(), y, aM2, pi_H, 0.},
+                       {&fermion_layout(my), &fermion_->q(), &fermion_->dq(), y, 0., pi_l, 0.},
+                       {&boson_layout(my), &boson_->q(), &boson_->dq(), y, 0., pi_phi, 0.}};
+        auto raw    = [&](const Leg& L, const double* vec, int l) {
           if (l > L.lay->l_max || L.lay->q_size <= 0) {
             return 0.;
           }

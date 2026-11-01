@@ -5383,10 +5383,12 @@ void PerturbationsModule::perturb_print_variables(double tau,
       }
       else {
         const double dkappa = pvecthermo[thermodynamics_module_->index_th_dkappa_];
+        // y, not ppw->pv->y: the evolver hands print_variables the state at the
+        // output time, while pv->y is its own working vector (#136, PR #495).
         const PhotonsSpecies::TensorTcaClosure tca = PhotonsSpecies::TensorTightCoupling(
-            ppw->pv->y[ppw->pv->index_pt_gwdot],
+            y[ppw->pv->index_pt_gwdot],
             dkappa,
-            PhotonsSpecies::TensorTcaDrift(ppw->pv->y[ppw->pv->index_pt_gwdot],
+            PhotonsSpecies::TensorTcaDrift(y[ppw->pv->index_pt_gwdot],
                                            dkappa,
                                            dy[ppw->pv->index_pt_gwdot],
                                            pvecthermo[thermodynamics_module_->index_th_ddkappa_]));

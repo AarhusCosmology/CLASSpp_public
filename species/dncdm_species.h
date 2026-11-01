@@ -203,12 +203,16 @@ class DNCDMSpecies : public NCDMBaseSpecies {
    * @param layout this species' per-pv NCDM layout (provides index_per_q).
    * @param a Scale factor at the current integration time.
    * @param k Fourier wavenumber of the perturbation mode.
-   * @param ppw Perturbation workspace holding the current phase-space state.
+   * @param y State vector to contract. Must be the y the caller was handed, NOT
+   *          ppw->pv->y: the evolvers call the RHS at their own trial vectors
+   *          (ndf15's ynew / numerical-Jacobian yydel), so ppw->pv->y is stale there.
+   * @param ppw Perturbation workspace (background lnf for the weights).
    */
   std::tuple<double, double, double> RescaledPerturbations(
       const NCDMBaseSpecies::PerturbLayout& layout,
       double a,
       double k,
+      const double* y,
       const perturb_workspace* ppw) const;
 
  protected:

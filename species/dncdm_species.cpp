@@ -694,6 +694,22 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
     }
     dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
   }
+
+  // Newtonian gauge: the decay runs on the parent's proper time, dt = a(1+psi) dtau,
+  // so the loss term -a^2 M Gamma/eps * f-bar picks up a factor (1+psi). The
+  // background part cancels against f-bar' in Psi = delta f / f-bar; what is left is
+  // the lapse term below (cf. DCDMSpecies: delta' -= a Gamma psi, its eps = aM limit).
+  // metric_euler = k^2 psi in Newtonian gauge and exactly 0 in synchronous gauge.
+  // Kept as its own loop, after the decay-only body, so the synchronous-gauge
+  // instruction sequence above is untouched (see the comment on the two loops).
+  if (ppaw.perturbations_module->GetPerturbs()->gauge == possible_gauges::newtonian) {
+    const double psi = metric_euler / (k * k);
+    for (int iq = 0; iq < layout.q_size; ++iq) {
+      const double q              = q_[iq];
+      const double epsilon        = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
+      dy[layout.index_per_q[iq]] -= a2 * M_ncdm * Gamma_ / epsilon * psi;
+    }
+  }
 }
 
 void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
@@ -749,10 +765,15 @@ BaseSpecies::StressEnergyContribution DNCDMSpecies::StressEnergy(
     return se;
   }
 
-  // DeltaRho, RhoPlusPTheta, RhoPlusPShear via RescaledPerturbations (one call).
+  // DeltaRho, RhoPlusPTheta, RhoPlusPShear via RescaledPerturbations (one call),
+  // contracting the y we were HANDED. It used to read ppw->pv->y, which is the
+  // evolver's committed state, not the trial vector the RHS is being evaluated at:
+  // the Einstein equations then saw a stale parent (and the numerical Jacobian saw
+  // no parent->metric coupling at all). The potentials came out roughly right but
+  // their time derivatives did not, which put a ~10% error into the low-l ISW (#136).
   const double a      = ppw->scalar_ctx.a;
   const double k      = ppw->scalar_ctx.k;
-  auto [d, t, s]      = RescaledPerturbations(layout, a, k, ppw);
+  auto [d, t, s]      = RescaledPerturbations(layout, a, k, y, ppw);
   se.delta_rho        = Rho(pvecback) * d;
   se.rho_plus_p_theta = (Rho(pvecback) + P(pvecback)) * t;
   se.rho_plus_p_shear = (Rho(pvecback) + P(pvecback)) * s;
@@ -799,7 +820,7 @@ BaseSpecies::StressEnergyContribution DNCDMSpecies::StressEnergy(
 // carries the exp(lnN) rescaling that keeps δ = δρ/ρ meaningful after f̄ has decayed
 // below underflow. Nothing here needs to know which mode is active.
 void DNCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
-                               const double* /*y*/,
+                               const double* y,
                                const double* /*dy*/,
                                PerturbSourceContext& ctx) const {
   if (ctx.index_md != ctx.p_mod->index_md_scalars_) {
@@ -812,7 +833,7 @@ void DNCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   perturb_workspace* ppw   = ctx.ppw;
   const double* pvecback   = ppw->pvecback.data();
   const perturb_vector* pv = ppw->pv.get();
-  const auto se            = StressEnergy(layout, pv, pv->y.data(), pvecback, ppw);
+  const auto se            = StressEnergy(layout, pv, y, pvecback, ppw);  // y at this sample
 
   if (index_tp_delta_ >= 0) {
     // ρ_H falls to ~1e-97 of ρ_tot at high Γ, so guard the ratio rather than assume
@@ -860,6 +881,7 @@ std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(
     const NCDMBaseSpecies::PerturbLayout& layout,
     double a,
     double k,
+    const double* y,
     const perturb_workspace* ppw) const {
   double rho_scaled              = 0.;
   double rho_plus_p_scaled       = 0.;
@@ -892,9 +914,9 @@ std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(
 
       rho_scaled              += dq_val * q2 * epsilon * std::exp(lnN + lnf);
       rho_plus_p_scaled       += dq_val * q2 * (epsilon + q2 / 3. / epsilon) * std::exp(lnN + lnf);
-      rho_delta_scaled        += dq_val * q2 * epsilon * eN * ppw->pv->y[index_pt];
-      rho_plus_p_theta_scaled += dq_val * q2 * q * eN * ppw->pv->y[index_pt + 1];
-      rho_plus_p_shear_scaled += dq_val * q2 * q2 / epsilon * eN * ppw->pv->y[index_pt + 2];
+      rho_delta_scaled        += dq_val * q2 * epsilon * eN * y[index_pt];
+      rho_plus_p_theta_scaled += dq_val * q2 * q * eN * y[index_pt + 1];
+      rho_plus_p_shear_scaled += dq_val * q2 * q2 / epsilon * eN * y[index_pt + 2];
     }
   }
   else {
@@ -909,10 +931,9 @@ std::tuple<double, double, double> DNCDMSpecies::RescaledPerturbations(
 
       rho_scaled              += dq_val * q2 * epsilon * std::exp(lnN + lnf);
       rho_plus_p_scaled       += dq_val * q2 * (epsilon + q2 / 3. / epsilon) * std::exp(lnN + lnf);
-      rho_delta_scaled        += dq_val * q2 * epsilon * std::exp(lnN + lnf) * ppw->pv->y[index_pt];
-      rho_plus_p_theta_scaled += dq_val * q2 * q * std::exp(lnN + lnf) * ppw->pv->y[index_pt + 1];
-      rho_plus_p_shear_scaled += dq_val * q2 * q2 / epsilon * std::exp(lnN + lnf) *
-                                 ppw->pv->y[index_pt + 2];
+      rho_delta_scaled        += dq_val * q2 * epsilon * std::exp(lnN + lnf) * y[index_pt];
+      rho_plus_p_theta_scaled += dq_val * q2 * q * std::exp(lnN + lnf) * y[index_pt + 1];
+      rho_plus_p_shear_scaled += dq_val * q2 * q2 / epsilon * std::exp(lnN + lnf) * y[index_pt + 2];
     }
   }
   rho_plus_p_theta_scaled *= k;

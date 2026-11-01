@@ -520,6 +520,21 @@ void evolver_ndf15(EvolverDerivs derivs,
           }
           oldnrm = newnrm;
         }
+        /* A non-finite Newton iterate is a failed iteration, whatever the norms said.
+           ndf15's norms are std::max reductions, and how they treat a NaN depends on
+           the compiler: std::max(a, NaN) returns a as written, so on arm64 (clang) a
+           NaN component "converged" and the step was ACCEPTED with a poisoned state,
+           while on x86-64 (GCC, maxsd) the NaN reached newnrm and the iteration
+           failed. Testing ynew here makes both take the second path: h shrinks, a NaN
+           from an oversized trial step is recovered from, and a NaN that persists
+           down to the step-size floor stops the run with its index below. One O(neq)
+           scan per Newton attempt, against at least one derivs call and one LU solve.
+           FirstNonFinite, not std::isnan, because of -ffast-math (nonfinite.h). */
+        const int nonfinite = FirstNonFinite(ynew + 1, neq);
+        if (nonfinite >= 0) {
+          gotynew = false;
+          tooslow = true;
+        }
         if (tooslow) {
           counters.steps_rejected += 1;
           /*	! Speed up the iteration by forming new linearization or reducing h. */
@@ -532,6 +547,15 @@ void evolver_ndf15(EvolverDerivs derivs,
             Jcurrent                     = true;
           }
           else if (absh <= hmin) {
+            if (nonfinite >= 0) {
+              class_stop(
+                  "ndf15: non-finite state at x=%e, also at the smallest step "
+                  "h=%e: y[%d]=%e. Something upstream produced NaN/Inf.",
+                  tnew,
+                  h,
+                  nonfinite,
+                  ynew[nonfinite + 1]);
+            }
             class_test(absh <= hmin,
                        "Step size too small: step:%g, minimum:%g, in interval: [%g:%g]\n",
                        absh,
@@ -556,6 +580,7 @@ void evolver_ndf15(EvolverDerivs derivs,
       }
       /*end of while loop for getting ynew
 	difkp1 is now the backward difference of ynew of order k+1. */
+
       err = 0.0;
       for (jj = 1; jj <= neq; jj++) {
         err = std::max(err, fabs(difkp1[jj] * invwt[jj]));
@@ -1260,6 +1285,46 @@ void fzero_Newton(FunctionRef<void(double* x, int x_size, double* F)> func,
 /* "numjac", "initialize_jacobian", "uninitialize_jacobian",					*/
 /* "initialize_numjac_workspace", "uninitialize_numjac_workspace".		*/
 /**********************************************************************/
+namespace {
+
+/* Stops the run when v[1..neq] (1-based, as ndf15 holds its vectors) has a NaN or
+   Inf; indices are reported 0-based, as the caller's y[] and dy[] see them. probed < 0
+   means v is the state (what = "y") or its derivative (what = "dy"); otherwise v is
+   the derivative at the finite-difference point y + del*e_probed.
+
+   numjac needs this because its row-maximum search compares |Fdiff| >= the running
+   maximum, which is false for NaN: a NaN column leaves Rowmax at 0, and absFdelRm then
+   reads through the null row pointer ydel_Fdel[0] -- a segfault rather than an error
+   (UBSan, PR #495 review). The scan is O(neq) per derivs call inside numjac, which
+   runs once per Jacobian, not once per step. */
+void NumjacStopIfNonFinite(
+    const double* v, int neq, double t, const char* what, int probed, double del) {
+  const int bad = FirstNonFinite(v + 1, neq);
+  if (bad < 0) {
+    return;
+  }
+  if (probed < 0) {
+    class_stop(
+        "ndf15 numjac: non-finite %s[%d]=%e at x=%e. Something upstream produced "
+        "NaN/Inf.",
+        what,
+        bad,
+        v[bad + 1],
+        t);
+  }
+  class_stop(
+      "ndf15 numjac: non-finite dy[%d]=%e at x=%e when probing the Jacobian column "
+      "of y[%d] (step %e). The state and its derivative are finite; the right-hand "
+      "side is not, one finite-difference step away from it.",
+      bad,
+      v[bad + 1],
+      t,
+      probed,
+      del);
+}
+
+}  // namespace
+
 void numjac(EvolverDerivs derivs,
             double t,
             double* y,
@@ -1310,6 +1375,9 @@ void numjac(EvolverDerivs derivs,
 
   /* Set new_jacobian flag: */
   jac->new_jacobian = true;
+
+  NumjacStopIfNonFinite(y, neq, t, "y", -1, 0.);
+  NumjacStopIfNonFinite(fval, neq, t, "dy", -1, 0.);
 
   for (j = 1; j <= neq; j++) {
     nj_ws->yscale[j] = std::max(fabs(y[j]), thresh);
@@ -1392,6 +1460,20 @@ void numjac(EvolverDerivs derivs,
     derivs(t, nj_ws->yydel.data() + 1, nj_ws->ffdel.data() + 1);
 
     *nfe += 1;
+    if (FirstNonFinite(nj_ws->ffdel.data() + 1, neq) >= 0) {
+      /* Name the first state entry this probe perturbed: column j when dense, the
+         first member of column group j-1 when grouped. */
+      int probed = j;
+      if ((jac->use_sparse) && (jac->repeated_pattern >= jac->trust_sparse)) {
+        for (i = 1; i <= neq; i++) {
+          if (jac->col_group[i - 1] == j - 1) {
+            probed = i;
+            break;
+          }
+        }
+      }
+      NumjacStopIfNonFinite(nj_ws->ffdel.data(), neq, t, "dy", probed - 1, nj_ws->del[probed]);
+    }
     for (i = 1; i <= neq; i++) {
       nj_ws->ydel_Fdel[i][j] = nj_ws->ffdel[i];
     }
@@ -1487,9 +1569,10 @@ void numjac(EvolverDerivs derivs,
           derivs(t, nj_ws->yydel.data() + 1, nj_ws->ffdel.data() + 1);
           *nfe            += 1;
           nj_ws->yydel[j]  = y[j];
-          int rowmax2      = 1;
-          Fdiff_new        = 0.0;
-          Fdiff_absrm      = 0.0;
+          NumjacStopIfNonFinite(nj_ws->ffdel.data(), neq, t, "dy", j - 1, del2);
+          int rowmax2 = 1;
+          Fdiff_new   = 0.0;
+          Fdiff_absrm = 0.0;
           for (i = 1; i <= neq; i++) {
             Fdiff_absrm   = std::max(Fdiff_absrm, fabs(Fdiff_new));
             Fdiff_new     = nj_ws->ffdel[i] - fval[i];

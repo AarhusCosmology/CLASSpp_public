@@ -153,10 +153,37 @@ void DNCDM_DR_Species::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbL
   dncdm_->PerturbSynchronousToNewtonian(dncdm_layout(base),
                                         y,
                                         ctx);  // NCDMBaseSpecies per-q transform
-  const double* pvecback  = ctx.ppw->pvecback.data();
-  const double rho_dr     = dr_sp_->Rho(pvecback);
-  const double decay_corr = (rho_dr > 0.) ? ctx.a * dncdm_->Gamma() * dncdm_->Rho(pvecback) / rho_dr
-                                          : 0.;
+  const double* pvecback = ctx.ppw->pvecback.data();
+  const double M_ncdm    = dncdm_->GetMass();
+  const double Gamma     = dncdm_->Gamma();
+
+  // Parent: the per-q transform above is the stable-NCDM one, in which f-bar(q) is
+  // constant in conformal time. The decaying parent's is not. The convention here
+  // is that of ApplyFluidLikeNewtonianShift, delta_N = delta_S + alpha rho'/rho
+  // (radiation: -4 aH alpha), whose per-q form is Psi_N = Psi_S + alpha (ln f-bar)'
+  // at fixed q. With (ln f-bar)' = -a^2 M Gamma / eps (DNCDMSpecies::BackgroundDerivs):
+  //   Psi_0 += -alpha a^2 M Gamma / eps
+  // (the per-q analogue of DCDM's -alpha a Gamma inside RhoPrimeOverRho). This
+  // species runs only in Psi-space: the F-space representation belongs to the
+  // inverse-decay composite, which is synchronous-gauge only.
+  const auto& dncdm_lay = dncdm_layout(base);
+  for (int iq = 0; iq < dncdm_lay.q_size; ++iq) {
+    const double q                = dncdm_->GetQ()[iq];
+    const double epsilon          = std::sqrt(q * q + ctx.a * ctx.a * M_ncdm * M_ncdm);
+    y[dncdm_lay.index_per_q[iq]] -= ctx.alpha * ctx.a * ctx.a * M_ncdm * Gamma / epsilon;
+  }
+
+  // Daughters: delta_N = delta_S + alpha rho_dr'/rho_dr (same convention), with
+  //   rho_dr' = -4 aH rho_dr + a Gamma M n_parent      (BackgroundDerivs above),
+  // so PerturbNewtonianReseed's (-4 aH + decay_corr) alpha needs
+  // decay_corr = +a Gamma M n / rho_dr. It is the parent's rest-mass
+  // density M n that is injected, NOT its energy density rho: the two differ by
+  // <eps>/(aM), which is huge while the parent is relativistic -- i.e. exactly when
+  // the initial conditions are set (rho_dr itself grows from zero there, so the
+  // correction is O(aH) with M n and orders of magnitude larger with rho).
+  const double rho_dr = dr_sp_->Rho(pvecback);
+  const double decay_corr =
+      (rho_dr > 0.) ? ctx.a * Gamma * M_ncdm * pvecback[dncdm_->bg_number_index()] / rho_dr : 0.;
   dr_sp_->PerturbNewtonianReseed(dr_layout(base), y, ctx, decay_corr);
 }
 
@@ -239,48 +266,46 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     ComputeFl(index_q, FL);
   }
 
+  // The parent is ALWAYS a full per-q hierarchy (DNCDMSpecies registers no fluid
+  // variables and never collapses), so the source is always the momentum integral.
+  // This used to branch on the global ncdmfa flag and, once it switched on
+  // (k tau > ncdm_fluid_trigger_tau_over_tau_k), read Psi_0 / Psi_1 of the
+  // LOWEST-q bin as if they were a fluid delta / theta and drop l >= 2 -- wrong in
+  // both gauges, and in Newtonian gauge fatal: that bin's Psi_1 ~ (eps/q) psi is
+  // huge for a non-relativistic parent and drove the DR velocity to a runaway
+  // (P(k) off by 1e16, #136).
   auto compute_collision_integral = [&](int l) {
     double integral_num   = 0.;
     double integral_denom = 0.;
+    bool must_rescale     = false;
+    for (int index_q = 0; index_q < q_size; ++index_q) {
+      double dq = dncdm_->dq()[index_q];
+      double w0 = dq * exp(pvecback[dncdm_->bg_lnf_index() + index_q]);
+      double q  = dncdm_->GetQ()[index_q];
 
-    if (ppw->approx[ppw->index_ap_ncdmfa] == static_cast<int>(ncdmfa_off)) {
-      bool must_rescale = false;
+      if (w0 == 0.) {
+        must_rescale = true;
+        break;
+      }
+
+      int psi_ind     = dncdm_lay.index_per_q[index_q] + l;
+      integral_num   += w0 * q * q * y[psi_ind] * FL[l * q_size + index_q];
+      integral_denom += w0 * q * q;
+    }
+    if (must_rescale) {
+      integral_num   = 0.;
+      integral_denom = 0.;
+      double lnN     = dncdm_->GetRescalingFactor(pvecback + dncdm_->bg_lnf_index());
       for (int index_q = 0; index_q < q_size; ++index_q) {
-        double dq = dncdm_->dq()[index_q];
-        double w0 = dq * exp(pvecback[dncdm_->bg_lnf_index() + index_q]);
-        double q  = dncdm_->GetQ()[index_q];
-
-        if (w0 == 0.) {
-          must_rescale = true;
-          break;
-        }
-
+        double dq       = dncdm_->dq()[index_q];
+        double lnf      = pvecback[dncdm_->bg_lnf_index() + index_q];
+        double q        = dncdm_->GetQ()[index_q];
         int psi_ind     = dncdm_lay.index_per_q[index_q] + l;
-        integral_num   += w0 * q * q * y[psi_ind] * FL[l * q_size + index_q];
-        integral_denom += w0 * q * q;
+        integral_num   += dq * q * q * exp(lnN + lnf) * y[psi_ind] * FL[l * q_size + index_q];
+        integral_denom += dq * q * q * exp(lnN + lnf);
       }
-      if (must_rescale) {
-        integral_num   = 0.;
-        integral_denom = 0.;
-        double lnN     = dncdm_->GetRescalingFactor(pvecback + dncdm_->bg_lnf_index());
-        for (int index_q = 0; index_q < q_size; ++index_q) {
-          double dq       = dncdm_->dq()[index_q];
-          double lnf      = pvecback[dncdm_->bg_lnf_index() + index_q];
-          double q        = dncdm_->GetQ()[index_q];
-          int psi_ind     = dncdm_lay.index_per_q[index_q] + l;
-          integral_num   += dq * q * q * exp(lnN + lnf) * y[psi_ind] * FL[l * q_size + index_q];
-          integral_denom += dq * q * q * exp(lnN + lnf);
-        }
-      }
-      return rprime_dr * integral_num / integral_denom;
     }
-    if (l == 0) {
-      return rprime_dr * y[dncdm_lay.index_per_q[0]];
-    }
-    if (l == 1) {
-      return rprime_dr * y[dncdm_lay.index_per_q[0] + 1] / k;
-    }
-    return 0.;
+    return rprime_dr * integral_num / integral_denom;
   };
 
   const int base = dr_lay.idx_F0;
@@ -290,6 +315,15 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
       collision_term = compute_collision_integral(l);
     }
     dy[base + l] += collision_term;
+  }
+
+  // Newtonian gauge: the injection rate a Gamma M n runs on the parent's proper time,
+  // so the isotropic source carries a factor (1 + psi), exactly as DCDM_DR_Species
+  // adds rprime_dr * metric_euler / k^2 to its DR monopole. metric_euler = k^2 psi in
+  // Newtonian gauge and exactly 0 in synchronous gauge; the branch keeps the
+  // synchronous-gauge arithmetic untouched.
+  if (ppaw.perturbations_module->GetPerturbs()->gauge == possible_gauges::newtonian) {
+    dy[base + 0] += rprime_dr * ctx.metric_euler / (k * k);
   }
 }
 

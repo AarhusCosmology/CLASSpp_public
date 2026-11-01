@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "evolver_ndf15.h"
 #include "evolver_options.h"
 #include "nonfinite.h"
 
@@ -53,6 +54,12 @@ void derivs_goes_nan(double x, double* /*y*/, double* dy) {
 
 void derivs_finite(double /*x*/, double* /*y*/, double* dy) {
   dy[0] = 1.0;
+}
+
+// Finite at the state y = 1 and nowhere else: the shape that reaches numjac's
+// perturbed evaluations y + del*e_j with a healthy state and a poisoned column.
+void derivs_nan_off_the_state(double /*x*/, double* y, double* dy) {
+  dy[0] = (y[0] == 1.0) ? -1.0 : RuntimeNaN();
 }
 
 // print_variables is optional but output is not (real callers always supply one), so
@@ -124,6 +131,81 @@ void test_finite_run_still_completes() {
   std::printf("nonfinite: finite run unaffected (y=%.6f)\n", y);
 }
 
+// ndf15 needs the same guard, and it must not depend on the platform. Its norms are
+// std::max reductions, whose NaN behaviour the compiler decides: on arm64 (clang)
+// std::max(a, NaN) returns a, so a NaN state passed both the Newton test and the
+// local error test and the run completed silently with a poisoned state; on x86-64
+// (GCC, maxsd) the NaN reached the Newton norm and the run ended in an anonymous
+// "Step size too small". When a stalled Newton iteration sent a NaN state to numjac,
+// its row-maximum search (>=, false for NaN) left Rowmax at 0 and read through the
+// null row pointer ydel_Fdel[0] (UBSan; a PR #495 variant segfaulted on 33/36 cells
+// at Gamma >= 1e5). Both platforms must now stop with the NaN named.
+void test_ndf15_aborts_on_nonfinite() {
+  double y               = 0.;
+  int used               = 1;
+  std::vector<double> xs = {0., 1.};
+  bool threw             = false;
+  std::string msg;
+  try {
+    EvolverOptions opt;
+    opt.rtol            = 1e-5;
+    opt.used_in_output  = &used;
+    opt.x_sampling      = xs.data();
+    opt.x_sampling_size = static_cast<int>(xs.size());
+    opt.output          = output_noop;
+    evolver_ndf15(derivs_goes_nan, 0., 1., &y, 1, opt);
+  }
+  catch (const std::runtime_error& e) {
+    threw = true;
+    msg   = e.what();
+  }
+  assert(threw);
+  assert(msg.find("non-finite") != std::string::npos);
+  assert(msg.find("y[0]") != std::string::npos);
+  std::printf("nonfinite: ndf15 aborted as required: %s\n", msg.c_str());
+}
+
+void test_ndf15_finite_run_still_completes() {
+  double y               = 0.;
+  int used               = 1;
+  std::vector<double> xs = {0., 1.};
+  EvolverOptions opt;
+  opt.rtol            = 1e-5;
+  opt.used_in_output  = &used;
+  opt.x_sampling      = xs.data();
+  opt.x_sampling_size = static_cast<int>(xs.size());
+  opt.output          = output_noop;
+  evolver_ndf15(derivs_finite, 0., 1., &y, 1, opt);
+  assert(y > 0.999 && y < 1.001);
+  std::printf("nonfinite: ndf15 finite run unaffected (y=%.6f)\n", y);
+}
+
+// numjac on its own: the state and its derivative are finite, the column evaluated
+// at y + del is not. Must be an error that names the column, not a segfault.
+void test_numjac_aborts_on_nonfinite_column() {
+  const int neq = 1;
+  jacobian jac;
+  numjac_workspace ws;
+  initialize_jacobian(&jac, neq);
+  initialize_numjac_workspace(&ws, neq);
+  std::vector<double> y    = {0., 1.};  // 1-based, as ndf15 holds it
+  std::vector<double> fval = {0., -1.};
+  int nfe                  = 0;
+  bool threw               = false;
+  std::string msg;
+  try {
+    numjac(derivs_nan_off_the_state, 0., y.data(), fval.data(), &jac, &ws, 1e-10, neq, &nfe);
+  }
+  catch (const std::runtime_error& e) {
+    threw = true;
+    msg   = e.what();
+  }
+  assert(threw);
+  assert(msg.find("non-finite") != std::string::npos);
+  assert(msg.find("y[0]") != std::string::npos);
+  std::printf("nonfinite: numjac aborted as required: %s\n", msg.c_str());
+}
+
 // StepMakesNoProgress lives in the same -fno-fast-math TU and for the same reason:
 // `t + h == t` is algebraically `h == 0`, which -ffast-math may substitute, at which
 // point the test only catches h == 0 exactly -- a value the step controller never
@@ -167,6 +249,9 @@ int main() {
   test_no_progress_check_survives_fast_math();
   test_evolver_aborts_on_nonfinite();
   test_finite_run_still_completes();
+  test_ndf15_finite_run_still_completes();
+  test_ndf15_aborts_on_nonfinite();
+  test_numjac_aborts_on_nonfinite_column();
   std::printf("evolver nonfinite test passed\n");
   return 0;
 }

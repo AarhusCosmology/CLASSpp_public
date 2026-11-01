@@ -7,7 +7,6 @@
 
 #include "errors.h"
 #include "species/axion_ncdm_species.h"
-#include "species/dncdm_species.h"
 #include "species/greybody_ncdm_species.h"
 #include "species/ncdm_interacting_species.h"
 #include "species/ncdm_species.h"
@@ -17,15 +16,15 @@ namespace {
 
 // Exactly the types whose perturbation code consults index_ap_ncdmfa:
 // NCDMSpecies (and its subclasses ncdm_greybody / ncdm_axion, which inherit
-// its perturbation code), NCDMInteractingSpecies, and the ncdm_decay_dr
-// composite. dcdm_wdm's daughter has no fluid approximation and is absent
-// on purpose.
+// its perturbation code) and NCDMInteractingSpecies. Absent on purpose:
+// dcdm_wdm's daughter, and ncdm_decay_dr, whose parent never collapses to a
+// fluid (dncdm_species.cpp) and whose DR source stopped reading the flag in
+// #136 -- so <name>.fluid_approximation on it is rejected like any other.
 constexpr std::array kFluidApproximationConsumers = {
     NCDMSpecies::kTypeName,
     GreyBodyNCDMSpecies::kTypeName,
     AxionNCDMSpecies::kTypeName,
     NCDMInteractingSpecies::kTypeName,
-    DNCDMSpecies::kTypeName,
 };
 
 bool ConsumesFluidApproximation(std::string_view type) {

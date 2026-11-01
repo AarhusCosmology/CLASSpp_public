@@ -835,6 +835,92 @@ class TestReviewRegressions(TestClass):
             cosmo.struct_cleanup()
             cosmo.empty()
 
+    def test_dncdm_dr_newtonian_matches_synchronous(self):
+        """#136 guard: ncdm_decay_dr in Newtonian gauge tracks the synchronous run.
+
+        Two failures are caught here. The DR decay source used to switch, with the
+        global ncdmfa flag, to reading the lowest-q parent bin as a fluid delta/theta
+        (the parent never becomes a fluid). In Newtonian gauge that bin's
+        Psi_1 ~ (eps/q) psi drove the DR velocity to a runaway: P(k) was off by 1e16.
+        Without the Newtonian-gauge terms (the proper-time factor (1 + psi) on the
+        decay and the gauge shift of the parent and DR initial conditions) the gauges
+        differ by 2% in C_l^TT at l < 20 and by 21% in P(k) at k < 0.01 h/Mpc. With
+        them the gap is 0.14% and 0.8%.
+
+        The momentum grid is Laguerre (strategy 1), since the trapezoid grid
+        (strategy 3) with its default max_q = 15 has a Newtonian-gauge error that
+        does not shrink with momenta_bins, also for a stable ncdm_standard (#496).
+        Below k = 1e-4/Mpc even a stable ncdm drifts between the gauges at the
+        default tolerances (#497), so P(k) starts there."""
+        params = {
+            'output': 'tCl,mPk',
+            'l_max_scalars': 1000,
+            'P_k_max_1/Mpc': 0.3,
+            'N_ur': 3.046,
+            'omega_b': 0.022032,
+            'omega_cdm': 0.11,
+            'YHe': 0.25,
+            'dncdm1.type': 'ncdm_decay_dr',
+            'dncdm1.m': 1.0,
+            'dncdm1.T': 0.71611,
+            'dncdm1.Gamma': 1e3,
+            'dncdm1.Omega_ini': 2e-5,
+            'dncdm1.quadrature_strategy': 1,
+            'dncdm1.momenta_bins': 16,
+        }
+        out = {}
+        for gauge in ('synchronous', 'newtonian'):
+            cosmo = Class()
+            try:
+                cosmo.set(dict(params, gauge=gauge))
+                cosmo.compute()
+                k = np.geomspace(1e-4, 0.2, 40)
+                out[gauge] = (cosmo.raw_cl(1000)['tt'][2:],
+                              np.array([cosmo.pk_lin(kk, 0.) for kk in k]))
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+        np.testing.assert_allclose(out['newtonian'][0], out['synchronous'][0], rtol=5e-3,
+                                   err_msg='C_l^TT, 2 <= l <= 1000')
+        np.testing.assert_allclose(out['newtonian'][1], out['synchronous'][1], rtol=1e-2,
+                                   err_msg='P(k), 1e-4 <= k <= 0.2 /Mpc')
+
+    def test_dncdm_dr_without_decay_matches_stable_ncdm(self):
+        """#136 guard: a DNCDM parent that does not decay is a stable ncdm.
+
+        DNCDMSpecies::StressEnergy used to contract ppw->pv->y (the evolver's
+        working vector) instead of the y it was handed, so the Einstein equations
+        saw a stale parent at every trial evaluation. The potentials stayed close
+        but their time derivatives did not: C_l^TT at l < 20 was 10.8% off an
+        equivalent stable ncdm on this grid. Now 3e-4, with both species on the
+        same 16-bin Laguerre grid."""
+        common = {
+            'output': 'tCl',
+            'l_max_scalars': 100,
+            'N_ur': 3.046,
+            'omega_b': 0.022032,
+            'omega_cdm': 0.11,
+            'YHe': 0.25,
+        }
+        species = {
+            'dncdm': {'dncdm1.type': 'ncdm_decay_dr', 'dncdm1.m': 1.0, 'dncdm1.T': 0.71611,
+                      'dncdm1.Gamma': 1e-3, 'dncdm1.deg': 1,
+                      'dncdm1.quadrature_strategy': 1, 'dncdm1.momenta_bins': 16},
+            'ncdm': {'nu1.type': 'ncdm_standard', 'nu1.m': 1.0, 'nu1.T': 0.71611,
+                     'nu1.quadrature_strategy': 1, 'nu1.momenta_bins': 16},
+        }
+        tt = {}
+        for name, extra in species.items():
+            cosmo = Class()
+            try:
+                cosmo.set(dict(common, **extra))
+                cosmo.compute()
+                tt[name] = cosmo.raw_cl(100)['tt'][2:]
+            finally:
+                cosmo.struct_cleanup()
+                cosmo.empty()
+        np.testing.assert_allclose(tt['dncdm'], tt['ncdm'], rtol=2e-3, err_msg='C_l^TT, 2 <= l <= 100')
+
     def test_dncdm_dr_collision_lmax_default_tracks_the_hierarchies(self):
         """l_max_dr_col has no default of its own: the DR collision at multipole
         l reads the parent NCDM's l-th multipole, so perturb_init refuses

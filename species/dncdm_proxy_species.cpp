@@ -423,11 +423,6 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
                       "species '%s': dr_representation = proxy does not support tensor modes",
                       name.c_str());
   }
-  class_test_severe(in.get<std::string>("fluid_approximation").has_value(),
-                    "species '%s': dr_representation = proxy needs the full Boltzmann hierarchy "
-                    "for the parent; remove '%s.fluid_approximation'",
-                    name.c_str(),
-                    name.c_str());
   class_test_severe(parent->q_size() != parent->q_size_bg(),
                     "species '%s': dr_representation = proxy requires a single parent momentum "
                     "grid (q_size=%d != q_size_bg=%d)",

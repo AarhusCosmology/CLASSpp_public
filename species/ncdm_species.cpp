@@ -270,7 +270,7 @@ void NCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWr
 }
 
 void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
-                              const double* /*y*/,
+                              const double* y,
                               const double* /*dy*/,
                               PerturbSourceContext& ctx) const {
   PerturbationsModule* p_mod = ctx.p_mod;
@@ -281,9 +281,10 @@ void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
     return;
   }
 
-  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecback = ppw->pvecback.data();
+  // The y perturb_sources hands us is the state AT this sampling time; ppw->pv->y is
+  // the evolver's committed state, which is not (#136).
   const perturb_vector* pv = ppw->pv.get();
-  const double* y          = ppw->pv->y.data();
 
   // delta_ncdm[n]: density perturbation
   if (index_tp_delta_ >= 0 || index_tp_theta_ >= 0) {

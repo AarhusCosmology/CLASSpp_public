@@ -18,6 +18,15 @@ bool IsNonFinite(double x) {
   return (bits & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL;
 }
 
+int FirstNonFinite(const double* x, int n) {
+  for (int i = 0; i < n; ++i) {
+    if (IsNonFinite(x[i])) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 bool StepMakesNoProgress(double t, double h) {
   // Deliberately written as the rounding test itself rather than as
   // |h| < eps*|t|: this asks the machine the exact question the integrator cares
