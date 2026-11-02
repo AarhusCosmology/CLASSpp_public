@@ -2979,7 +2979,41 @@ void test_massive_daughters(double r_l, double r_phi, bool balanced) {
   }
 }
 
+// emission_gauss indexes the kernel's 1..4-point Gauss-Legendre tables: 0 would leave the
+// bands without nodes (no decays at all), 5 would read past the tables. Both are refused
+// at construction, and every tabulated rule is accepted.
+void test_emission_gauss_range() {
+  const int N        = 12;
+  Grid P             = MakeGrid(1e-3, 1e2, N);
+  Grid F             = MakeGrid(1e-4, 2e2, N);
+  Grid B             = MakeGrid(1e-4, 2e2, N);
+  const auto refused = [&](int ng) {
+    DecayTransitionKernel::Config cfg;
+    cfg.emission_gauss = ng;
+    try {
+      DecayTransitionKernel K(View(P),
+                              View(F),
+                              View(B),
+                              Statistics::Fermion,
+                              Statistics::Boson,
+                              cfg);
+    }
+    catch (const std::invalid_argument&) {
+      return true;
+    }
+    return false;
+  };
+  assert(refused(0));
+  assert(refused(-1));
+  assert(refused(5));
+  for (int ng = 1; ng <= 4; ++ng) {
+    assert(!refused(ng));
+  }
+  std::printf("emission_gauss: 1..4 accepted, 0, -1 and 5 refused\n");
+}
+
 int main() {
+  test_emission_gauss_range();
   test_massive_daughters(0.25, 0., false);  // Hannestad & Madsen's beta = 0.25, massless phi
   test_massive_daughters(0.25, 0., true);
   test_massive_daughters(0.1, 0.3, false);  // both massive: no hidden m_phi = 0 assumption

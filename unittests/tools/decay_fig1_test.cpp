@@ -7,7 +7,7 @@
 //      dependence on noise-level bins is what stalled ndf15 at m_H = 2 MeV,
 //      tau = 0.2 s; the control runs the same state with the floor off.
 //   2. Fig 1 itself with the harness's DEFAULT scheme, against the paper's digitized
-//      curves (scripts/data/hannestad_madsen_1997/fig1.csv; the needed columns are
+//      curves (the digitized table is posted on issue #389; the needed columns are
 //      embedded below). Every run is under a watchdog, so a returning stall fails
 //      instead of hanging CI.
 #include <algorithm>
@@ -246,8 +246,8 @@ void test_floored_diagonal_matches_jacobian() {
 // ── 2. fig 1 against the digitized paper ──────────────────────────────────────────
 
 // q = p/T_nu (labelled p/T_gamma in the paper) and q^2 f_F for tau = 0.2, 1, 20 s,
-// verbatim from scripts/data/hannestad_madsen_1997/fig1.csv (q in [0.1, 12.75]; the
-// q = 13 row is empty there).
+// verbatim from the digitized table on issue #389 (q in [0.1, 12.75]; the q = 13 row is
+// empty there).
 constexpr double kQ[]     = {0.1,  0.25,  0.5,  0.75,  1,    1.25,  1.5,  1.75, 2,     2.25, 2.5,
                              2.75, 3,     3.25, 3.5,   3.75, 4,     4.25, 4.5,  4.75,  5,    5.25,
                              5.5,  5.75,  6,    6.25,  6.5,  6.75,  7,    7.25, 7.5,   7.75, 8,
@@ -319,7 +319,7 @@ Fig1Run RunFig1(double tau_s, const double* paper) {
       assert(it != q.begin() && it != q.end());
       const size_t hi = static_cast<size_t>(it - q.begin());
       const size_t lo = hi - 1;
-      // ln f linear in q between log-spaced nodes, as scripts/hannestad_fig1.py does.
+      // ln f linear in q between log-spaced nodes.
       assert(f[lo] > 0. && f[hi] > 0.);
       const double t  = (x - q[lo]) / (q[hi] - q[lo]);
       const double fx = std::exp((1. - t) * std::log(f[lo]) + t * std::log(f[hi]));

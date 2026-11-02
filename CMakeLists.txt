@@ -257,6 +257,9 @@ if(NOT SKBUILD)
   # build tree: it is a validation tool, not part of the `./class` workflow.
   add_executable(decay_harness main/decay_harness.cpp)
   target_link_libraries(decay_harness PRIVATE classpp)
+  # Hannestad & Madsen's three-level cascade on the same engine (issue #389, step 3).
+  add_executable(decay_cascade main/decay_cascade.cpp)
+  target_link_libraries(decay_cascade PRIVATE classpp)
 
   enable_testing()
   add_subdirectory(unittests)

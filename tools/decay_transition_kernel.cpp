@@ -53,6 +53,12 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
                     "n_parent=%d, n_daughter=%d)",
                     cfg_.n_parent,
                     cfg_.n_daughter);
+  // The emission quadrature reads kGaussX/kGaussW[emission_gauss - 1]: 0 would leave every
+  // band without nodes (a silently non-decaying model), 5 reads past the tables.
+  class_test_severe(cfg_.emission_gauss < 1 || cfg_.emission_gauss > 4,
+                    "emission_gauss must be 1..4, the Gauss-Legendre rules the kernel "
+                    "tabulates (got %d)",
+                    cfg_.emission_gauss);
   mult_parent_leg_   = cfg_.n_daughter;
   mult_daughter_leg_ = cfg_.n_parent;
   mult_boson_leg_    = static_cast<double>(cfg_.n_parent) * cfg_.n_daughter;

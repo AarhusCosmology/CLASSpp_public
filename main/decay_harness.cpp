@@ -4,7 +4,7 @@
  *  Arguments are key=value pairs, every one optional except m_H and tau:
  *
  *      decay_harness m_H=5 tau=1 r_l=0.1 [r_phi=0] [T_start=10] [T_end=0.01]
- *                    [samples=2.3,1,0.5] [n_eff_spectator=2] [daughter_thermal=1]
+ *                    [samples=2.3,1,0.5] [n_eff_spectator=1] [daughter_thermal=1]
  *                    [inverse_decays=1] [quantum_statistics=1] [balanced_gather=1]
  *                    [parent_n=48] [daughter_n=96] [daughter_q_min=1e-3] [rtol=1e-6]
  *
