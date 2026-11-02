@@ -57,6 +57,27 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
   mult_daughter_leg_ = cfg_.n_parent;
   mult_boson_leg_    = static_cast<double>(cfg_.n_parent) * cfg_.n_daughter;
   mult_energy_       = mult_boson_leg_;
+  // Daughter masses (Config::fermion_mass_ratio / boson_mass_ratio). Structural for the
+  // same reason as the multiplicity, so a closed or unphysical channel is severe.
+  {
+    const double rl   = cfg_.fermion_mass_ratio;
+    const double rphi = cfg_.boson_mass_ratio;
+    class_test_severe(!(rl >= 0.) || !(rphi >= 0.) || !(rl + rphi < 1.),
+                      "daughter mass ratios must be >= 0 with m_l/m_H + m_phi/m_H < 1, "
+                      "i.e. the decay must be kinematically open (got %g, %g)",
+                      rl,
+                      rphi);
+    massive_ = (rl > 0.) || (rphi > 0.);
+    if (massive_) {
+      rl2_     = rl * rl;
+      rphi2_   = rphi * rphi;
+      e2s_     = 0.5 * (1. + rl2_ - rphi2_);
+      e3s_     = 0.5 * (1. + rphi2_ - rl2_);
+      gs_      = 0.5 * (1. - rl2_ - rphi2_);
+      ps_      = RestFrameMomentum(rl, rphi);
+      inv_2ps_ = 0.5 / ps_;
+    }
+  }
   class_test_severe(!(cfg_.chain_cap > 1.),
                     "chain_cap must exceed 1 (got %g): 1 IS the linear gather's "
                     "sensitivity, so capping at or below it would throw the chain rule "
@@ -152,6 +173,46 @@ DecayTransitionKernel::DecayTransitionKernel(GridView parent,
   dev_phi_edge_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
   dth_l_edge_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
   dth_phi_edge_.assign(static_cast<size_t>(total) * DepositStencil::kWidth, 0.);
+
+  // Energy views the deposits are split on. A massless daughter's view IS its momentum
+  // grid (same pointer), so nothing below can tell the difference on that path.
+  fermion_e_    = fermion_;
+  boson_e_      = boson_;
+  fermion_bg_e_ = fermion_bg_;
+  boson_bg_e_   = boson_bg_;
+  if (cfg_.fermion_mass_ratio > 0.) {
+    el_.assign(fermion_.n, 0.);
+    el_bg_.assign(fermion_bg_.n, 0.);
+    fermion_e_.q    = el_.data();
+    fermion_bg_e_.q = el_bg_.data();
+  }
+  if (cfg_.boson_mass_ratio > 0.) {
+    ephi_.assign(boson_.n, 0.);
+    ephi_bg_.assign(boson_bg_.n, 0.);
+    boson_e_.q    = ephi_.data();
+    boson_bg_e_.q = ephi_bg_.data();
+  }
+  if (massive_) {
+    e2_star_.assign(total, 0.);
+    e3_star_.assign(total, 0.);
+  }
+}
+
+void DecayTransitionKernel::RefreshDaughterEnergies() const {
+  // Comoving energies sqrt(q^2 + a^2 m_i^2); they move with a, the grids do not.
+  const auto fill = [](const GridView& g, double am2_i, std::vector<double>& out) {
+    for (int k = 0; k < g.n; ++k) {
+      out[k] = std::sqrt(g.q[k] * g.q[k] + am2_i);
+    }
+  };
+  if (cfg_.fermion_mass_ratio > 0.) {
+    fill(fermion_, am2_ * rl2_, el_);
+    fill(fermion_bg_, am2_ * rl2_, el_bg_);
+  }
+  if (cfg_.boson_mass_ratio > 0.) {
+    fill(boson_, am2_ * rphi2_, ephi_);
+    fill(boson_bg_, am2_ * rphi2_, ephi_bg_);
+  }
 }
 
 void DecayTransitionKernel::TwoBinSplit(
@@ -306,6 +367,14 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     return;
   }
 
+  if (massive_) {
+    RefreshDaughterEnergies();
+  }
+  // The coordinates the band is cut and the deposits are split on: daughter energy,
+  // which is the momentum grid itself for a massless daughter.
+  const double* const EF = fermion_e_.q;
+  const double* const EB = boson_e_.q;
+
   // Log-odds of the daughter occupations, once per RHS on the BACKGROUND grids --
   // O(n_q) against the O(n_parent n_q) nodes that read them back, so the two
   // transcendentals per bin are amortised away. See Config::balanced_gather.
@@ -334,7 +403,10 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     eps1_[i]          = eps1;
     // band(q1) = [(eps1-q1)/2, (eps1+q1)/2]; width = q1 exactly (qhi = qlo + q1),
     // computed this way so Sum wn_s = q1 with no catastrophic cancellation.
-    const double qlo  = 0.5 * (eps1 - q1);
+    //
+    // Massive daughters: the same band in fermion ENERGY, [eps1 E* - q1 p*, + 2 q1 p*]/m
+    // (Config::fermion_mass_ratio). "q" below then names the energy coordinate eps2.
+    const double qlo  = massive_ ? eps1 * e2s_ - q1 * ps_ : 0.5 * (eps1 - q1);
     const double fH_i = f_H[i];
 
     // Lay out this parent's nodes on the union partition, integrating the emission
@@ -349,29 +421,29 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     // The band is NOT clipped to the grids: nodes outside stay outside and the
     // deposit clamps them, so clamped_energy_residual and the total band weight
     // (= q1) both stay exact.
-    const double qhi    = qlo + q1;
+    const double qhi    = massive_ ? qlo + 2. * q1 * ps_ : qlo + q1;
     int nbp             = 0;
     breakpoints_[nbp++] = qlo;
     int af              = 0;
-    while (af < fermion_.n && fermion_.q[af] <= qlo) {
+    while (af < fermion_.n && EF[af] <= qlo) {
       ++af;
     }
     int ab = boson_.n - 1;
-    while (ab >= 0 && eps1 - boson_.q[ab] <= qlo) {
+    while (ab >= 0 && eps1 - EB[ab] <= qlo) {
       --ab;
     }
     while (true) {
-      const bool have_f = (af < fermion_.n) && (fermion_.q[af] < qhi);
-      const bool have_b = (ab >= 0) && (eps1 - boson_.q[ab] < qhi);
+      const bool have_f = (af < fermion_.n) && (EF[af] < qhi);
+      const bool have_b = (ab >= 0) && (eps1 - EB[ab] < qhi);
       if (!have_f && !have_b) {
         break;
       }
       double x;
-      if (have_f && (!have_b || fermion_.q[af] <= eps1 - boson_.q[ab])) {
-        x = fermion_.q[af++];
+      if (have_f && (!have_b || EF[af] <= eps1 - EB[ab])) {
+        x = EF[af++];
       }
       else {
-        x = eps1 - boson_.q[ab--];
+        x = eps1 - EB[ab--];
       }
       if (x <= breakpoints_[nbp - 1]) {
         continue;
@@ -417,6 +489,10 @@ void DecayTransitionKernel::PrepareTransitions(double a,
         for (int gp = 0; gp < ng; ++gp) {
           q2_star_[off + cnt] = ca + hw * (1.0 + kGaussX[ng - 1][gp]);
           wn_[off + cnt]      = hw * kGaussW[ng - 1][gp];
+          if (massive_) {
+            // d(eps2) times the band's flat density m/(2p*): sum_s wn_s = q1 still.
+            wn_[off + cnt] *= inv_2ps_;
+          }
           ++cnt;
         }
       }
@@ -425,16 +501,35 @@ void DecayTransitionKernel::PrepareTransitions(double a,
     node_cnt_[i] = cnt;
 
     for (int n = off; n < off + cnt; ++n) {
-      const double q2 = q2_star_[n];
-      const double q3 = eps1 - q2;  // q2* + q3* = eps1 exactly (energy conservation per transition)
-      q3_star_[n]     = q3;
+      // The node coordinate is the fermion daughter's ENERGY; for a massless daughter
+      // that is its momentum, and e2/e3 below ARE q2/q3.
+      const double e2 = q2_star_[n];
+      const double e3 = eps1 -
+                        e2;  // eps2* + eps3* = eps1 exactly (energy conservation per transition)
+      double q2       = e2;
+      double q3       = e3;
+      if (massive_) {
+        // Momenta from the energies. fmax guards the round-off at a band edge that
+        // touches the daughter's rest energy; the true value there is 0.
+        if (cfg_.fermion_mass_ratio > 0.) {
+          q2 = std::sqrt(std::fmax(e2 * e2 - am2_ * rl2_, 0.));
+        }
+        if (cfg_.boson_mass_ratio > 0.) {
+          q3 = std::sqrt(std::fmax(e3 * e3 - am2_ * rphi2_, 0.));
+        }
+        q2_star_[n] = q2;
+        e2_star_[n] = e2;
+        e3_star_[n] = e3;
+      }
+      q3_star_[n] = q3;
 
       // Gather f with the two-bin split weights; the SAME weights scatter into
-      // df_* (transpose consistency -> exact discrete conservation).
+      // df_* (transpose consistency -> exact discrete conservation). Split in energy,
+      // so that sum_e w_e eps_e = eps* (== q* when massless).
       DepositStencil sf;
       DepositStencil sb;
-      BuildDeposit(fermion_, q2, sf, &hint_f);
-      BuildDeposit(boson_, q3, sb, &hint_b);
+      BuildDeposit(fermion_e_, e2, sf, &hint_f);
+      BuildDeposit(boson_e_, e3, sb, &hint_b);
       const int jf   = sf.j0;
       const int kb   = sb.j0;
       const bool clf = sf.clamped;
@@ -487,8 +582,8 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       if (separate_bg_grids_) {
         DepositStencil sfb;
         DepositStencil sbb;
-        BuildDeposit(fermion_bg_, q2, sfb, &hint_fbg);
-        BuildDeposit(boson_bg_, q3, sbb, &hint_bbg);
+        BuildDeposit(fermion_bg_e_, e2, sfb, &hint_fbg);
+        BuildDeposit(boson_bg_e_, e3, sbb, &hint_bbg);
         fl_g   = cfg_.balanced_gather ? gather_balanced(sfb, eta_l_, fermion_stat_)
                                       : gather(sfb, f_l);
         fphi_g = cfg_.balanced_gather ? gather_balanced(sbb, eta_phi_, boson_stat_)
@@ -520,9 +615,27 @@ void DecayTransitionKernel::PrepareTransitions(double a,
       lambda_s_[n] = lam;
 
       // Emission-angle cosines (formalism-notes eq. 6.9, massless daughters).
-      cos_a_[n] = (2.0 * eps1 * q2 - am2_) / (2.0 * q1 * q2);
-      cos_b_[n] = (2.0 * eps1 * q3 - am2_) / (2.0 * q1 * q3);
-      cos_g_[n] = 1.0 - am2_ / (2.0 * q2 * q3);
+      if (!massive_) {
+        cos_a_[n] = (2.0 * eps1 * q2 - am2_) / (2.0 * q1 * q2);
+        cos_b_[n] = (2.0 * eps1 * q3 - am2_) / (2.0 * q1 * q3);
+        cos_g_[n] = 1.0 - am2_ / (2.0 * q2 * q3);
+      }
+      else {
+        // From the invariants (P1 - P2)^2 = m_phi^2, (P1 - P3)^2 = m_l^2 and
+        // (P2 + P3)^2 = m^2, in units of a^2 m^2:
+        //   cos_a = (eps1 eps2 - E*_l) / (q1 q2),   cos_b = (eps1 eps3 - E*_phi) / (q1 q3),
+        //   cos_g = (eps2 eps3 - (1 - r_l^2 - r_phi^2)/2) / (q2 q3).
+        // q1 = q2 cos_a + q3 cos_b holds identically, which is what the l = 1 identity
+        // needs. Clamped because a daughter emitted at rest (q -> 0 at a band edge) has
+        // an undefined direction and round-off can push the ratio past 1; a q of
+        // exactly 0 carries no l >= 1 moment, so any admissible value will do.
+        const auto cosine = [](double num, double den) {
+          return den > 0. ? std::fmin(1., std::fmax(-1., num / den)) : 1.;
+        };
+        cos_a_[n] = cosine(eps1 * e2 - am2_ * e2s_, q1 * q2);
+        cos_b_[n] = cosine(eps1 * e3 - am2_ * e3s_, q1 * q3);
+        cos_g_[n] = cosine(e2 * e3 - am2_ * gs_, q2 * q3);
+      }
 
       // Off-grid clamp diagnostic: a clamped deposit preserves number but places
       // energy at the edge bin, not at q*. Book that mismatch (0 with covering
@@ -537,16 +650,16 @@ void DecayTransitionKernel::PrepareTransitions(double a,
         if (clf) {
           double e_dep = 0.;
           for (int e = 0; e < DepositStencil::kWidth; ++e) {
-            e_dep += sf.w[e] * fermion_.q[jf + e];
+            e_dep += sf.w[e] * EF[jf + e];
           }
-          clamped_energy_residual_ += (e_dep - q2) * (-dN);
+          clamped_energy_residual_ += (e_dep - e2) * (-dN);
         }
         if (clb) {
           double e_dep = 0.;
           for (int e = 0; e < DepositStencil::kWidth; ++e) {
-            e_dep += sb.w[e] * boson_.q[kb + e];
+            e_dep += sb.w[e] * EB[kb + e];
           }
-          clamped_energy_residual_ += (e_dep - q3) * (-2.0 * dN);
+          clamped_energy_residual_ += (e_dep - e3) * (-2.0 * dN);
         }
       }
     }
@@ -702,7 +815,7 @@ void DecayTransitionKernel::PrepareTransitions(double a,
         const double dNe      = dN + C * g_l * d_l;
         acc_l[k]             += -mult_daughter_leg * wf[e] * dNe /
                                 (fermion_.q[k] * fermion_.q[k] * fermion_.dq[k]);
-        split_acc            += -mult_energy * 2.0 * wf[e] * fermion_.q[k] * (dNe - dN);
+        split_acc            += -mult_energy * 2.0 * wf[e] * EF[k] * (dNe - dN);
         d_l_edge_[W * n + e]  = d_l;  // ApplyPerturbationOperator rebuilds its
                                       // coefficients from this (Lambda_k = Lambda + g_l d_l)
         dev_l_edge_[W * n + e] = f_l_st[k] - flg_st;
@@ -725,7 +838,7 @@ void DecayTransitionKernel::PrepareTransitions(double a,
         const double dNe          = dN + C * g_phi * d_phi;
         acc_phi[k]               += -mult_boson_leg * 2.0 * wb[e] * dNe /
                                     (boson_.q[k] * boson_.q[k] * boson_.dq[k]);
-        split_energy_residual_   += -mult_energy * 2.0 * wb[e] * boson_.q[k] * (dNe - dN);
+        split_energy_residual_   += -mult_energy * 2.0 * wb[e] * EB[k] * (dNe - dN);
         d_phi_edge_[W * n + e]    = d_phi;
         dev_phi_edge_[W * n + e]  = f_phi_st[k] - fphig_st;
         dth_phi_edge_[W * n + e]  = LumpDTheta(g_phi, wb, nb, kb, f_phi_st, fphig_st, e);
@@ -1100,6 +1213,9 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
         const double dN_l   = B * (sH * Pa_l[l] + sl + sphi * Pg_l[l]);
         const double dN_phi = B * (sH * Pb_l[l] + sl * Pg_l[l] + sphi);
         double& R           = (l == 0) ? resid_e : resid_m;
+        // l = 0 books energy, l = 1 momentum; they coincide for a massless daughter.
+        const double* const QF = (l == 0) ? fermion_e_.q : fermion_.q;
+        const double* const QB = (l == 0) ? boson_e_.q : boson_.q;
         for (int e = 0; e < nf; ++e) {
           const int k          = jf + e;
           const double dl      = dle[e];
@@ -1109,7 +1225,7 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
                                  one_m_thl * Fl_node_l[l] + devl[e] * dthg_l_l[l] + dFl_l[l];
           const double dN_l_k  = B * (cH_e * FH_bin[l] * Pa_l[l] + c_l * Fl_e +
                                       cphi_e * Fphi_g_l[l] * Pg_l[l]);
-          R                   += -mult_energy_ * 2.0 * wf[e] * fermion_.q[k] * (dN_l_k - dN_l);
+          R                   += -mult_energy_ * 2.0 * wf[e] * QF[k] * (dN_l_k - dN_l);
         }
         for (int e = 0; e < nb; ++e) {
           const int k            = kb + e;
@@ -1120,7 +1236,10 @@ void DecayTransitionKernel::ApplyPerturbationOperatorAllL(int l_max,
                                    one_m_thp * Fphi_node_l[l] + devp[e] * dthg_p_l[l] + dFphi_l[l];
           const double dN_phi_k  = B * (cH_e * FH_bin[l] * Pb_l[l] + cl_e * Fl_g_l[l] * Pg_l[l] +
                                         c_phi * Fphi_e);
-          R                     += -mult_energy_ * 2.0 * wb[e] * boson_.q[k] * (dN_phi_k - dN_phi);
+          R                     += -mult_energy_ * 2.0 * wb[e] * QB[k] * (dN_phi_k - dN_phi);
+        }
+        if (massive_ && l == 1) {
+          R += StencilMomentumMisplacement(n, dN_l, dN_phi);
         }
       }
     }
@@ -1273,18 +1392,27 @@ DecayTransitionKernel::Moments DecayTransitionKernel::ComputeMoments(
     M.N_H            += w * df_H[i];
     M.E_H            += w * eps * df_H[i];
   }
-  for (int j = 0; j < fermion_.n; ++j) {
-    const double q  = fermion_.q[j];
-    const double w  = fermion_.dq[j] * q * q;
-    M.N_l          += w * df_l[j];
-    M.E_l          += w * q * df_l[j];  // massless daughter: eps = q
-  }
-  for (int k = 0; k < boson_.n; ++k) {
-    const double q  = boson_.q[k];
-    const double w  = boson_.dq[k] * q * q;
-    M.N_phi        += w * df_phi[k];
-    M.E_phi        += w * q * df_phi[k];
-  }
+  // Daughter energies: eps = q for a massless daughter. One loop per case rather than a
+  // per-bin select, so the massless loop is the one it always was.
+  const auto daughter = [](const GridView& g, const double* df, double Ai, double& N, double& E) {
+    if (Ai > 0.) {
+      for (int j = 0; j < g.n; ++j) {
+        const double q  = g.q[j];
+        const double w  = g.dq[j] * q * q;
+        N              += w * df[j];
+        E              += w * std::sqrt(q * q + Ai) * df[j];
+      }
+      return;
+    }
+    for (int j = 0; j < g.n; ++j) {
+      const double q  = g.q[j];
+      const double w  = g.dq[j] * q * q;
+      N              += w * df[j];
+      E              += w * q * df[j];  // massless daughter: eps = q
+    }
+  };
+  daughter(fermion_, df_l, A * cfg_.fermion_mass_ratio * cfg_.fermion_mass_ratio, M.N_l, M.E_l);
+  daughter(boson_, df_phi, A * cfg_.boson_mass_ratio * cfg_.boson_mass_ratio, M.N_phi, M.E_phi);
   return M;
 }
 
@@ -1340,6 +1468,9 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
   double* const resid = (l == 0)   ? &split_energy_residual_pert_
                         : (l == 1) ? &split_momentum_residual_pert_
                                    : nullptr;
+  // l = 0 books energy, l = 1 momentum; they coincide for a massless daughter.
+  const double* const QF = (l == 0) ? fermion_e_.q : fermion_.q;
+  const double* const QB = (l == 0) ? boson_e_.q : boson_.q;
 
   for (int i = 0; i < parent_.n; ++i) {
     dF_H[i] = 0.;
@@ -1492,7 +1623,7 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         dF_l[k]             += -mult_daughter_leg_ * wf[e] * dN_l_k /
                                (fermion_.q[k] * fermion_.q[k] * fermion_.dq[k]);
         if (resid) {
-          *resid += -mult_energy_ * 2.0 * wf[e] * fermion_.q[k] * (dN_l_k - dN_l);
+          *resid += -mult_energy_ * 2.0 * wf[e] * QF[k] * (dN_l_k - dN_l);
         }
       }
 
@@ -1512,11 +1643,30 @@ void DecayTransitionKernel::ApplyPerturbationOperator(int l,
         dF_phi[k]             += -mult_boson_leg_ * 2.0 * wb[e] * dN_phi_k /
                                  (boson_.q[k] * boson_.q[k] * boson_.dq[k]);
         if (resid) {
-          *resid += -mult_energy_ * 2.0 * wb[e] * boson_.q[k] * (dN_phi_k - dN_phi);
+          *resid += -mult_energy_ * 2.0 * wb[e] * QB[k] * (dN_phi_k - dN_phi);
         }
+      }
+      if (massive_ && l == 1) {
+        *resid += StencilMomentumMisplacement(n, dN_l, dN_phi);
       }
     }
   }
+}
+
+double DecayTransitionKernel::StencilMomentumMisplacement(int n, double dN_l, double dN_phi) const {
+  // The energy split places sum_e w_e q_e of momentum per particle where q* was emitted
+  // (Config::fermion_mass_ratio). Weighted like the split residuals: x2 on both legs,
+  // the fermion's from its spin weight and the boson's from the deposit's dof ratio.
+  constexpr int W = DepositStencil::kWidth;
+  const int jf    = j_fermion_[n];
+  const int kb    = k_boson_[n];
+  double qf       = 0.;
+  double qb       = 0.;
+  for (int e = 0; e < W; ++e) {
+    qf += w_fermion_[W * n + e] * fermion_.q[jf + e];
+    qb += w_boson_[W * n + e] * boson_.q[kb + e];
+  }
+  return -mult_energy_ * 2.0 * ((qf - q2_star_[n]) * dN_l + (qb - q3_star_[n]) * dN_phi);
 }
 
 void DecayTransitionKernel::NodeKinematics(

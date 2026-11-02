@@ -1,5 +1,6 @@
 // Unit tests for DecayTransitionKernel (tools/decay_transition_kernel): the pure
-// conservative transition network for nu_H <-> nu_l + phi (massless daughters).
+// conservative transition network for nu_H <-> nu_l + phi (massless daughters, and
+// massive ones in test_massive_daughters).
 // The load-bearing property is machine-precision number+energy conservation for
 // ARBITRARY positive f arrays; the equilibrium residual is the only soft
 // (convergence-ratio) criterion. Physics: arXiv:2011.01502; design spec section 4.
@@ -2117,7 +2118,7 @@ void test_separate_bg_grids(bool balanced = false) {
 // loop-invariant reciprocal out of the l loop, which is a legitimate optimisation
 // with no physical content. 1e-12 of the array's own scale is far tighter than any
 // real defect could hide under and still leaves that room.
-void test_all_l_matches_per_l(bool balanced = false) {
+void test_all_l_matches_per_l(bool balanced = false, double r_l = 0., double r_phi = 0.) {
   Grid P       = MakeGrid(1e-3, 1e2, 48);
   Grid F       = MakeGrid(1e-4, 2e2, 64);
   Grid B       = MakeGrid(1e-4, 2e2, 64);
@@ -2164,6 +2165,8 @@ void test_all_l_matches_per_l(bool balanced = false) {
   cfg.balanced_gather    = balanced;
   cfg.balanced_pert      = balanced;
   cfg.lumped_loss        = !balanced;
+  cfg.fermion_mass_ratio = r_l;
+  cfg.boson_mass_ratio   = r_phi;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   // Reference: the per-l form, one multipole at a time into contiguous slices, then
@@ -2258,8 +2261,9 @@ void test_all_l_matches_per_l(bool balanced = false) {
   const double wm = std::fabs(K.split_momentum_residual_pert() - ref_resid_m) /
                     Scale3(K.split_momentum_residual_pert(), ref_resid_m, e_scale);
   std::printf(
-      "all-l vs per-l: dF_H=%.2e dF_l=%.2e dF_phi=%.2e "
+      "all-l vs per-l%s: dF_H=%.2e dF_l=%.2e dF_phi=%.2e "
       "resid_e=%.2e resid_m=%.2e\n",
+      (r_l > 0. || r_phi > 0.) ? " (massive daughters)" : "",
       wH,
       wl,
       wp,
@@ -2296,7 +2300,12 @@ void test_all_l_matches_per_l(bool balanced = false) {
 // what the hierarchy delivers and what makes f + h F stay positive for the difference.
 // The step is scanned rather than fixed: the quotient is a cancellation, so it has a
 // truncation branch and a round-off branch and the minimum over the scan is the signal.
-void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int n_daughter = 1) {
+void test_perturbation_jacobian(bool balanced,
+                                bool chain,
+                                int n_parent   = 1,
+                                int n_daughter = 1,
+                                double r_l     = 0.,
+                                double r_phi   = 0.) {
   const int N = 48;
   Grid P      = MakeGrid(1e-3, 1e2, N);
   Grid F      = MakeGrid(1e-4, 2e2, N);
@@ -2336,6 +2345,10 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
   // finite-difference mismatch of exactly that factor. No new machinery needed.
   cfg.n_parent   = n_parent;
   cfg.n_daughter = n_daughter;
+  // Daughter masses likewise: the energy split changes the deposit weights, and the
+  // operator has to be the Jacobian of whatever the background built from them.
+  cfg.fermion_mass_ratio = r_l;
+  cfg.boson_mass_ratio   = r_phi;
   DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
 
   std::vector<double> oH(N);
@@ -2413,9 +2426,10 @@ void test_perturbation_jacobian(bool balanced, bool chain, int n_parent = 1, int
       best_h = h;
     }
   }
-  std::printf("pert Jacobian vs finite differences (%s gather%s): %.2e at h=%.0e\n",
+  std::printf("pert Jacobian vs finite differences (%s gather%s%s): %.2e at h=%.0e\n",
               balanced ? "balanced" : "linear",
               chain ? " + chain rule" : "",
+              (r_l > 0. || r_phi > 0.) ? ", massive daughters" : "",
               best,
               best_h);
   // Guard against a vacuous pass: the operator must not be identically zero.
@@ -2624,7 +2638,356 @@ void test_chain_cap_reaches_background_diagonal() {
 
 }  // namespace
 
+// MASSIVE DAUGHTERS (Config::fermion_mass_ratio / boson_mass_ratio; issue #389,
+// Hannestad & Madsen 1997, astro-ph/9702125).
+//
+// The claims, each independent of the others:
+//
+//   (1) KINEMATICS. Every node conserves energy exactly (eps2 + eps3 = eps1 with
+//       eps_i = sqrt(q_i^2 + a^2 m_i^2)) and three-momentum (q1 = q2 cos_a + q3 cos_b);
+//       the band carries total weight q1 as before; and every node energy lies inside
+//       Hannestad's band E^+- = (m_0/2m_H)[E_H sqrt(1 + 4(m_l/m_0)^2) +- p_H], written
+//       here from his m_0 formula, independently of the kernel's p*.
+//   (2) MaxDaughterMomentum's massive form bounds every node momentum, and reduces to
+//       the massless form at zero mass.
+//   (3) The three background identities the issue names hold to round-off for
+//       ARBITRARY f, with each daughter's energy moment weighed by its own eps(q). Same
+//       statement, same tolerance as test_conservation.
+//   (4) Well-balanced: under balanced_gather, FD/BE in ENERGY with mu_H = mu_l + mu_phi
+//       is a discrete fixed point. That is the statement that the split is linear in
+//       energy, not momentum -- a momentum split would leave an O(dq^2) residual.
+//   (5) The perturbation operator's l = 0 number and energy identities and its l = 1
+//       momentum identity close against their booked residuals; the momentum one now
+//       also books the energy split's momentum misplacement, so the test asserts that
+//       booking is nonzero and is what closes it.
+//   (6) Continuity: a tiny mass changes the parent's rate by a tiny amount.
+void test_massive_daughters(double r_l, double r_phi, bool balanced) {
+  Grid P       = MakeGrid(1e-3, 1e2, 64);
+  Grid F       = MakeGrid(1e-6, 2e2, 80);  // low enough for a daughter emitted near rest
+  Grid B       = MakeGrid(1e-6, 2e2, 80);
+  const int NP = 64;
+  const int ND = 80;
+
+  std::mt19937 rng(2718U);
+  std::uniform_real_distribution<double> U(0.01, 0.9);
+  std::uniform_real_distribution<double> Upm(-1.0, 1.0);
+  std::vector<double> fH(NP);
+  std::vector<double> fl(ND);
+  std::vector<double> fphi(ND);
+  for (auto& x : fH) {
+    x = U(rng);
+  }
+  for (auto& x : fl) {
+    x = U(rng);
+  }
+  for (auto& x : fphi) {
+    x = U(rng);
+  }
+
+  const double a     = 0.5;
+  const double m     = 2.0;
+  const double Gamma = 0.3;
+  const double A     = a * a * m * m;  // (a m)^2 = 1
+  const double Al    = A * r_l * r_l;
+  const double Aphi  = A * r_phi * r_phi;
+  const auto eps_l   = [&](double q) { return std::sqrt(q * q + Al); };
+  const auto eps_phi = [&](double q) { return std::sqrt(q * q + Aphi); };
+
+  DecayTransitionKernel::Config cfg;
+  cfg.inverse_decays     = true;
+  cfg.quantum_statistics = true;
+  cfg.balanced_gather    = balanced;
+  cfg.balanced_pert      = balanced;
+  cfg.lumped_loss        = !balanced;
+  cfg.fermion_mass_ratio = r_l;
+  cfg.boson_mass_ratio   = r_phi;
+  DecayTransitionKernel K(View(P), View(F), View(B), Statistics::Fermion, Statistics::Boson, cfg);
+
+  // ── (1) + (2) kinematics ────────────────────────────────────────────────
+  K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
+  {
+    // Hannestad's m_0, in units of a*m_H = 1.
+    const double m0 = std::sqrt(1. - 2. * (r_phi * r_phi + r_l * r_l) +
+                                std::pow(r_phi * r_phi - r_l * r_l, 2));
+    const double cE = 0.5 * m0 * std::sqrt(1. + 4. * r_l * r_l / (m0 * m0));
+    const double cp = 0.5 * m0;
+    const double q_bound =
+        DecayTransitionKernel::MaxDaughterMomentum(P.q.back(), std::sqrt(A), r_l, r_phi);
+    double worst_e    = 0.;
+    double worst_p    = 0.;
+    double worst_w    = 0.;
+    double worst_band = 0.;
+    double q_seen     = 0.;
+    for (int i = 0; i < NP; ++i) {
+      const double q1   = P.q[i];
+      const double eps1 = std::sqrt(q1 * q1 + A);
+      const double Elo  = cE * eps1 - cp * q1;
+      const double Ehi  = cE * eps1 + cp * q1;
+      double wsum       = 0.;
+      for (int s = 0; s < K.node_count(i); ++s) {
+        double q2;
+        double q3;
+        double ca;
+        double cb;
+        double cg;
+        K.NodeKinematics(i, s, q2, q3, ca, cb, cg);
+        const double e2  = eps_l(q2);
+        worst_e          = std::fmax(worst_e, std::fabs(e2 + eps_phi(q3) - eps1) / eps1);
+        worst_p          = std::fmax(worst_p, std::fabs(q2 * ca + q3 * cb - q1) / eps1);
+        worst_band       = std::fmax(worst_band, std::fmax(Elo - e2, e2 - Ehi) / eps1);
+        q_seen           = std::fmax(q_seen, std::fmax(q2, q3));
+        wsum            += K.node_weight(i, s);
+        assert(std::fabs(ca) <= 1. && std::fabs(cb) <= 1. && std::fabs(cg) <= 1.);
+      }
+      worst_w = std::fmax(worst_w, std::fabs(wsum - q1) / q1);
+    }
+    std::printf(
+        "massive daughters (r_l=%.2f, r_phi=%.2f)%s kinematics: |eps2+eps3-eps1|=%.2e "
+        "|q2 cos_a+q3 cos_b-q1|=%.2e |sum w - q1|=%.2e outside Hannestad band by %.2e; "
+        "max q %.4g <= bound %.4g\n",
+        r_l,
+        r_phi,
+        balanced ? " (balanced)" : "",
+        worst_e,
+        worst_p,
+        worst_w,
+        worst_band,
+        q_seen,
+        q_bound);
+    assert(worst_e < 1e-13);
+    assert(worst_p < 1e-10);
+    assert(worst_w < 1e-13);
+    assert(worst_band < 1e-13);
+    assert(q_seen <= q_bound * (1. + 1e-14));
+    assert(q_seen > 0.95 * q_bound);  // a bound, and a tight one
+    assert(DecayTransitionKernel::MaxDaughterMomentum(P.q.back(), std::sqrt(A), 0., 0.) ==
+           DecayTransitionKernel::MaxDaughterMomentum(P.q.back(), std::sqrt(A)));
+  }
+
+  // ── (3) background identities, arbitrary f ──────────────────────────────
+  {
+    std::vector<double> dfH(NP);
+    std::vector<double> dfl(ND);
+    std::vector<double> dfphi(ND);
+    K.ComputeBackgroundDerivs(a,
+                              m,
+                              Gamma,
+                              fH.data(),
+                              fl.data(),
+                              fphi.data(),
+                              dfH.data(),
+                              dfl.data(),
+                              dfphi.data());
+    assert(K.clamped_energy_residual() == 0.);  // grids cover the bands
+
+    // The moments the kernel reports, cross-checked against ones formed here from the
+    // daughters' own eps(q), so a ComputeMoments that kept eps = q cannot hide.
+    const auto M = K.ComputeMoments(a, m, dfH.data(), dfl.data(), dfphi.data());
+    double El    = 0.;
+    double Ephi  = 0.;
+    for (int j = 0; j < ND; ++j) {
+      El   += F.dq[j] * F.q[j] * F.q[j] * eps_l(F.q[j]) * dfl[j];
+      Ephi += B.dq[j] * B.q[j] * B.q[j] * eps_phi(B.q[j]) * dfphi[j];
+    }
+    const double num_f  = std::fabs(M.N_H + M.N_l) / Scale(M.N_H, M.N_l);
+    const double num_b  = std::fabs(2. * M.N_H + M.N_phi) / Scale(2. * M.N_H, M.N_phi);
+    const double escale = Scale3(2. * M.E_H, 2. * M.E_l, M.E_phi);
+    const double ene    = std::fabs(2. * M.E_H + 2. * M.E_l + M.E_phi - K.split_energy_residual()) /
+                          escale;
+    const double mom    = std::fmax(std::fabs(El - M.E_l), std::fabs(Ephi - M.E_phi)) / escale;
+    std::printf(
+        "  background: |N_H+N_l|=%.2e |2N_H+N_phi|=%.2e |2E_H+2E_l+E_phi - booked|=%.2e "
+        "(booked %.2e) moments vs eps(q)=%.2e\n",
+        num_f,
+        num_b,
+        ene,
+        std::fabs(K.split_energy_residual()) / escale,
+        mom);
+    assert(num_f < 1e-12);
+    assert(num_b < 1e-12);
+    assert(ene < 1e-12);
+    assert(mom < 1e-13);
+    assert(std::fabs(M.N_H) > 0.);
+  }
+
+  // ── (4) equilibrium in ENERGY is a discrete fixed point ─────────────────
+  {
+    const double T     = 0.7;
+    const double mu_l  = -0.3;
+    const double mu_ph = -0.2;  // below the boson's lowest energy, so BE is admissible
+    std::vector<double> eH(NP);
+    std::vector<double> el(ND);
+    std::vector<double> ephi(ND);
+    for (int i = 0; i < NP; ++i) {
+      eH[i] = 1. / (std::exp((std::sqrt(P.q[i] * P.q[i] + A) - mu_l - mu_ph) / T) + 1.);
+    }
+    for (int j = 0; j < ND; ++j) {
+      el[j]   = 1. / (std::exp((eps_l(F.q[j]) - mu_l) / T) + 1.);
+      ephi[j] = 1. / (std::exp((eps_phi(B.q[j]) - mu_ph) / T) - 1.);
+    }
+    std::vector<double> dfH(NP);
+    std::vector<double> dfl(ND);
+    std::vector<double> dfphi(ND);
+    K.ComputeBackgroundDerivs(a,
+                              m,
+                              Gamma,
+                              eH.data(),
+                              el.data(),
+                              ephi.data(),
+                              dfH.data(),
+                              dfl.data(),
+                              dfphi.data());
+    // Against the decay-only rate of the same bin, a*Gamma*m/eps1 * f_H.
+    double worst = 0.;
+    for (int i = 0; i < NP; ++i) {
+      const double eps1 = std::sqrt(P.q[i] * P.q[i] + A);
+      worst             = std::fmax(worst, std::fabs(dfH[i]) / (a * a * m * Gamma / eps1 * eH[i]));
+    }
+    std::printf("  equilibrium in energy: max |df_H| / decay rate = %.2e\n", worst);
+    // Asserted only where it is claimed. The linear gather of f is not well balanced --
+    // for massless daughters either -- and per bin its residual is relative to an f_H
+    // that is e^-140 on the tail, so it is printed as the control and nothing more.
+    if (balanced) {
+      assert(worst < 1e-12);
+    }
+  }
+
+  // ── (5) perturbation identities ─────────────────────────────────────────
+  {
+    std::vector<double> FH(NP);
+    std::vector<double> Fl(ND);
+    std::vector<double> Fphi(ND);
+    for (auto& x : FH) {
+      x = Upm(rng);
+    }
+    for (auto& x : Fl) {
+      x = Upm(rng);
+    }
+    for (auto& x : Fphi) {
+      x = Upm(rng);
+    }
+    K.PrepareTransitions(a, m, Gamma, fH.data(), fl.data(), fphi.data());
+    std::vector<double> dH(NP);
+    std::vector<double> dl(ND);
+    std::vector<double> dphi(ND);
+
+    K.ApplyPerturbationOperator(0,
+                                FH.data(),
+                                Fl.data(),
+                                Fphi.data(),
+                                dH.data(),
+                                dl.data(),
+                                dphi.data());
+    double numH   = 0.;
+    double numl   = 0.;
+    double numphi = 0.;
+    double eH     = 0.;
+    double el     = 0.;
+    double ephi   = 0.;
+    for (int i = 0; i < NP; ++i) {
+      const double w  = P.dq[i] * P.q[i] * P.q[i];
+      numH           += w * dH[i];
+      eH             += w * std::sqrt(P.q[i] * P.q[i] + A) * dH[i];
+    }
+    for (int j = 0; j < ND; ++j) {
+      const double wl  = F.dq[j] * F.q[j] * F.q[j];
+      const double wb  = B.dq[j] * B.q[j] * B.q[j];
+      numl            += wl * dl[j];
+      el              += wl * eps_l(F.q[j]) * dl[j];
+      numphi          += wb * dphi[j];
+      ephi            += wb * eps_phi(B.q[j]) * dphi[j];
+    }
+    const double nf = std::fabs(numH + numl) / Scale(numH, numl);
+    const double nb = std::fabs(2. * numH + numphi) / Scale(2. * numH, numphi);
+    const double en = std::fabs(2. * eH + 2. * el + ephi - K.split_energy_residual_pert()) /
+                      Scale3(2. * eH, 2. * el, ephi);
+
+    K.ApplyPerturbationOperator(1,
+                                FH.data(),
+                                Fl.data(),
+                                Fphi.data(),
+                                dH.data(),
+                                dl.data(),
+                                dphi.data());
+    double momH   = 0.;
+    double moml   = 0.;
+    double momphi = 0.;
+    for (int i = 0; i < NP; ++i) {
+      momH += P.dq[i] * P.q[i] * P.q[i] * P.q[i] * dH[i];
+    }
+    for (int j = 0; j < ND; ++j) {
+      moml   += F.dq[j] * F.q[j] * F.q[j] * F.q[j] * dl[j];
+      momphi += B.dq[j] * B.q[j] * B.q[j] * B.q[j] * dphi[j];
+    }
+    const double mscale = Scale3(2. * momH, 2. * moml, momphi);
+    const double bk     = K.split_momentum_residual_pert();
+    const double mm     = std::fabs(2. * momH + 2. * moml + momphi - bk) / mscale;
+    std::printf(
+        "  pert: l=0 |numH+numl|=%.2e |2numH+numphi|=%.2e |energy - booked|=%.2e; "
+        "l=1 |momentum - booked|=%.2e (booked %.2e)\n",
+        nf,
+        nb,
+        en,
+        mm,
+        std::fabs(bk) / mscale);
+    assert(nf < 1e-11);
+    assert(nb < 1e-11);
+    assert(en < 1e-11);
+    assert(mm < 1e-10);
+    // The energy split misplaces momentum whatever the lumping does, so this booking
+    // is never zero with a massive daughter, even on the exact-split (balanced) path.
+    assert(std::fabs(bk) / mscale > 1e-10);
+    assert(std::fabs(numH) > 0.);
+  }
+
+  // ── (6) continuity at small mass ────────────────────────────────────────
+  {
+    const auto parent_rate = [&](double rl, double rphi) {
+      DecayTransitionKernel::Config c = cfg;
+      c.fermion_mass_ratio            = rl;
+      c.boson_mass_ratio              = rphi;
+      DecayTransitionKernel Kc(View(P),
+                               View(F),
+                               View(B),
+                               Statistics::Fermion,
+                               Statistics::Boson,
+                               c);
+      std::vector<double> dfH(NP);
+      std::vector<double> dfl(ND);
+      std::vector<double> dfphi(ND);
+      Kc.ComputeBackgroundDerivs(a,
+                                 m,
+                                 Gamma,
+                                 fH.data(),
+                                 fl.data(),
+                                 fphi.data(),
+                                 dfH.data(),
+                                 dfl.data(),
+                                 dfphi.data());
+      return dfH;
+    };
+    const auto ref   = parent_rate(0., 0.);
+    const auto small = parent_rate(1e-3 * r_l, 1e-3 * r_phi);
+    double num       = 0.;
+    double den       = 0.;
+    for (int i = 0; i < NP; ++i) {
+      num = std::fmax(num, std::fabs(small[i] - ref[i]));
+      den = std::fmax(den, std::fabs(ref[i]));
+    }
+    std::printf("  continuity: masses x1e-3 move df_H by %.2e of scale\n", num / den);
+    assert(num / den < 1e-3);
+  }
+}
+
 int main() {
+  test_massive_daughters(0.25, 0., false);  // Hannestad & Madsen's beta = 0.25, massless phi
+  test_massive_daughters(0.25, 0., true);
+  test_massive_daughters(0.1, 0.3, false);  // both massive: no hidden m_phi = 0 assumption
+  test_massive_daughters(0.1, 0.3, true);
+  test_all_l_matches_per_l(false, 0.25, 0.);
+  test_all_l_matches_per_l(true, 0.1, 0.3);
+  test_perturbation_jacobian(false, false, 1, 1, 0.25, 0.);
+  test_perturbation_jacobian(true, true, 1, 1, 0.1, 0.3);
   test_deposit_moments();
   test_band_partition();
   test_separate_bg_grids();

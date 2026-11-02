@@ -126,7 +126,9 @@ inline double ChainFactor(double dg, double chain, double inv_cap) {
 
 /**
  * Conservative discrete transition network for nu_H <-> nu_l + phi (massless
- * daughters). Discretizes the joint band integral ONCE per RHS evaluation and
+ * daughters by default; massive ones through Config::fermion_mass_ratio and
+ * boson_mass_ratio, where the band and the deposit split move from momentum to
+ * daughter energy -- see there). Discretizes the joint band integral ONCE per RHS evaluation and
  * derives all three background derivatives AND the per-l perturbation collision
  * operator from the SAME discrete transitions, so number+energy conservation and
  * detailed balance hold on the grid to machine precision for any resolution.
@@ -356,6 +358,42 @@ class DecayTransitionKernel {
      *  which is wrong in a way that still looks like physics. */
     int n_parent   = 1;
     int n_daughter = 1;
+
+    /** Daughter rest masses in units of the parent's, m_l/m_H and m_phi/m_H. (0, 0) is
+     *  the massless-daughter network this kernel was written for, and reproduces it bit
+     *  for bit: every massive branch is gated on a ratio being nonzero.
+     *
+     *  Needed for Hannestad & Madsen 1997 (astro-ph/9702125), where beta = m_l/m_H is a
+     *  headline parameter (0.15, 0.25 in their figs 4-7); at beta = 0.25 the band edges
+     *  move 6% from the massless formula.
+     *
+     *  WHAT CHANGES. With E* = (m^2 + m_l^2 - m_phi^2)/(2m) and p* the two-body
+     *  rest-frame energy and momentum of the fermion daughter, its lab ENERGY is flat on
+     *
+     *      eps2 in [(eps1 E* - q1 p*)/m, (eps1 E* + q1 p*)/m],     eps3 = eps1 - eps2,
+     *
+     *  (comoving eps = sqrt(q^2 + a^2 m_i^2)), which is Hannestad's E^+- with m_0 = 2p*.
+     *  The band is therefore laid out and integrated in daughter ENERGY rather than
+     *  momentum, with the flat density m/(2p*) folded into the node weight so that
+     *  sum_s wn_s = q1 exactly as before, and the stencil splits each node in ENERGY:
+     *
+     *      sum_e w_e = 1,     sum_e w_e eps(q_je) = eps*.
+     *
+     *  That is the one choice that keeps every background identity EXACT -- number from
+     *  sum w = 1, energy from eps2* + eps3* = eps1 and the energy split -- and it is also
+     *  what the balanced gather wants, because the log-odds is linear in ENERGY at
+     *  equilibrium, not in momentum. For massless daughters eps = q and both statements
+     *  reduce to the ones above.
+     *
+     *  WHAT IT COSTS. Two weights cannot match number, energy AND momentum once eps(q)
+     *  is curved, so the perturbation operator's l = 1 momentum identity picks up the
+     *  stencil's momentum misplacement (sum_e w_e q_je - q*) dN. It is O(d eps^2) on a
+     *  resolved grid and is BOOKED into split_momentum_residual_pert(), so that identity
+     *  still closes to round-off. The background has no momentum identity to lose.
+     *
+     *  Must satisfy m_l/m_H + m_phi/m_H < 1 (the decay is open), checked in the ctor. */
+    double fermion_mass_ratio = 0.;
+    double boson_mass_ratio   = 0.;
   };
 
   struct Moments {
@@ -405,6 +443,30 @@ class DecayTransitionKernel {
    *  nodes approach the band edge without reaching it. */
   static double MaxDaughterMomentum(double q1_max, double a_m) {
     return 0.5 * (std::sqrt(q1_max * q1_max + a_m * a_m) + q1_max);
+  }
+
+  /** The same bound for massive daughters (Config::fermion_mass_ratio r_l and
+   *  boson_mass_ratio r_phi): the larger of the two daughters' momenta at the top of
+   *  their energy bands, eps_i^+ = (eps1 E_i* + q1 p*)/m. Still closed form, still
+   *  increasing in q1 and a. Reduces to the two-argument form at r_l = r_phi = 0. */
+  static double MaxDaughterMomentum(double q1_max, double a_m, double r_l, double r_phi) {
+    const double eps1 = std::sqrt(q1_max * q1_max + a_m * a_m);
+    const double ps   = RestFrameMomentum(r_l, r_phi);
+    const double el   = eps1 * 0.5 * (1. + r_l * r_l - r_phi * r_phi) + q1_max * ps;
+    const double ephi = eps1 * 0.5 * (1. + r_phi * r_phi - r_l * r_l) + q1_max * ps;
+    const double ql   = std::sqrt(std::fmax(el * el - a_m * a_m * r_l * r_l, 0.));
+    const double qphi = std::sqrt(std::fmax(ephi * ephi - a_m * a_m * r_phi * r_phi, 0.));
+    return std::fmax(ql, qphi);
+  }
+
+  /** Two-body rest-frame daughter momentum over the parent mass, p* / m, for daughter
+   *  mass ratios r_l, r_phi:
+   *  sqrt((1 - (r_l + r_phi)^2)(1 - (r_l - r_phi)^2)) / 2. 1/2 for massless daughters,
+   *  and Hannestad's m_0/(2 m_H). */
+  static double RestFrameMomentum(double r_l, double r_phi) {
+    const double s = r_l + r_phi;
+    const double d = r_l - r_phi;
+    return 0.5 * std::sqrt(std::fmax((1. - s * s) * (1. - d * d), 0.));
   }
 
   /** The configuration this kernel was built with. Read-only, so an owning species'
@@ -677,7 +739,11 @@ class DecayTransitionKernel {
    *  and l = 1 calls; l >= 2 has no conservation identity to book against.
    *
    *  The l = 0 NUMBER identities (numH+numl, 2numH+numphi) stay EXACTLY zero: lumping
-   *  moves where a deposit lands, never how much. */
+   *  moves where a deposit lands, never how much.
+   *
+   *  With massive daughters the energy moments weigh each bin by eps(q), and the
+   *  momentum residual also carries the energy split's momentum misplacement
+   *  (sum_e w_e q_je - q*) dN (see Config::fermion_mass_ratio). */
   double split_energy_residual_pert() const {
     return split_energy_residual_pert_;
   }
@@ -704,7 +770,9 @@ class DecayTransitionKernel {
   double node_weight(int i, int s) const {
     return wn_[node_off_[i] + s];
   }
-  /** Kinematics of node s of parent bin i, from the last PrepareTransitions. */
+  /** Kinematics of node s of parent bin i, from the last PrepareTransitions. q2/q3 are
+   *  the daughters' MOMENTA; with massive daughters their energies sqrt(q^2 + a^2 m_i^2)
+   *  sum to eps1, with massless ones q2 + q3 = eps1. */
   void NodeKinematics(
       int i, int s, double& q2, double& q3, double& cos_a, double& cos_b, double& cos_g) const;
 
@@ -746,6 +814,29 @@ class DecayTransitionKernel {
   bool chain_pert_ = false;
   Statistics fermion_stat_, boson_stat_;
   Config cfg_;
+
+  // Massive-daughter kinematics (Config::fermion_mass_ratio / boson_mass_ratio). All
+  // fixed at construction; massive_ gates every branch that differs from the massless
+  // network, so (0, 0) runs the original arithmetic unchanged.
+  bool massive_   = false;
+  double e2s_     = 0.5;  // E_l*/m   = (1 + r_l^2 - r_phi^2)/2
+  double e3s_     = 0.5;  // E_phi*/m = (1 + r_phi^2 - r_l^2)/2
+  double gs_      = 0.5;  // (1 - r_l^2 - r_phi^2)/2, the l-phi invariant in cos_g
+  double ps_      = 0.5;  // p*/m
+  double inv_2ps_ = 1.;   // m/(2 p*): the flat energy band's density
+  double rl2_     = 0.;   // r_l^2
+  double rphi2_   = 0.;   // r_phi^2
+  // Daughter ENERGIES on the four grids, refreshed per PrepareTransitions (they move
+  // with a). The *_e_ views are what the deposits are split on: they alias the
+  // momentum grids for a massless daughter, so that path is untouched.
+  mutable std::vector<double> el_, ephi_, el_bg_, ephi_bg_;
+  GridView fermion_e_, boson_e_, fermion_bg_e_, boson_bg_e_;
+  // Per-node daughter energies, massive_ only (q2_star_/q3_star_ hold momenta).
+  mutable std::vector<double> e2_star_, e3_star_;
+  void RefreshDaughterEnergies() const;
+  // Node n's l = 1 momentum misplacement under the energy split, in the weighted units
+  // of split_momentum_residual_pert(). massive_ only.
+  double StencilMomentumMisplacement(int n, double dN_l, double dN_phi) const;
 
   // Per-node scratch, sized parent_.n * node_stride_ in the ctor (allocation-free RHS).
   mutable std::vector<double> q2_star_, q3_star_;        // node momenta, q2*+q3* = eps1
