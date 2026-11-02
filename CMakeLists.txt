@@ -130,6 +130,7 @@ set(CLASS_TOOLS_FILES
   tools/bbn_solver.cpp
   tools/bbn_weak.cpp
   tools/common.cpp
+  tools/decay_harness.cpp
   tools/decay_transition_kernel.cpp
   tools/dei_rkck.cpp
   tools/acoustic_spline.cpp
@@ -252,6 +253,10 @@ if(NOT SKBUILD)
     XCODE_SCHEME_ARGUMENTS "explanatory.ini"
     XCODE_SCHEME_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
   )
+  # Standalone decay-kernel driver (tools/decay_harness.h, issue #389). Stays in the
+  # build tree: it is a validation tool, not part of the `./class` workflow.
+  add_executable(decay_harness main/decay_harness.cpp)
+  target_link_libraries(decay_harness PRIVATE classpp)
 
   enable_testing()
   add_subdirectory(unittests)

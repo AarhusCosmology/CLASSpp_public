@@ -1,0 +1,71 @@
+# Hannestad & Madsen 1997, "A Cosmological Three Level Neutrino Laser",
+# astro-ph/9702125, fig 1: final f_F of the two-level decay H -> F + phi at
+# m_H = 2 MeV, m_F = 0.2 MeV, m_phi = 0.005 MeV, for tau_H = 0.2 s (solid),
+# 1 s (dotted) and 20 s (dashed), as the caption labels them. The curves are those of
+# alpha_H = (m_H/3 MeV)^2 (tau/1 s) = 0.1, 1, 10, i.e. tau = 0.225, 2.25, 22.5 s (issue
+# #389, PR #492; scripts/hannestad_fig1.py).
+#
+# Columns: q = p/T_nu (the paper's axis is labelled p/T_gamma, but it is the comoving
+# momentum in units of T_nu; checked by the number integral int q^2 f dq = 3.55), and
+# y = q^2 f_F with f_F the bare per-dof occupation. An empty cell is off the plot.
+#
+# Digitized exactly, not traced by hand: the arXiv source's IDL vector PostScript was
+# parsed for its M/R/P/D path operators and dash styles, calibrated on the major axis
+# ticks (~0.2 % per device unit), and the polylines resampled linearly onto this q grid
+# (p95 resampling error <= 0.007 absolute). Source: the maintainer's comment on issue
+# #389, https://github.com/AarhusCosmology/CLASSpp/issues/389#issuecomment-6556636024
+# (table hm97_fig1.csv), copied verbatim.
+q,F_tau0.2s,F_tau1s,F_tau20s
+0.1,0.009,0.009,0.005
+0.25,0.051,0.048,0.030
+0.5,0.179,0.166,0.105
+0.75,0.367,0.324,0.203
+1,0.585,0.496,0.306
+1.25,0.800,0.662,0.402
+1.5,0.976,0.805,0.484
+1.75,1.094,0.913,0.548
+2,1.147,0.982,0.593
+2.25,1.140,1.011,0.620
+2.5,1.087,1.004,0.632
+2.75,1.004,0.966,0.631
+3,0.903,0.905,0.621
+3.25,0.796,0.830,0.603
+3.5,0.689,0.748,0.581
+3.75,0.590,0.663,0.555
+4,0.499,0.580,0.528
+4.25,0.418,0.502,0.500
+4.5,0.348,0.429,0.471
+4.75,0.288,0.365,0.444
+5,0.237,0.309,0.417
+5.25,0.194,0.259,0.391
+5.5,0.158,0.217,0.366
+5.75,0.128,0.180,0.343
+6,0.104,0.149,0.320
+6.25,0.084,0.124,0.299
+6.5,0.067,0.102,0.279
+6.75,0.054,0.084,0.259
+7,0.043,0.069,0.241
+7.25,0.035,0.057,0.224
+7.5,0.028,0.046,0.207
+7.75,0.022,0.038,0.192
+8,0.018,0.031,0.177
+8.25,0.014,0.025,0.163
+8.5,0.011,0.021,0.150
+8.75,0.009,0.017,0.137
+9,0.007,0.014,0.126
+9.25,0.006,0.011,0.115
+9.5,0.004,0.009,0.104
+9.75,0.004,0.007,0.095
+10,0.003,0.006,0.086
+10.25,0.002,0.005,0.077
+10.5,0.002,0.004,0.070
+10.75,0.001,0.003,0.062
+11,0.001,0.003,0.056
+11.25,0.001,0.002,0.050
+11.5,0.001,0.002,0.044
+11.75,0.001,0.001,0.039
+12,0.001,0.001,0.035
+12.25,0.000,0.001,0.031
+12.5,0.000,0.001,0.027
+12.75,0.000,0.001,0.024
+13,,,

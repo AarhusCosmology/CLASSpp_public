@@ -377,8 +377,19 @@ void DecayTransitionKernel::PrepareTransitions(double a,
 
   // Log-odds of the daughter occupations, once per RHS on the BACKGROUND grids --
   // O(n_q) against the O(n_parent n_q) nodes that read them back, so the two
-  // transcendentals per bin are amortised away. See Config::balanced_gather.
-  if (cfg_.balanced_gather) {
+  // transcendentals per bin are amortised away. See Config::balanced_gather, and
+  // Config::gather_floor for the smooth floor that keeps the gather Lipschitz in bins
+  // at the integrator's noise level.
+  if (cfg_.balanced_gather && cfg_.gather_floor > 0.) {
+    const double d = cfg_.gather_floor;
+    for (int j = 0; j < fermion_bg_.n; ++j) {
+      eta_l_[j] = EtaOfFloored(f_l[j], fermion_stat_, d);
+    }
+    for (int j = 0; j < boson_bg_.n; ++j) {
+      eta_phi_[j] = EtaOfFloored(f_phi[j], boson_stat_, d);
+    }
+  }
+  else if (cfg_.balanced_gather) {
     for (int j = 0; j < fermion_bg_.n; ++j) {
       eta_l_[j] = EtaOf(f_l[j], fermion_stat_);
     }
@@ -726,8 +737,17 @@ void DecayTransitionKernel::PrepareTransitions(double a,
   // Per-bin half of the balanced gather's chain rule (see chain_l_). Uses the SAME
   // clamp as EtaOf, so an unfilled bin gives a bounded 1/kFMin rather than a division
   // by zero. Indexed on the STATE grid because that is what CollisionDiagonal
-  // differentiates with respect to.
-  if (cfg_.balanced_gather) {
+  // differentiates with respect to. Under gather_floor it is |d eta/d f| of the floored
+  // log-odds instead, the exact derivative of what the gather above used.
+  if (cfg_.balanced_gather && cfg_.gather_floor > 0.) {
+    for (int k = 0; k < fermion_.n; ++k) {
+      chain_l_[k] = EtaSlopeFloored(f_l_st[k], fermion_stat_, cfg_.gather_floor);
+    }
+    for (int k = 0; k < boson_.n; ++k) {
+      chain_phi_[k] = EtaSlopeFloored(f_phi_st[k], boson_stat_, cfg_.gather_floor);
+    }
+  }
+  else if (cfg_.balanced_gather) {
     for (int k = 0; k < fermion_.n; ++k) {
       const double x = ClampF(f_l_st[k], fermion_stat_);
       chain_l_[k]    = 1. / (x * (1. - x));

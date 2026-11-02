@@ -71,6 +71,36 @@ inline double FOfEta(double eta, Statistics s) {
   return 1. / (std::exp(eta < 1e-12 ? 1e-12 : eta) - 1.);
 }
 
+/** Smooth positive floor s(x) = (x + sqrt(x^2 + 4 d^2)) / 2 (Config::gather_floor).
+ *
+ *  s(x) = x + d^2/x + O(d^4/x^3) for x >> d, s(0) = d, s(x) -> d^2/|x| for x << -d.
+ *  It is C-infinity and monotone, with s'(x)/s(x) = 1/sqrt(x^2 + 4 d^2) <= 1/(2d), so a
+ *  log-odds built from it has a bounded derivative however a bin's occupation wanders
+ *  around zero. */
+inline double SoftFloor(double x, double d) {
+  return 0.5 * (x + std::sqrt(x * x + 4. * d * d));
+}
+
+/** EtaOf with the smooth floor d > 0 on f (and, for a fermion, on 1-f), see
+ *  Config::gather_floor. Equal to EtaOf up to a relative (d/f)^2 wherever f >> d. */
+inline double EtaOfFloored(double f, Statistics s, double d) {
+  if (s == Statistics::Fermion) {
+    return std::log(SoftFloor(1. - f, d) / SoftFloor(f, d));
+  }
+  return std::log((1. + f) / SoftFloor(f, d));
+}
+
+/** |d eta/d f| of EtaOfFloored: the per-bin half of the floored gather's chain rule,
+ *  which reduces to 1/(f(1 -+ f)) at d = 0. Bounded by 1/d (fermion) and 1/(2d)
+ *  (boson). */
+inline double EtaSlopeFloored(double f, Statistics s, double d) {
+  const double d2 = 4. * d * d;
+  if (s == Statistics::Fermion) {
+    return 1. / std::sqrt((1. - f) * (1. - f) + d2) + 1. / std::sqrt(f * f + d2);
+  }
+  return 1. / std::sqrt(f * f + d2) - 1. / (1. + f);
+}
+
 /** The log-odds gather's chain factor, relative to the linear gather's.
  *
  *  With G = FOfEta(sum_e w_e eta_e) the exact derivative of the gathered occupation
@@ -271,6 +301,59 @@ class DecayTransitionKernel {
      *  cap = 100. The default 1e4 sits where the daughters are converged to ~1e-5 and the
      *  run costs ~1.2x the linear gather; 1e5 costs ~4x and buys nothing measurable. */
     double chain_cap = kChainCapDefault;
+
+    /** Smooth floor on the occupations the balanced gather takes the log-odds of:
+     *  eta is formed from SoftFloor(f, d) (and SoftFloor(1-f, d) for a fermion) instead
+     *  of the hard clamp to [kFMin, kFMax]. 0, the default, keeps the hard clamp bit for
+     *  bit. Read only under balanced_gather.
+     *
+     *  WHY (issue #389; measured in DecayHarness at Hannestad & Madsen's fig 1, m_H = 2
+     *  MeV, tau = 0.2 s, which with d = 0 never finished). The log-odds gather is a
+     *  weighted GEOMETRIC mean, G = f_a^w f_b^(1-w) in the dilute limit, so as a stencil
+     *  bin empties G goes to zero like f_b^(1-w): continuous but not Lipschitz. Above the
+     *  daughters' thermal tail the bins sit at the integrator's noise level (|f| ~ 1e-23
+     *  of either sign against an abstol of 1e-15), and a parent bin whose band edge
+     *  reaches there carries an inverse-decay term that depends on that noise through
+     *  f^(1-w). At the stall (ln a = 1.962, T_nu = 0.14 MeV) the top parent bin held
+     *  f_H = 3.1e-16 and boson bin 85 held f = -2.8e-31; d(df_H)/d(f_phi[85]), measured
+     *  by finite differences of size 1e-27, 1e-24, 1e-21, 1e-18, came out 1.2e11, 1.3e8,
+     *  1.4e5, 1.6e2 -- i.e. the response to the step is a constant ~1e-16 jump, against a
+     *  df_H of -2.1e-15. numjac's columns there are meaningless, simplified Newton stops
+     *  contracting (newnrm == oldnrm at every h), and ndf15 shrinks h to 1e-13 at a fixed
+     *  ln a and stays there. Hypotheses killed on the way: Pauli blocking (f_l <= 0.964
+     *  everywhere at the stall) and f_phi >> 1 (the offending bin is EMPTY, not full).
+     *
+     *  WHAT THE FLOOR DOES. s(f) has s'/s <= 1/(2d), so |dG/df_e| <= w_e G/(2d): the
+     *  gather is Lipschitz everywhere, and a bin wandering through |f| << d moves G by
+     *  O(|f|/d) instead of O(|f|^(1-w)). The band factor is otherwise unchanged:
+     *  where every stencil occupation is >> d the log-odds differ from the clamped ones by
+     *  a relative (d/f)^2, so the well-balanced property survives on every bin above the
+     *  floor (exactly where it is physics) and is given up only in bins that hold less
+     *  than the integrator resolves. The scatter weights are untouched, so every
+     *  conservation identity is exactly what it was. CollisionDiagonal and the
+     *  balanced_pert chain rule use EtaSlopeFloored, the exact derivative of the floored
+     *  eta, so they stay the Jacobian of what the background integrates.
+     *
+     *  WHAT IT COSTS. The geometric mean no longer vanishes at an exactly empty bin:
+     *  G|_{f_k=0} ~ d^{w_k} f_other^{1-w_k}, so the zero-bill argument in lumped_loss is
+     *  exact only up to that, and an empty bin can be pushed slightly negative. Once it is,
+     *  s(f) = d^2/|f| shrinks the bill further, so the excursion stays far below d.
+     *  Measured over the fig 1 runs at d = 1e-18: min f >= -1.1e-21, against -8.5e-12 for
+     *  the linear gather with the same exact split (balanced_gather = 0, lumped_loss = 0).
+     *  FOfEta's convex-combination bound (see there) no longer holds for a fermion bin
+     *  whose noise takes f above 1: s(1-f) = d^2/(f-1) can send eta below -36.7, where G
+     *  rounds to exactly 1 and dg = G(1-G) to 0. That is the right limit (a full bin
+     *  blocks completely and its derivative vanishes), not a failure.
+     *
+     *  CHOOSING d. It must sit above both the noise the integrator leaves in bins below
+     *  its absolute tolerance and numjac's increment there (~sqrt(eps) abstol = 1.5e-23
+     *  for abstol 1e-15), and well below any occupation that matters. Measured on the
+     *  stall case: d = 1e-30 still stalls (> 120 s), 1e-24 finishes in 52 s (5294 rejected
+     *  steps, 1845 Jacobians), and 1e-20, 1e-18, 1e-15 all finish in 3.1 s with 15
+     *  Jacobians; fig 1 at tau = 0.2, 1, 20 s is identical to 4 digits across 1e-20..1e-16.
+     *  DecayHarness uses 1e-18 (three decades above the noise, two below abstol). A CLASS
+     *  species that wants it should measure its own: its abstol and units differ. */
+    double gather_floor = 0.;
 
     /** Lump the daughter loss onto the deposit bin's own occupation (blended by the
      *  harmonic limiter, see LumpTheta) rather than using the exact two-bin split.
