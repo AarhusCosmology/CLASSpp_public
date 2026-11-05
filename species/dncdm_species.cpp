@@ -650,6 +650,43 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
   // exactly the instruction sequence it has always been (a branch in there moves
   // P(k) in the last digit under -ffast-math), and a shared scratch buffer would be
   // a data race, since perturb_derivs runs concurrently across k-modes.
+  //
+  // The cut of a grid that stops at q_max (dlnf0_dlnq_cut_, nonzero for qm_trapz) is a
+  // driver on the last bin only, added after either loop so that neither body changes.
+  //
+  // The drivers are normalised as NCDMSpecies normalises them (ncdm_driver_normalisation):
+  // their q-sum must be -3 (rho+p), which the spline of ln f on a coarse grid misses (#497).
+  // The parent's background and perturbations share one grid, so both sums are taken over
+  // it with the occupation of this a from pvecback (w_bg_ is rewritten by every
+  // background call and is not this a's).
+  double driver_norm = 1.;
+  if (normalise_drivers_) {
+    double driver_sum = 0.;
+    double bg_sum     = 0.;
+    for (int iq = 0; iq < layout.q_size; ++iq) {
+      const double q    = q_[iq];
+      const double eps  = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
+      const double w    = dq_[iq] * std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]);
+      driver_sum       += w * q * q * eps * GetDlnf0Dlnq(iq, pvecback);
+      bg_sum           += w * q * q * (eps + q * q / (3. * eps));
+    }
+    if (driver_sum != 0.) {
+      driver_norm = -3. * bg_sum / driver_sum;
+    }
+  }
+  const double driver_continuity = metric_continuity * driver_norm;
+  const double driver_euler      = metric_euler * driver_norm;
+  const double driver_shear      = metric_shear * driver_norm;
+  const auto add_cut_driver      = [&](double scale) {
+    const int iq          = layout.q_size - 1;
+    const double q        = q_[iq];
+    const double epsilon  = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
+    const double cut      = dlnf0_dlnq_cut_ * scale;
+    const int idx         = layout.index_per_q[iq];
+    dy[idx]              += driver_continuity * cut / 3.;
+    dy[idx + 1]          -= epsilon * driver_euler / (3. * q * k) * cut;
+    dy[idx + 2]          -= s_l[2] * driver_shear * 2. / 15. * cut;
+  };
   if (collision_owned_) {
     for (int iq = 0; iq < layout.q_size; ++iq) {
       const double q          = q_[iq];
@@ -660,17 +697,20 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
       const double qk_div_epsilon = k * q / epsilon;
       const int idx               = layout.index_per_q[iq];
 
-      dy[idx]     = -qk_div_epsilon * y[idx + 1] + metric_continuity * dlnf0_dlnq / 3.;
+      dy[idx]     = -qk_div_epsilon * y[idx + 1] + driver_continuity * dlnf0_dlnq / 3.;
       dy[idx + 1] = qk_div_epsilon / 3. * (y[idx] - 2. * s_l[2] * y[idx + 2]) -
-                    epsilon * metric_euler / (3. * q * k) * dlnf0_dlnq;
+                    epsilon * driver_euler / (3. * q * k) * dlnf0_dlnq;
       dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
-                    s_l[2] * metric_shear * 2. / 15. * dlnf0_dlnq;
+                    s_l[2] * driver_shear * 2. / 15. * dlnf0_dlnq;
       for (int l = 3; l < lmax; ++l) {
         dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                       (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
       }
       dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] -
                        (1. + lmax) * k * cotKgen * y[idx + lmax];
+    }
+    if (dlnf0_dlnq_cut_ != 0.) {
+      add_cut_driver(std::exp(pvecback[index_bg_lnf_decay_dr1_ + layout.q_size - 1]));
     }
     return;
   }
@@ -683,16 +723,19 @@ void DNCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
     const double qk_div_epsilon = k * q / epsilon;
     const int idx               = layout.index_per_q[iq];
 
-    dy[idx]     = -qk_div_epsilon * y[idx + 1] + metric_continuity * dlnf0_dlnq / 3.;
+    dy[idx]     = -qk_div_epsilon * y[idx + 1] + driver_continuity * dlnf0_dlnq / 3.;
     dy[idx + 1] = qk_div_epsilon / 3. * (y[idx] - 2. * s_l[2] * y[idx + 2]) -
-                  epsilon * metric_euler / (3. * q * k) * dlnf0_dlnq;
+                  epsilon * driver_euler / (3. * q * k) * dlnf0_dlnq;
     dy[idx + 2] = qk_div_epsilon / 5. * (2. * s_l[2] * y[idx + 1] - 3. * s_l[3] * y[idx + 3]) -
-                  s_l[2] * metric_shear * 2. / 15. * dlnf0_dlnq;
+                  s_l[2] * driver_shear * 2. / 15. * dlnf0_dlnq;
     for (int l = 3; l < lmax; ++l) {
       dy[idx + l] = qk_div_epsilon / (2. * l + 1.) *
                     (l * s_l[l] * y[idx + l - 1] - (l + 1.) * s_l[l + 1] * y[idx + l + 1]);
     }
     dy[idx + lmax] = qk_div_epsilon * y[idx + lmax - 1] - (1. + lmax) * k * cotKgen * y[idx + lmax];
+  }
+  if (dlnf0_dlnq_cut_ != 0.) {
+    add_cut_driver(1.);
   }
 
   // Newtonian gauge: the decay runs on the parent's proper time, dt = a(1+psi) dtau,
@@ -729,9 +772,9 @@ void DNCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
     // swapped for ∂f̄/∂ln q (see PerturbDerivs). An already-empty bin then seeds
     // F = 0 by itself — the right statement, and one Ψ-space cannot make.
     const double dlnf0_dlnq = collision_owned_
-                                  ? pvecback[index_bg_dlnfdlnq_decay_ + index_q] *
+                                  ? GetDlnf0Dlnq(index_q, pvecback) *
                                         std::exp(pvecback[index_bg_lnf_decay_dr1_ + index_q])
-                                  : pvecback[index_bg_dlnfdlnq_decay_ + index_q];
+                                  : GetDlnf0Dlnq(index_q, pvecback);
     const int lmax          = layout.l_max;
 
     y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;

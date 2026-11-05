@@ -186,7 +186,10 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     DistributionFunction(&pbadist, q, f0);
   };
 
+  normalise_drivers_ = settings.normalise_drivers;
+
   // Handle perturbation quadrature
+  dlnf0_dlnq_cut_ = 0.;
   if (strategy == qm_auto) {
     q_.resize(_QUADRATURE_MAX_);
     w_.resize(_QUADRATURE_MAX_);
@@ -222,10 +225,10 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     // Manual sampling
     q_.resize(input_q_size_);
     w_.resize(input_q_size_);
-    std::vector<double> dq_dummy(input_q_size_);
+    std::vector<double> dq(input_q_size_);
     get_qsampling_manual(q_.data(),
                          w_.data(),
-                         dq_dummy.data(),
+                         dq.data(),
                          input_q_size_,
                          qmax_,
                          static_cast<enum quadrature_method>(strategy),
@@ -233,6 +236,9 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
                          pbadist.tablesize,
                          distribution_function,
                          gb);
+    if (strategy == qm_trapz) {
+      dlnf0_dlnq_cut_ = -q_.back() / dq.back();
+    }
 
     q_bg_.resize(input_q_size_bg_);
     w_bg_.resize(input_q_size_bg_);
@@ -288,6 +294,9 @@ void NCDMBaseSpecies::InitQuadrature(const NcdmSettings& settings) {
     else {
       dlnf0_dlnq_[index_q] = q / f0 * df0dq;
     }
+  }
+  if (!dlnf0_dlnq_.empty()) {
+    dlnf0_dlnq_.back() += dlnf0_dlnq_cut_;
   }
 
   // Compute factor_

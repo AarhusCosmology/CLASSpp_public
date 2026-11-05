@@ -20,12 +20,13 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 
 | file | S | speed vs defaults | use it for |
 |---|---|---|---|
-| *(compiled defaults)* | 0.387 ³ ⁴ ⁵ | 1.00× | everything |
+| *(compiled defaults)* | 0.387 ³ ⁴ ⁵ ⁶ | 1.00× | everything |
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
 | `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread, 20% with halofit | reproducing results from 2026-10-09 to 2026-10-21 |
 | `precision_pre_2026_10_27.pre` | 0.387 ³ | 8% slower on one thread, 61% on w0waCDM | reproducing results from 2026-10-21 to 2026-10-27 |
+| `precision_pre_2026_11_05.pre` | 0.387 ³ | as fast | reproducing results from 2026-10-27 to 2026-11-05 |
 | `act_dr6.pre` | — ¹ | 3.3× slower ² | ACT DR6 and SPT-3G D1: temperature, polarisation and lensing |
 
 ¹ Not scored on `plik_lite`. Its own metric is the distance to a converged reference
@@ -73,6 +74,20 @@ from 500 to 1000 multipoles (see **Tensors** below). `act_dr6` and `precise` set
 `l_linstep`, triggers and headroom. The
 `precision_pre_*` files pin the old values, and their headers say how to restore the old k range
 and the fluid's evolver. See `docs/superpowers/specs/2026-10-27-precision-sync-design.md`.
+
+⁶ On 2026-11-05 the metric drivers of the ncdm hierarchy began to be normalised to the ρ+p of
+the background grid (`ncdm_driver_normalisation`). The quadrature had missed it by 2e-3 on the
+default synchronous grid, so the neutrinos did not conserve energy and momentum. For one
+0.06 eV neutrino at the Planck best fit the C_l move by at most 1.5e-4 and P(k) by 1.7e-4, all
+of it towards a 32-bin Laguerre grid, which the default grid now matches to 2e-5; for 1 eV, TT
+at ℓ < 20 moves by 2.9e-3. One thread is as fast. A decaying ncdm (`ncdm_decay_dr`) is normalised
+on its single grid: for a production-like parent (Γ = 1e5, 0.3 eV, 16 trapezoid bins) synchronous TT
+at ℓ < 20 was 1.2e-3 off a 32-bin Laguerre grid and is 8e-6 off now, 1.7% slower. Not re-measured on
+`plik_lite`. The same day,
+in Newtonian gauge only, modes with k < 5 a₀H₀ began to be integrated at a tolerance tighter by
+(k / 5 a₀H₀)² (`tol_perturb_newtonian_k_over_a0H0`): the comoving density cancels δ against
+3aHθ/k² there, and P(k) at k = 1e-5 h/Mpc was 18% off synchronous for a 1 eV neutrino. A
+Newtonian CMB + P(k) run is 1% slower. See #497.
 
 ## Two things these files do not cover
 

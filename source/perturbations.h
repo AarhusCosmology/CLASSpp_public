@@ -432,6 +432,11 @@ struct perturb_workspace {
   double delta_cb = 0.0; /**< relative density perturbation of only cdm and baryon */
   double theta_cb = 0.0; /**< velocity divergence theta of only cdm and baryon */
 
+  /** 1 + w of the species summed in delta_m and delta_cb, sum(rho+p)/sum(rho). theta_m and
+   *  theta_cb are (rho+p)-weighted, so the comoving densities need this factor (#497). */
+  double one_plus_w_m  = 1.0;
+  double one_plus_w_cb = 1.0;
+
   /* Module-owned PPF dark-energy closure. Written by FluidSpecies::ComputePpf
      during stress-energy assembly (it depends on the totals of every other
      species), then read back by the module totals and by the fluid's own

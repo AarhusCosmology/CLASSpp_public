@@ -847,11 +847,11 @@ class TestReviewRegressions(TestClass):
         differ by 2% in C_l^TT at l < 20 and by 21% in P(k) at k < 0.01 h/Mpc. With
         them the gap is 0.14% and 0.8%.
 
-        The momentum grid is Laguerre (strategy 1), since the trapezoid grid
-        (strategy 3) with its default max_q = 15 has a Newtonian-gauge error that
-        does not shrink with momenta_bins, also for a stable ncdm_standard (#496).
-        Below k = 1e-4/Mpc even a stable ncdm drifts between the gauges at the
-        default tolerances (#497), so P(k) starts there."""
+        The momentum grid is Laguerre (strategy 1): until #496 was fixed, the trapezoid
+        grid (strategy 3) with its default max_q = 15 had a Newtonian-gauge error that
+        did not shrink with momenta_bins, also for a stable ncdm_standard. Below
+        k = 1e-4/Mpc even a stable ncdm drifts between the gauges at the default
+        tol_perturb_integration (#497), so P(k) starts there."""
         params = {
             'output': 'tCl,mPk',
             'l_max_scalars': 1000,
@@ -2375,6 +2375,148 @@ class TestReviewRegressions(TestClass):
         }
         reference = dict(scenario, **{'nu2.deg': 1.0})
         self._assert_scenarios_match(scenario, reference, "Explicit legacy default")
+
+    # ── #496/#497: ncdm energy-momentum conservation on a finite momentum grid ──
+    _NCDM_GAUGE_BASE = {
+        'N_ur': 3.046,
+        'omega_b': 0.022032,
+        'omega_cdm': 0.11,
+        'YHe': 0.25,
+        'nu1.type': 'ncdm_standard',
+        'nu1.T': 0.71611,
+    }
+
+    def _ncdm_spectra(self, params, k=None, l_max=None):
+        """C_l^TT (from l = 2) and/or P(k) at z = 0 of one run."""
+        cosmo = Class()
+        try:
+            cosmo.set(params)
+            cosmo.compute()
+            tt = cosmo.raw_cl(l_max)['tt'][2:] if l_max else None
+            pk = np.array([cosmo.pk_lin(kk, 0.) for kk in k]) if k is not None else None
+            return tt, pk
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_ncdm_trapezoid_cut_newtonian_matches_synchronous(self):
+        """#496 guard: a trapezoid grid that stops at max_q is consistent in both gauges.
+
+        The grid integrates f0(q) Theta(q_max - q), whose d ln f0/d ln q has a delta
+        function at q_max. Without it, the q-sums of the metric drivers lose the
+        boundary term q_max^3 eps f0(q_max) of the integration by parts that makes them
+        -3(rho+p): 7e-4 at the default max_q = 15, whatever the number of bins. The
+        comoving density of Newtonian gauge, a cancellation, turned that into a gauge
+        gap of 7.7e-3 in C_l^TT and 2.5% in P(k) here, at 48 bins as at 96; now 3.3e-4
+        and 7.1e-4."""
+        params = dict(self._NCDM_GAUGE_BASE, **{
+            'output': 'tCl,mPk',
+            'l_max_scalars': 1000,
+            'P_k_max_1/Mpc': 0.3,
+            'nu1.m': 1.0,
+            'nu1.quadrature_strategy': 3,
+            'nu1.momenta_bins': 48,
+        })
+        self.scenario = dict(params)
+        k = np.geomspace(1e-4, 0.2, 40)
+        out = {g: self._ncdm_spectra(dict(params, gauge=g), k=k, l_max=1000)
+               for g in ('synchronous', 'newtonian')}
+        np.testing.assert_allclose(out['newtonian'][0], out['synchronous'][0], rtol=2e-3,
+                                   err_msg='C_l^TT, 2 <= l <= 1000')
+        np.testing.assert_allclose(out['newtonian'][1], out['synchronous'][1], rtol=5e-3,
+                                   err_msg='P(k), 1e-4 <= k <= 0.2 /Mpc')
+
+    def test_dncdm_dr_trapezoid_newtonian_matches_synchronous(self):
+        """#496/#497 guard for ncdm_decay_dr on a coarse trapezoid grid.
+
+        The decaying parent's d ln f/d ln q is the spline derivative of its evolving ln f,
+        so on 16 bins the q-sum of its metric drivers misses -3(rho+p) (and the grid's cut
+        at max_q adds to that). The gauges differed by 5.9e-2 in C_l^TT and 19% in P(k);
+        with the cut term and the drivers normalised as for ncdm_standard, 1.7e-3 and
+        2.3e-3. ncdm_driver_normalisation = 0 gives 4.9e-2 and 15%. The cut itself is
+        checked bin by bin in unittests/species/dncdm_cut_driver_test.cpp."""
+        params = {
+            'output': 'tCl,mPk',
+            'l_max_scalars': 1000,
+            'P_k_max_1/Mpc': 0.3,
+            'N_ur': 3.046,
+            'omega_b': 0.022032,
+            'omega_cdm': 0.11,
+            'YHe': 0.25,
+            'dncdm1.type': 'ncdm_decay_dr',
+            'dncdm1.m': 1.0,
+            'dncdm1.T': 0.71611,
+            'dncdm1.Gamma': 1e3,
+            'dncdm1.Omega_ini': 2e-5,
+            'dncdm1.quadrature_strategy': 3,
+            'dncdm1.momenta_bins': 16,
+        }
+        self.scenario = dict(params)
+        k = np.geomspace(1e-4, 0.2, 40)
+        out = {g: self._ncdm_spectra(dict(params, gauge=g), k=k, l_max=1000)
+               for g in ('synchronous', 'newtonian')}
+        np.testing.assert_allclose(out['newtonian'][0], out['synchronous'][0], rtol=5e-3,
+                                   err_msg='C_l^TT, 2 <= l <= 1000')
+        np.testing.assert_allclose(out['newtonian'][1], out['synchronous'][1], rtol=1e-2,
+                                   err_msg='P(k), 1e-4 <= k <= 0.2 /Mpc')
+
+    def test_ncdm_default_grid_drivers_match_the_background(self):
+        """#497 guard: the ncdm metric drivers are normalised to the background rho+p.
+
+        On the default grid the q-sum of the drivers misses -3(rho+p) of the background
+        grid by 2e-3 (synchronous) and 2e-5 (Newtonian), so the species does not conserve
+        energy and momentum. Synchronous C_l^TT at l < 20 was 2.9e-3 off a 32-bin Laguerre
+        grid for m = 1 eV (now 1.0e-5), and in Newtonian gauge, where the comoving density
+        cancels to (k/aH)^2, P(k) was 5.7e-3 off synchronous here (1.2% at k = 1e-5 h/Mpc)
+        even at tol_perturb_integration = 1e-8 (now 2.5e-4). ncdm_driver_normalisation = 0
+        restores both."""
+        base = dict(self._NCDM_GAUGE_BASE, **{'nu1.m': 1.0})
+        self.scenario = dict(base)
+        cl = dict(base, output='tCl', l_max_scalars=20)
+        tt_default, _ = self._ncdm_spectra(cl, l_max=20)
+        tt_laguerre, _ = self._ncdm_spectra(
+            dict(cl, **{'nu1.quadrature_strategy': 1, 'nu1.momenta_bins': 32}), l_max=20)
+        np.testing.assert_allclose(tt_default, tt_laguerre, rtol=3e-4,
+                                   err_msg='synchronous C_l^TT, default grid vs Laguerre, l < 20')
+
+        pk = dict(base, output='mPk', **{'P_k_max_1/Mpc': 0.01, 'tol_perturb_integration': 1e-8})
+        k = np.geomspace(1e-5, 1e-3, 12)
+        out = {g: self._ncdm_spectra(dict(pk, gauge=g), k=k)[1] for g in ('synchronous', 'newtonian')}
+        np.testing.assert_allclose(out['newtonian'], out['synchronous'], rtol=2e-3,
+                                   err_msg='P(k), 1e-5 <= k <= 1e-3 /Mpc')
+
+    def test_newtonian_superhorizon_pk_at_default_tolerance(self):
+        """#497 guard: Newtonian-gauge P(k) on super-horizon scales at the default tolerance.
+
+        delta and 3aH theta/k^2 are of order the potential there and cancel to the comoving
+        density, (k/aH)^2 smaller, so an integration error of tol_perturb_integration in them
+        becomes tol (aH/k)^2 in P(k); the error is constant in time, not a transient of the
+        initial conditions (an earlier start makes it larger). A 1 eV neutrino starts the
+        integration early, where it was -18% off synchronous at k = 1e-5 h/Mpc (9.9% here,
+        from k = 1e-5/Mpc). Modes with k < 5 a_0 H_0 now get a tolerance tighter by
+        (k / 5 a_0 H_0)^2: 2.5e-4."""
+        params = dict(self._NCDM_GAUGE_BASE, **{'nu1.m': 1.0, 'output': 'mPk', 'P_k_max_1/Mpc': 0.01})
+        self.scenario = dict(params)
+        k = np.geomspace(1e-5, 1e-3, 12)
+        out = {g: self._ncdm_spectra(dict(params, gauge=g), k=k)[1] for g in ('synchronous', 'newtonian')}
+        np.testing.assert_allclose(out['newtonian'], out['synchronous'], rtol=2e-3,
+                                   err_msg='P(k), 1e-5 <= k <= 1e-3 /Mpc')
+
+    def test_comoving_density_carries_one_plus_w_of_the_matter(self):
+        """#497 guard: delta_m + 3aH (1+w_m) theta_m/k^2 is the comoving density.
+
+        theta_m is (rho+p)-weighted, so the comoving density needs the factor (1+w_m);
+        it used to be taken as 1. A relativistic ncdm in delta_m has p/rho_m ~ 1e-5 today
+        for m = 1e-3 eV, which the Newtonian-gauge cancellation to (k/aH)^2 turned into
+        a gap between the gauges in P(k) of 1.35e-2 here (3% at k = 1e-5 h/Mpc), at any
+        tolerance. Now 1.8e-3, and 5.7e-4 with the drivers normalised."""
+        params = dict(self._NCDM_GAUGE_BASE, **{'nu1.m': 1e-3, 'output': 'mPk',
+                                                'P_k_max_1/Mpc': 0.01})
+        self.scenario = dict(params)
+        k = np.geomspace(1e-5, 1e-3, 12)
+        out = {g: self._ncdm_spectra(dict(params, gauge=g), k=k)[1] for g in ('synchronous', 'newtonian')}
+        np.testing.assert_allclose(out['newtonian'], out['synchronous'], rtol=3e-3,
+                                   err_msg='P(k), 1e-5 <= k <= 1e-3 /Mpc')
 
 
 class TestLazyLifecycle(unittest.TestCase):

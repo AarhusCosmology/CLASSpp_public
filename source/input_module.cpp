@@ -445,11 +445,12 @@ void InputModule::ConstructSpecies() {
   // The ncdm perturbation momentum grid is gauge-dependent: synchronous gauge
   // converges with far fewer q-bins than Newtonian (synchronous reaches sub-0.1%
   // P(k) at ~5 bins, Newtonian needs ~11). Use the gauge-appropriate tolerance.
-  ncdm_settings.tol_ncdm    = (perturbations_.gauge == possible_gauges::newtonian)
-                                  ? precision_.tol_ncdm_newtonian
-                                  : precision_.tol_ncdm_synchronous;
-  ncdm_settings.tol_ncdm_bg = precision_.tol_ncdm_bg;
-  ncdm_settings.tol_M_ncdm  = precision_.tol_M_ncdm;
+  ncdm_settings.tol_ncdm          = (perturbations_.gauge == possible_gauges::newtonian)
+                                        ? precision_.tol_ncdm_newtonian
+                                        : precision_.tol_ncdm_synchronous;
+  ncdm_settings.tol_ncdm_bg       = precision_.tol_ncdm_bg;
+  ncdm_settings.tol_M_ncdm        = precision_.tol_M_ncdm;
+  ncdm_settings.normalise_drivers = (precision_.ncdm_driver_normalisation != 0);
 
   SpeciesBuildContext ctx{
       /*pfc=*/&file_content_,
@@ -3002,6 +3003,7 @@ void precision::parse(const FileContent& fc) {
   read(fc, "tol_ncdm_newtonian", tol_ncdm_newtonian);
   read(fc, "tol_ncdm_bg", tol_ncdm_bg);
   read(fc, "tol_ncdm_initial_w", tol_ncdm_initial_w);
+  read(fc, "ncdm_driver_normalisation", ncdm_driver_normalisation);
   read(fc, "tol_tau_eq", tol_tau_eq);
   read(fc, "Omega0_cdm_min_synchronous", Omega0_cdm_min_synchronous);
   read(fc, "sBBN file", sBBN_file);
@@ -3164,6 +3166,7 @@ void precision::parse(const FileContent& fc) {
        "perturbations_sampling_boost_above_age_fraction",
        perturbations_sampling_boost_above_age_fraction);
   read(fc, "tol_perturb_integration", tol_perturb_integration);
+  read(fc, "tol_perturb_newtonian_k_over_a0H0", tol_perturb_newtonian_k_over_a0H0);
   read(fc, "c_gamma_k_H_square_max", c_gamma_k_H_square_max);
   read(fc, "tol_tau_approx", tol_tau_approx);
   read(fc, "radiation_streaming_approximation", radiation_streaming_approximation);
@@ -3496,6 +3499,7 @@ ShootingResult InputModule::DoShooting(const InputModulePtr& input_module) {
                                   : input_module->precision_.tol_ncdm_synchronous;
   ncdm_settings.tol_ncdm_bg = input_module->precision_.tol_ncdm_bg;
   ncdm_settings.tol_M_ncdm  = input_module->precision_.tol_M_ncdm;
+  ncdm_settings.normalise_drivers = (input_module->precision_.ncdm_driver_normalisation != 0);
   SpeciesBuildContext gctx{&fc,
                            &input_module->background_,
                            &input_module->precision_,

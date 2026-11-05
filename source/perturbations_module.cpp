@@ -2530,7 +2530,14 @@ void PerturbationsModule::perturb_solve(int index_md,
        a local, so there is no shared mutable controller state to establish in the
        right order any more. Only what the chosen evolver honours is set. */
     EvolverOptions options;
-    options.rtol            = ppr->tol_perturb_integration;
+    options.rtol = ppr->tol_perturb_integration;
+    /* Newtonian gauge cancels delta against 3aH theta/k^2 to the comoving density, (k/aH)^2
+       smaller on super-horizon scales: tighten the tolerance by (k/k_ref)^2 there (#497). */
+    const double k_ref_newtonian = ppr->tol_perturb_newtonian_k_over_a0H0 * pba->H0;
+    if (ppt->gauge == possible_gauges::newtonian && k < k_ref_newtonian) {
+      options.rtol = std::max(options.rtol * (k / k_ref_newtonian) * (k / k_ref_newtonian),
+                              std::min(options.rtol, 1e-10));
+    }
     options.x_sampling      = tau_sampling_.data();
     options.x_sampling_size = tau_actual_size;
     options.used_in_output  = ppw->pv->used_in_sources.data();
@@ -4625,24 +4632,26 @@ void PerturbationsModule::perturb_einstein(
        gauge-independent variables (you could comment this out if you
        really want gauge-dependent results) */
 
+    // The comoving density is delta + 3aH sum[(rho+p) theta]/(k^2 sum rho). theta_m is
+    // weighted by sum(rho+p), hence the factor (1+w_m): exact for any stable species.
+    // Before #497 it was taken as 1, which a relativistic ncdm in delta_m violates by
+    // its p/rho_m, about 1e-5 for m = 1e-3 eV today; Newtonian gauge cancels its
+    // delta and velocity terms to (k/aH)^2 on super-horizon scales and turned that
+    // into a 2.5% gap at k = 1e-5 h/Mpc. (Until 2.4.3 the factor was (-2 H'/H)
+    // instead of 3aH, from a confusion between (1+w_total) and (1+w_matter), the
+    // relevant one; the same typo is in the CLASSgal paper 1307.1459v1-v3.)
+    //
+    // Still exact only for stable species: a decaying one has rho' != -3aH(rho+p).
     if (has_source_delta_m_) {
       ppw->delta_m += 3. * ppw->pvecback[background_module_->index_bg_a_] *
-                      ppw->pvecback[background_module_->index_bg_H_] * ppw->theta_m / k2;
-      // note: until 2.4.3 there was a typo, the factor was (-2 H'/H) instead
-      // of (3 aH). There is the same typo in the CLASSgal paper
-      // 1307.1459v1,v2,v3. It came from a confusion between (1+w_total)
-      // and (1+w_matter)=1 [the latter is the relevant one here].
-      //
-      // note2: at this point this gauge-invariant variable is only
-      // valid if all matter components are pressureless and
-      // stable. This relation will be generalized soon to the case
-      // of decaying dark matter.
+                      ppw->pvecback[background_module_->index_bg_H_] * ppw->one_plus_w_m *
+                      ppw->theta_m / k2;
     }
 
     if (has_source_delta_cb_) {
       ppw->delta_cb += 3. * ppw->pvecback[background_module_->index_bg_a_] *
-                       ppw->pvecback[background_module_->index_bg_H_] * ppw->theta_cb /
-                       k2;  //check gauge transformation
+                       ppw->pvecback[background_module_->index_bg_H_] * ppw->one_plus_w_cb *
+                       ppw->theta_cb / k2;
     }
 
     if (has_source_theta_m_) {
@@ -4743,7 +4752,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
     }
     if ((has_source_delta_m_ || has_source_theta_m_) &&
         (has_source_delta_cb_ || has_source_theta_cb_)) {
-      ppw->theta_cb = total_cold.rho_plus_p_theta / (total_cold.rho + total_cold.p);
+      ppw->theta_cb      = total_cold.rho_plus_p_theta / (total_cold.rho + total_cold.p);
+      ppw->one_plus_w_cb = (total_cold.rho + total_cold.p) / total_cold.rho;
     }
 
     if (auto* f = ppf_fluid()) {
@@ -4759,8 +4769,10 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
                      (total_cold.rho + total_warm.rho);
     }
     if (has_source_delta_m_ || has_source_theta_m_) {
-      ppw->theta_m = (total_cold.rho_plus_p_theta + total_warm.rho_plus_p_theta) /
-                     ((total_cold.rho + total_cold.p) + (total_warm.rho + total_warm.p));
+      ppw->theta_m      = (total_cold.rho_plus_p_theta + total_warm.rho_plus_p_theta) /
+                          ((total_cold.rho + total_cold.p) + (total_warm.rho + total_warm.p));
+      ppw->one_plus_w_m = ((total_cold.rho + total_cold.p) + (total_warm.rho + total_warm.p)) /
+                          (total_cold.rho + total_warm.rho);
     }
   }
 

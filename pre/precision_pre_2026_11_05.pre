@@ -1,0 +1,33 @@
+# CLASS++ precision: the defaults as they were from 2026-10-27 to 2026-11-05.
+#
+# On 2026-11-05 the metric drivers of the ncdm hierarchy, the dlnf0/dlnq terms, began to be
+# normalised to the rho+p of the background grid, which is what the Einstein equations see.
+# The quadrature misses that sum by 2e-3 on the default synchronous grid and by 2e-5 on the
+# Newtonian one, so the species did not conserve energy and momentum. For one 0.06 eV
+# neutrino at the Planck 2018 best fit, the C_l move by at most 1.5e-4 (C_L^phiphi above
+# L = 500, 1e-4 in TT and TE at l < 30) and P(k) by 1.7e-4 (k > 0.05/Mpc). All of it is error:
+# the distance of the default grid to a 32-bin Laguerre grid went from 2e-5-1.7e-4 to
+# 5e-7-1.8e-5. For m = 1 eV, TT at l < 20 was 2.9e-3 off and is 1e-5 off now. In Newtonian
+# gauge, whose comoving density cancels to (k/aH)^2, P(k) at k = 1e-5 h/Mpc was 1.2% off
+# synchronous even at tol_perturb_integration = 1e-8 (#497). One thread is as fast. A decaying
+# ncdm is normalised on its single grid: a Gamma = 1e5, 0.3 eV parent on 16 trapezoid bins had
+# synchronous TT at l < 20 1.2e-3 off a 32-bin Laguerre grid, 8e-6 now (1.7% slower).
+#
+# The same day, in Newtonian gauge only, modes with k < 5 a_0 H_0 began to be integrated at
+# tol_perturb_integration * (k / 5 a_0 H_0)^2: that cancellation turns an integration error
+# of tol in delta and theta into tol (aH/k)^2 in P(k), -18% at k = 1e-5 h/Mpc for a 1 eV
+# neutrino and -0.8% for 0.06 eV, 5e-4 and 2e-4 now. A Newtonian CMB + P(k) run is 1% slower.
+#
+# Two corrections of the same day are not undone by this file, since they remove errors no
+# setting asked for: the comoving density of P(k) carries the factor (1+w_m) of the matter
+# (a light ncdm made the gauges differ by 3% at k = 1e-5 h/Mpc), and a trapezoid momentum
+# grid (quadrature_strategy = 3) puts the cut at max_q into d ln f0/d ln q of its last node
+# (#496: 0.8% in TT and 4.6% in P(k) in Newtonian gauge, 3.3e-4 in TT at l < 20 in
+# synchronous gauge, at the default max_q = 15).
+#
+# Pass this file to reproduce a result computed in that period, or to bisect.
+#
+# For earlier periods use precision_pre_2026_10_27.pre, precision_pre_2026_10_21.pre,
+# precision_pre_2026_10_09.pre or precision_pre_2026_08_21.pre.
+ncdm_driver_normalisation = 0
+tol_perturb_newtonian_k_over_a0H0 = 0

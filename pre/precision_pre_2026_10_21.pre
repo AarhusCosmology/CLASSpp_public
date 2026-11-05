@@ -47,3 +47,8 @@ delta_l_max = 500
 radiation_streaming_trigger_tau_over_tau_k = 26
 neglect_CMB_sources_below_visibility = 0.008
 hyper_sampling_flat = 8
+# On 2026-11-05 the ncdm metric drivers began to be normalised to the background rho+p, and
+# Newtonian-gauge super-horizon modes to be integrated more tightly (see
+# precision_pre_2026_11_05.pre).
+ncdm_driver_normalisation = 0
+tol_perturb_newtonian_k_over_a0H0 = 0

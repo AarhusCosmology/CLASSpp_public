@@ -27,11 +27,12 @@ class BackgroundModule;
 #endif
 
 struct NcdmSettings {
-  double h;
-  double T_cmb;
-  double tol_ncdm;
-  double tol_ncdm_bg;
-  double tol_M_ncdm;
+  double h               = 0.;
+  double T_cmb           = 0.;
+  double tol_ncdm        = 0.;
+  double tol_ncdm_bg     = 0.;
+  double tol_M_ncdm      = 0.;
+  bool normalise_drivers = true;  ///< precision::ncdm_driver_normalisation
 };
 
 /**
@@ -329,6 +330,20 @@ class NCDMBaseSpecies : public BaseSpecies {
   std::vector<double> q_;
   std::vector<double> w_;
   std::vector<double> dlnf0_dlnq_;
+  /** The extra d ln f / d ln q of the last node of a grid that stops at a finite q_max
+   *  (qm_trapz), -q_max/dq_last; zero for the grids that run to infinity. Such a grid
+   *  integrates f0(q) Theta(q_max - q), whose derivative carries -f0(q_max) delta(q - q_max).
+   *  Without that term, the q-sums of the metric sources lose the boundary term
+   *  q_max^3 eps f0(q_max) of the integration by parts that makes them -3(rho+p): at
+   *  q_max = 15 the species does not conserve energy and momentum to 7e-4, which the
+   *  cancellation in the comoving density of Newtonian gauge turns into percent errors
+   *  (#496). Already included in dlnf0_dlnq_; species that compute d ln f / d ln q
+   *  themselves (DNCDMSpecies) add it to their last node. */
+  double dlnf0_dlnq_cut_ = 0.;
+  /** precision::ncdm_driver_normalisation: scale the metric drivers of the hierarchy so
+   *  that their q-sum is the rho+p of the background grid (NCDMSpecies::PerturbDerivs,
+   *  DNCDMSpecies::PerturbDerivs). */
+  bool normalise_drivers_ = true;
 
   // ── Quadrature — background sampling ─────────────────────────────────────
   std::vector<double> q_bg_;

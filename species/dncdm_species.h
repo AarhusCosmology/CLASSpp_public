@@ -216,8 +216,9 @@ class DNCDMSpecies : public NCDMBaseSpecies {
       const perturb_workspace* ppw) const;
 
  protected:
+  // With the cut of a grid that stops at q_max on the last node (dlnf0_dlnq_cut_).
   double GetDlnf0Dlnq(int iq, const double* pvecback) const override {
-    return pvecback[index_bg_dlnfdlnq_decay_ + iq];
+    return pvecback[index_bg_dlnfdlnq_decay_ + iq] + (iq == q_size() - 1 ? dlnf0_dlnq_cut_ : 0.);
   }
   double GetW0ForGwSource(int iq, const double* pvecback) const override {
     return dq_[iq] * std::exp(pvecback[index_bg_lnf_decay_dr1_ + iq]);

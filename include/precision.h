@@ -178,6 +178,20 @@ struct precision {
    */
   double tol_ncdm_initial_w = 1.e-3;
   /**
+   * 1: scale the metric drivers of the ncdm hierarchy (the dlnf0/dlnq terms) so that their
+   * momentum sum equals the rho+p of the background grid, which is what the Einstein
+   * equations see; 0: leave them to the quadrature. The quadrature misses that sum by
+   * 2e-3 on the default synchronous grid and 2e-5 on the Newtonian one, so the species
+   * does not conserve energy and momentum. That cost 2.9e-3 in TT at l < 20 for m = 1 eV,
+   * and in Newtonian gauge, where the comoving density cancels to (k/aH)^2, 1.2% in P(k)
+   * at k = 1e-5 h/Mpc (#497). ncdm_decay_dr is normalised too, on its single grid: the
+   * spline derivative of its ln f misses the sum by enough on 16 trapezoid bins that the
+   * gauges differed by 5% in TT (1.7e-3 now), and synchronous TT at l < 20 of a Gamma = 1e5,
+   * 0.3 eV parent was 1.2e-3 off a 32-bin Laguerre grid (8e-6 now); 1.7% slower on one thread.
+   * 0 until 2026-11-05.
+   */
+  int ncdm_driver_normalisation = 1;
+  /**
    * Tolerance on the deviation of the conformal time of equality from the true value in 1/Mpc.
    */
   double tol_tau_eq = 1.e-6;
@@ -482,6 +496,17 @@ struct precision {
    * IMPORTANT FOR SETTING THE STEPSIZE OF NDF15
    */
   double tol_perturb_integration = 0.0001;
+
+  /**
+   * Newtonian gauge only: modes with k below this multiple of a_0 H_0 are integrated at
+   * tol_perturb_integration * (k / (this * a_0 H_0))^2, but not below 1e-10. On super-horizon
+   * scales the Newtonian-gauge delta and 3aH theta/k^2 are of
+   * order the potential and cancel to the comoving density, (k/aH)^2 smaller, so an
+   * integration error of tol in them is an error of tol (aH/k)^2 in P(k): -18% at
+   * k = 1e-5 h/Mpc for m_ncdm = 1 eV, 1.5e-3 for LambdaCDM (#497); now 5e-4 and 1.4e-4.
+   * Costs 1-7% of a Newtonian P(k) run on one thread. 0 switches it off (until 2026-11-05).
+   */
+  double tol_perturb_newtonian_k_over_a0H0 = 5.;
 
   /**
    * cutoff relevant for controlling stiffness in the PPF scheme. It is

@@ -396,9 +396,34 @@ void NCDMSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,
     // Exact Boltzmann hierarchy
     const double M_ncdm = M_;
     const int lmax      = layout.l_max;
+    // The metric drivers enter the energy and momentum of the species through
+    // sum_q w q^2 eps dlnf0/dlnq, which is -3 a^4 (rho+p)/factor_ only to the accuracy of
+    // the quadrature, while the Einstein equations see the rho+p of the background grid.
+    // The mismatch (2e-3 on the default synchronous grid, 2e-5 on the Newtonian one)
+    // breaks energy-momentum conservation of the species: 2.9e-3 in TT at l < 20 for
+    // m = 1 eV, and in Newtonian gauge, whose comoving density cancels to (k/aH)^2, a
+    // 1.2% gauge gap in P(k) at k = 1e-5 h/Mpc (#497). Normalising the drivers to the
+    // background grid's rho+p, summed here at this a rather than read from the
+    // interpolated pvecback, restores it and keeps their momentum dependence.
+    // (Initial conditions: InitialQuadratureNorm.)
+    double driver_norm = 1.;
+    if (normalise_drivers_) {
+      double driver_sum = 0.;
+      for (int iq = 0; iq < layout.q_size; ++iq) {
+        const double q = q_[iq];
+        driver_sum += w_[iq] * q * q * std::sqrt(q * q + a2 * M_ncdm * M_ncdm) * dlnf0_dlnq_[iq];
+      }
+      double bg_sum = 0.;
+      for (size_t iq = 0; iq < q_bg_.size(); ++iq) {
+        const double q    = q_bg_[iq];
+        const double eps  = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
+        bg_sum           += w_bg_[iq] * q * q * (eps + q * q / (3. * eps));
+      }
+      driver_norm = -3. * bg_sum / driver_sum;
+    }
     for (int iq = 0; iq < layout.q_size; ++iq) {
       const double q          = q_[iq];
-      const double dlnf0_dlnq = dlnf0_dlnq_[iq];
+      const double dlnf0_dlnq = dlnf0_dlnq_[iq] * driver_norm;
 
       const double epsilon        = std::sqrt(q * q + a2 * M_ncdm * M_ncdm);
       const double qk_div_epsilon = k * q / epsilon;

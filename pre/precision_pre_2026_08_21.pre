@@ -96,3 +96,8 @@ extrapolation_method = 3
 l_linstep = 40
 delta_l_max = 500
 hyper_sampling_flat = 8
+# On 2026-11-05 the ncdm metric drivers began to be normalised to the background rho+p, and
+# Newtonian-gauge super-horizon modes to be integrated more tightly (see
+# precision_pre_2026_11_05.pre).
+ncdm_driver_normalisation = 0
+tol_perturb_newtonian_k_over_a0H0 = 0
