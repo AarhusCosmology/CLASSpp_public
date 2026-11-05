@@ -3382,17 +3382,12 @@ void precision::parse(const FileContent& fc) {
      matter. An explicitly given value is left exactly as given (and still
      validated where it is used). */
 
-  // The decay-radiation collision term at multipole l reads the parent NCDM's
-  // l-th multipole (DNCDM_DR_Species::AddCouplingDerivs), so it can reach no
-  // further than either hierarchy -- which perturb_init enforces. That makes
-  // l_max_dr_col's default a function of the other two rather than a constant
-  // of its own: 17 was consistent while l_max_ncdm was also 17, but the #397
-  // precision defaults lowered l_max_ncdm to 10, and from then on the DEFAULT
-  // configuration failed that check, aborting every decaying-NCDM run. l_max_ncdm
-  // is 17 again since 2026-10-09; the rule stays, since either can be set.
-  if (!fc.get<int>("l_max_dr_col").has_value()) {
-    l_max_dr_col = std::min(l_max_dr, l_max_ncdm);
-  }
+  // l_max_dr_col (the decay-radiation collision term) has no constant default: it
+  // reads the parent's multipole of the same l, so its default is the smaller of the
+  // two hierarchies, and since #137 each ncdm_decay_dr sets its own (<name>.l_max,
+  // <name>.l_max_dr). The -1 it keeps here is resolved per species in
+  // DNCDM_DR_Species::AddCouplingDerivs. (A literal 17 had aborted every
+  // decaying-NCDM run once the #397 defaults lowered l_max_ncdm to 10.)
 }
 
 // ── Hook-based shooting (the species-owned replacement for the enum dispatch) ──

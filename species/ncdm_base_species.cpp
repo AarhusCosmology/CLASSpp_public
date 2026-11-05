@@ -88,6 +88,7 @@ void NCDMBaseSpecies::ReadParametersByInstance(FileContent* pfc,
   input_q_size_        = input.get_or("momenta_bins", input_q_size_);
   input_q_size_bg_     = input.get_or("momenta_bins_bg", input_q_size_);
   qmax_                = input.get_or("max_q", qmax_);
+  l_max_input_         = input.get_l_max("l_max");
 
   // PSD file: a single-instance flag and an optional filename.
   int use_psd_file = input.get_or("use_psd_file", 0);
@@ -726,7 +727,7 @@ void NCDMBaseSpecies::RegisterTensorPerturbationIndices(BaseSpecies::PerturbLayo
     return;
   }
 
-  layout.l_max  = ppr->l_max_ncdm;
+  layout.l_max  = LMax(ppr);
   layout.q_size = q_size();
 
   layout.index_per_q.clear();

@@ -619,6 +619,22 @@ int main() {
     assert(rel < 1e-3);
   }
 
+  // ── #137: a standalone dr_psd keeps its own l_max ──────────────────────────
+  // The l_max_dr of a decay daughter is set by its composite; a standalone instance
+  // must not lose its <name>.l_max to that (it once read l_max_dr here, -1 when absent).
+  {
+    precision ppr{};
+    ppr.l_max_ncdm = 17;
+    FileContent fc = BaseFc();
+    fc.set("drx.l_max", "6");
+    auto sp = MakeDrPsd(fc, Statistics::Boson);
+    assert(sp->LMax(&ppr) == 6);
+    assert(sp->MaxMultipole(&ppr, false) == 6);
+    FileContent fc_default = BaseFc();
+    auto sp_default        = MakeDrPsd(fc_default, Statistics::Boson);
+    assert(sp_default->LMax(&ppr) == 17);
+  }
+
   std::printf("dr_psd test passed\n");
   return 0;
 }

@@ -21,7 +21,7 @@ class DarkRadiationSpecies : public BaseSpecies {
   // ── PerturbLayout ──────────────────────────────────────────────────────────
   struct PerturbLayout : BaseSpecies::PerturbLayout {
     int idx_F0 = -1;  ///< base offset for the DR multipole hierarchy in pv->y
-    int l_max  = -1;  ///< max multipole (ppr->l_max_dr)
+    int l_max  = -1;  ///< max multipole (LMax)
     double closure_L =
         0.;  ///< Limber order of the l_max truncation, = limber_closure::Order(l_max)
   };
@@ -44,7 +44,16 @@ class DarkRadiationSpecies : public BaseSpecies {
 
   /** Scalars only: DR carries no tensor hierarchy. */
   int MaxMultipole(const precision* ppr, bool tensors) const override {
-    return tensors ? 0 : ppr->l_max_dr;
+    return tensors ? 0 : LMax(ppr);
+  }
+
+  /** The hierarchy's l_max (#137): what the composite set from `<parent>.l_max_dr`, else
+   *  the precision default l_max_dr. */
+  int LMax(const precision* ppr) const {
+    return l_max_input_ > 0 ? l_max_input_ : ppr->l_max_dr;
+  }
+  void SetLMaxInput(int l_max) {
+    l_max_input_ = l_max;
   }
 
   // ── Background ──────────────────────────────────────────────────────────────
@@ -134,6 +143,7 @@ class DarkRadiationSpecies : public BaseSpecies {
   const background* pba_;
   const BackgroundModule* bgm_;
 
+  int l_max_input_    = -1;  ///< see LMax
   int index_bi_rho_   = -1;
   int index_pt_F0_    = -1;
   int index_tp_delta_ = -1;  // #309 transfer-source slot

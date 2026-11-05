@@ -446,7 +446,7 @@ struct precision {
   int l_max_dr =
       17; /**< number of momenta in Boltzmann hierarchy for decay radiation, at least 4 */
   int l_max_dr_col =
-      17; /**< number of collision terms in Boltzmann hierarchy for decay radiation, at least 2 */
+      -1; /**< highest multipole of the decay-radiation collision term, at least 2. It reads the parent's multipole of the same l, so it can reach no further than either hierarchy; -1 (default): as far as both reach, per species (#137). An explicit value beyond either is an error. */
   int l_max_dncdm_col =
       17; /**< max multipole receiving the DNCDM inverse-decay collision term; must be <= l_max_ncdm */
   int l_max_ur =

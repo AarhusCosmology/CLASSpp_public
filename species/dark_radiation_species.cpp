@@ -50,10 +50,10 @@ void DarkRadiationSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayou
                                                        int /*gauge*/) {
   auto& layout      = static_cast<PerturbLayout&>(base);
   layout.idx_F0     = index_pt;
-  layout.l_max      = ppr->l_max_dr;
-  layout.closure_L  = limber_closure::Order(ppr->l_max_dr);
+  layout.l_max      = LMax(ppr);
+  layout.closure_L  = limber_closure::Order(layout.l_max);
   index_pt_F0_      = index_pt;
-  index_pt         += ppr->l_max_dr + 1;
+  index_pt         += layout.l_max + 1;
 }
 
 void DarkRadiationSpecies::PerturbDerivs(const BaseSpecies::PerturbLayout& base,

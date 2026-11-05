@@ -41,10 +41,20 @@ struct NcdmSettings {
  */
 class NCDMBaseSpecies : public BaseSpecies {
  public:
-  /** Every NCDM-family hierarchy (ncdm, dncdm, dr_psd, wdm daughters) runs to
-   *  l_max_ncdm, in both modes. */
+  /** Every NCDM-family hierarchy (ncdm, dncdm, dr_psd, wdm daughters) runs to its own
+   *  LMax, in both modes. */
   int MaxMultipole(const precision* ppr, bool /*tensors*/) const override {
-    return ppr->l_max_ncdm;
+    return LMax(ppr);
+  }
+
+  /** This species' hierarchy l_max (#137): its instance key (`<name>.l_max`, or
+   *  `<parent>.l_max_dr` for a decay daughter), else the precision default l_max_ncdm. */
+  int LMax(const precision* ppr) const {
+    return l_max_input_ > 0 ? l_max_input_ : ppr->l_max_ncdm;
+  }
+  /** For a composite that builds this species as a daughter: -1 restores l_max_ncdm. */
+  void SetLMaxInput(int l_max) {
+    l_max_input_ = l_max;
   }
 
   /** Every NCDM species is, by definition, a momentum-resolved hierarchy. */
@@ -240,6 +250,9 @@ class NCDMBaseSpecies : public BaseSpecies {
                                      const PerturbSwitchContext& ctx) const override;
 
  protected:
+  /** `<name>.l_max`, or what a composite set; -1 runs the hierarchy to l_max_ncdm (see LMax). */
+  int l_max_input_ = -1;
+
   int index_tp_delta_ = -1;  // #309 transfer-source slot (this ncdm flavor)
   int index_tp_theta_ = -1;
 

@@ -515,7 +515,7 @@ void DrPsdSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
   auto& layout = static_cast<NCDMBaseSpecies::PerturbLayout&>(base);
 
   // No fluid approximation (design §5 excludes dr_psd): always full hierarchy.
-  layout.l_max = ppr->l_max_ncdm;
+  layout.l_max = LMax(ppr);
   // In the reduced representation the "q" index counts MOMENTS, not grid points. That
   // is the whole cost saving, and it is safe because eps = q makes the free-streaming
   // coefficient q-independent, so every moment obeys the same hierarchy exactly.

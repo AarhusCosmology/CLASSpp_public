@@ -928,9 +928,10 @@ class TestReviewRegressions(TestClass):
         until the #397 precision defaults lowered l_max_ncdm to 10, after which
         the DEFAULT configuration hit that check and every decaying-NCDM run
         aborted (test_dncdm_dr_computes above is the same regression). The
-        default is now min(l_max_dr, l_max_ncdm); an explicit value is still
-        validated, not clamped. l_max_ncdm is set to 10 here so that the minimum
-        binds whatever the compiled defaults are (17 again since 2026-10-09)."""
+        default follows both hierarchies, per species since #137 (<name>.l_max,
+        <name>.l_max_dr); an explicit value is still validated, not clamped.
+        l_max_ncdm is set to 10 here so that the minimum binds whatever the compiled
+        defaults are (17 again since 2026-10-09)."""
         base = {
             'output': 'tCl',
             'l_max_scalars': 200,
@@ -969,6 +970,99 @@ class TestReviewRegressions(TestClass):
         cosmo.set(dict(self.verbose, **base, **{'l_max_dr_col': 30}))
         try:
             with self.assertRaises(CosmoComputationError):
+                cosmo.compute()
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    # ── #137: l_max per species ─────────────────────────────────────────────────
+    _LMAX_BASE = {
+        'output': 'tCl,mPk',
+        'l_max_scalars': 200,
+        'P_k_max_1/Mpc': 0.3,
+        'N_ur': 2.0328,
+        'omega_b': 0.022032,
+        'omega_cdm': 0.11,
+        'YHe': 0.25,
+    }
+    _LMAX_DNCDM = {
+        'dncdm1.type': 'ncdm_decay_dr',
+        'dncdm1.m': 1.0,
+        'dncdm1.T': 0.71611,
+        'dncdm1.Gamma': 1e3,
+        'dncdm1.Omega_ini': 0.001,
+        # A decaying parent needs one momentum grid for background and perturbations.
+        'dncdm1.quadrature_strategy': 3,
+        'dncdm1.momenta_bins': 8,
+    }
+
+    def _lmax_spectra(self, params):
+        cosmo = Class()
+        try:
+            cosmo.set(dict(self.verbose, **params))
+            cosmo.compute()
+            return cosmo.raw_cl(200)['tt'].copy(), np.array([cosmo.pk_lin(k, 0.) for k in (1e-3, 1e-2, 0.1)])
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_instance_l_max_is_the_global_one_for_that_species(self):
+        """#137: <name>.l_max (and <name>.l_max_dr for the decay radiation of an
+        ncdm_decay_dr) sets one species' hierarchy exactly as l_max_ncdm (l_max_dr)
+        sets every species'. Bit-identical, and different from the default."""
+        nu = dict(self._LMAX_BASE, **{'nu1.type': 'ncdm_standard', 'nu1.m': 0.3})
+        self.scenario = dict(nu)
+        instance = self._lmax_spectra(dict(nu, **{'nu1.l_max': 10}))
+        globally = self._lmax_spectra(dict(nu, l_max_ncdm=10))
+        default = self._lmax_spectra(nu)
+        np.testing.assert_array_equal(instance[0], globally[0])
+        np.testing.assert_array_equal(instance[1], globally[1])
+        self.assertFalse(np.array_equal(instance[1], default[1]), 'nu1.l_max had no effect')
+
+        d = dict(self._LMAX_BASE, **self._LMAX_DNCDM)
+        instance = self._lmax_spectra(dict(d, **{'dncdm1.l_max': 8, 'dncdm1.l_max_dr': 12}))
+        globally = self._lmax_spectra(dict(d, l_max_ncdm=8, l_max_dr=12))
+        np.testing.assert_array_equal(instance[0], globally[0])
+        np.testing.assert_array_equal(instance[1], globally[1])
+
+    def test_species_with_different_l_max_run_together(self):
+        """#137: two ncdm species with their own l_max, one above l_max_ncdm. The
+        workspace's s_l is sized from each species' own l_max: a dcdm_wdm daughter,
+        whose l_max key predates #137, read past it (AddressSanitizer:
+        heap-buffer-overflow in WdmDecayProductSpecies::PerturbDerivs at l_max = 25)."""
+        params = dict(self._LMAX_BASE, **{'nu1.type': 'ncdm_standard', 'nu1.m': 0.3, 'nu1.l_max': 25,
+                                          'nu2.type': 'ncdm_standard', 'nu2.m': 0.05, 'nu2.l_max': 6})
+        self.scenario = dict(params)
+        tt, pk = self._lmax_spectra(params)
+        self.assertTrue(np.all(np.isfinite(tt[2:])) and np.all(np.isfinite(pk)))
+
+    def test_dncdm_dr_collision_stops_at_the_parent_l_max(self):
+        """#137: the decay-radiation collision at multipole l reads the parent's l-th
+        multipole, so it stops at the parent's own l_max; before, only the global
+        l_max_ncdm bounded it. An explicit l_max_dr_col beyond the parent's l_max is
+        refused, as one beyond l_max_ncdm was."""
+        d = dict(self._LMAX_BASE, **self._LMAX_DNCDM, **{'dncdm1.l_max': 6})
+        self.scenario = dict(d)
+        derived = self._lmax_spectra(d)
+        explicit = self._lmax_spectra(dict(d, l_max_dr_col=6))
+        np.testing.assert_array_equal(derived[0], explicit[0])
+        cosmo = Class()
+        cosmo.set(dict(self.verbose, **d, l_max_dr_col=10))
+        try:
+            with self.assertRaises(CosmoComputationError):
+                cosmo.compute()
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_instance_l_max_below_four_is_refused(self):
+        """#137: a hierarchy needs l >= 4, as the precision defaults require."""
+        params = dict(self._LMAX_BASE, **{'nu1.type': 'ncdm_standard', 'nu1.m': 0.3, 'nu1.l_max': 3})
+        self.scenario = dict(params)
+        cosmo = Class()
+        cosmo.set(dict(self.verbose, **params))
+        try:
+            with self.assertRaisesRegex(CosmoSevereError, 'l_max >= 4'):
                 cosmo.compute()
         finally:
             cosmo.struct_cleanup()

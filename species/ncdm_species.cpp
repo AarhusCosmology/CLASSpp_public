@@ -333,7 +333,7 @@ void NCDMSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
     layout.q_size = 1;
   }
   else {
-    layout.l_max  = ppr->l_max_ncdm;
+    layout.l_max  = LMax(ppr);
     layout.q_size = q_size();
   }
   layout.index_per_q.clear();

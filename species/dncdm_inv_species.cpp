@@ -302,6 +302,14 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // GetDeg()) and so preserves whatever is set here.
   fermion->SetSpeciesMultiplicity(n_daughter);
 
+  // The daughters were built on the parent's instance name, so the base read the PARENT's
+  // <name>.l_max into them; they run to <name>.l_max_dr instead (#137), l_max_ncdm without
+  // it. Set here and not in DrPsdSpecies, which is also a standalone species (type =
+  // dr_psd) whose own <name>.l_max must stand.
+  const int l_max_dr = in.get_l_max("l_max_dr");
+  fermion->SetLMaxInput(l_max_dr);
+  boson->SetLMaxInput(l_max_dr);
+
   // An explicit dr_q_max is always honoured — a narrow grid is sometimes a deliberate
   // cost choice, and refusing it would make published configurations unreproducible.
   // But it is worth exactly one warning, because the failure mode is silent: the
@@ -390,7 +398,10 @@ Named DNCDMInvSpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // layout exists.  Mirrors what AddCouplingDerivs computes per call:
   // min(l_max_dncdm_col, the hierarchies' own l_max).
   if (ctx.ppr != nullptr) {
-    composite->set_reduced_table_l_max(std::min(ctx.ppr->l_max_dncdm_col, ctx.ppr->l_max_ncdm));
+    composite->set_reduced_table_l_max(std::min({ctx.ppr->l_max_dncdm_col,
+                                                 composite->parent().LMax(ctx.ppr),
+                                                 composite->fermion().LMax(ctx.ppr),
+                                                 composite->boson().LMax(ctx.ppr)}));
   }
   return {name, std::move(composite)};
 }

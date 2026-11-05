@@ -160,9 +160,8 @@ WdmDecayProductSpecies::WdmDecayProductSpecies(FileContent* pfc,
   // Decay is Poisson in cosmic time, so cumulative decayed fraction F = 1-e^{-Gamma t}
   // is the natural coordinate: uniform-in-F bins carry equal injected decays (= equal
   // injected energy). q = a'(F) * kQKick via the fiducial t(a) map => grid = f(Gamma).
-  n_bins_      = input.get_or("momenta_bins", 96);
-  q_edge_tol_  = input.get_or("q_edge_tol", 1e-3);
-  l_max_input_ = input.get_or("l_max", -1);
+  n_bins_     = input.get_or("momenta_bins", 96);
+  q_edge_tol_ = input.get_or("q_edge_tol", 1e-3);
   if (auto qmr = input.get<double>("q_min_ratio")) {
     q_min_ratio_floor_ = qmr;
   }
@@ -565,7 +564,7 @@ void WdmDecayProductSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLay
   auto& layout = static_cast<PerturbLayout&>(base);
 
   // No fluid approximation: always the full Boltzmann hierarchy (DNCDM precedent).
-  layout.l_max     = (l_max_input_ > 0) ? l_max_input_ : ppr->l_max_ncdm;
+  layout.l_max     = LMax(ppr);
   layout.q_size    = q_size();
   layout.closure_L = limber_closure::Order(layout.l_max);
 

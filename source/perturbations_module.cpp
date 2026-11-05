@@ -624,18 +624,28 @@ void PerturbationsModule::perturb_init() {
   }
 
   bool has_dncdm_dr = false;
+  /* An explicit l_max_dr_col must stay within both hierarchies of every decaying ncdm,
+     whose l_max are per species since #137 (the default -1 follows them by itself). */
   for (const auto& sp : all_species_) {
-    if (dynamic_cast<DNCDM_DR_Species*>(sp.get())) {
+    if (const auto* d = dynamic_cast<const DNCDM_DR_Species*>(sp.get())) {
       has_dncdm_dr = true;
-      break;
+      if (ppr->l_max_dr_col >= 0) {
+        class_test(ppr->l_max_dr_col > d->dr().LMax(ppr),
+                   "l_max_dr_col = %d exceeds the l_max = %d of the decay radiation of '%s' "
+                   "(l_max_dr or %s.l_max_dr). Change your input accordingly.",
+                   ppr->l_max_dr_col,
+                   d->dr().LMax(ppr),
+                   d->dncdm().name().c_str(),
+                   d->dncdm().name().c_str());
+        class_test(ppr->l_max_dr_col > d->dncdm().LMax(ppr),
+                   "l_max_dr_col = %d exceeds the l_max = %d of '%s' (l_max_ncdm or %s.l_max). "
+                   "Change your input accordingly.",
+                   ppr->l_max_dr_col,
+                   d->dncdm().LMax(ppr),
+                   d->dncdm().name().c_str(),
+                   d->dncdm().name().c_str());
+      }
     }
-  }
-  if (has_dncdm_dr) {
-    class_test(ppr->l_max_dr_col > ppr->l_max_dr,
-               "l_max_dr_col must be <= l_max_dr. Change your input accordingly.");
-
-    class_test(ppr->l_max_dr_col > ppr->l_max_ncdm,
-               "l_max_dr_col must be <= l_max_ncdm. Change your input accordingly.");
   }
 
   class_test(ppt->has_vectors, "Vectors not coded yet");

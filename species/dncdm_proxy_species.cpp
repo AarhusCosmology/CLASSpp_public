@@ -453,13 +453,18 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
   // coupling silently, leaving free-streaming daughters against an interacting
   // background -- a changed model with no diagnostic. Structural (a precision setting,
   // not a sampled value), hence severe.
-  class_test_severe(ctx.ppr->l_max_ncdm >= kLMaxScratch || ctx.ppr->l_max_dr >= kLMaxScratch,
+  // The hierarchies run to the instance's own l_max (#137): <name>.l_max for the parent,
+  // <name>.l_max_dr for the daughters, else the precision defaults.
+  const int l_max_dr_in  = in.get_l_max("l_max_dr");
+  const int l_max_dr     = l_max_dr_in > 0 ? l_max_dr_in : ctx.ppr->l_max_dr;
+  const int l_max_parent = parent->LMax(ctx.ppr);
+  class_test_severe(l_max_parent >= kLMaxScratch || l_max_dr >= kLMaxScratch,
                     "species '%s': dr_representation = proxy supports multipoles up to "
-                    "l_max = %d; got l_max_ncdm=%d, l_max_dr=%d",
+                    "l_max = %d; got l_max=%d for the parent, l_max_dr=%d",
                     name.c_str(),
                     kLMaxScratch - 1,
-                    ctx.ppr->l_max_ncdm,
-                    ctx.ppr->l_max_dr);
+                    l_max_parent,
+                    l_max_dr);
 
   // ── the shared daughter grid ───────────────────────────────────────────────
   // Log-trapezoid with half-weight endpoints, the same construction DrPsdSpecies
@@ -665,6 +670,8 @@ Named DNCDMProxySpecies::Create(std::unique_ptr<DNCDMSpecies> parent,
 
   auto fermion = std::make_unique<DarkRadiationSpecies>("dr_" + name + "_l", ctx.pba, ctx.bgm);
   auto boson   = std::make_unique<DarkRadiationSpecies>("dr_" + name + "_phi", ctx.pba, ctx.bgm);
+  fermion->SetLMaxInput(l_max_dr);  // #137, read and checked against kLMaxScratch above
+  boson->SetLMaxInput(l_max_dr);
 
   auto composite         = std::make_unique<DNCDMProxySpecies>(std::move(parent),
                                                                std::move(fermion),

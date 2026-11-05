@@ -59,6 +59,22 @@ class SpeciesInput {
     return c == 'y' || c == 'Y';
   }
 
+  /** The l_max of a Boltzmann hierarchy set per instance (#137): the value of
+   *  `<instance>.<field>`, at least 4 like the precision defaults l_max_ncdm and
+   *  l_max_dr, or -1 when absent, meaning that default. Structural, hence severe. */
+  int get_l_max(const std::string& field) const {
+    auto v = get<int>(field);
+    if (!v) {
+      return -1;
+    }
+    class_test_severe(*v < 4,
+                      "species '%s': %s = %d; a Boltzmann hierarchy needs l_max >= 4",
+                      instance_name_.c_str(),
+                      field.c_str(),
+                      *v);
+    return *v;
+  }
+
   /** Required accessor: throws std::invalid_argument if the field is absent. */
   template <class T>
   T require(const std::string& field) const {

@@ -1033,5 +1033,29 @@ int main() {
   }
 
   std::printf("dncdm inv test passed\n");
+  // ── #137: the parent runs to <name>.l_max, its psd daughters to <name>.l_max_dr ──
+  // The daughters are built on the parent's instance name, so without the composite
+  // setting them they would inherit the parent's l_max.
+  {
+    precision ppr{};
+    ppr.l_max_ncdm = 17;
+    for (const bool with_dr : {false, true}) {
+      FileContent fc;
+      SetInvBase(fc);
+      fc.set("dncdm1.l_max", "9");
+      if (with_dr) {
+        fc.set("dncdm1.l_max_dr", "6");
+      }
+      background pba        = MakeBackground();
+      NcdmSettings settings = TestSettings();
+      auto comp             = BuildComposite(fc, pba, settings);
+      const int expect      = with_dr ? 6 : ppr.l_max_ncdm;
+      assert(comp->parent().LMax(&ppr) == 9);
+      assert(comp->fermion().LMax(&ppr) == expect);
+      assert(comp->boson().LMax(&ppr) == expect);
+    }
+    std::printf("dncdm_inv: per-instance l_max of parent and daughters OK\n");
+  }
+
   return 0;
 }

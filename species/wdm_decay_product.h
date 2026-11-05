@@ -276,7 +276,6 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
   int n_bins_        = 96;
   double q_edge_tol_ = 1e-3;  // decayed-fraction trimmed off each end (grid F-span);
                               // the trimmed tail is clamped into the edge bin, not dropped
-  int l_max_input_ = -1;      // -1 → ppr->l_max_ncdm
   std::optional<double> q_min_ratio_floor_;  // optional hard floor on q_lo/q_kick
 
   static constexpr double kSigmaMin = 0.03;  // ≈ 4 background-table samples (7e-3 in ln a)

@@ -1,5 +1,6 @@
 #include "dncdm_dr_species.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -78,8 +79,10 @@ std::vector<Named> DNCDM_DR_Species::CreateAll(const SpeciesBuildContext& ctx) {
                         e.key.c_str(),
                         e.species->q_size(),
                         e.species->q_size_bg());
-      result.push_back(
-          {e.key, std::make_unique<DNCDM_DR_Species>(std::move(e.species), ctx.pba, ctx.bgm)});
+      auto composite = std::make_unique<DNCDM_DR_Species>(std::move(e.species), ctx.pba, ctx.bgm);
+      // The decay radiation's own l_max (#137); the parent read <name>.l_max itself.
+      composite->dr().SetLMaxInput(in.get_l_max("l_max_dr"));
+      result.push_back({e.key, std::move(composite)});
     }
   }
   return result;
@@ -308,10 +311,15 @@ void DNCDM_DR_Species::AddCouplingDerivs(double /*tau*/,
     return rprime_dr * integral_num / integral_denom;
   };
 
+  // The collision at l reads the parent's l-th multipole: it stops at the smaller
+  // hierarchy, each per species (#137), or earlier at an explicit l_max_dr_col (which
+  // perturb_init has checked against both).
+  const int l_col = std::min(
+      {ppr->l_max_dr_col >= 0 ? ppr->l_max_dr_col : lmax, lmax, dncdm_lay.l_max});
   const int base = dr_lay.idx_F0;
   for (int l = 0; l <= lmax; ++l) {
     double collision_term = 0.;
-    if ((l <= ppr->l_max_dr_col) && (l < 800)) {
+    if ((l <= l_col) && (l < 800)) {
       collision_term = compute_collision_integral(l);
     }
     dy[base + l] += collision_term;
