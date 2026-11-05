@@ -292,6 +292,14 @@ class PerturbationsModule : public BaseModule {
                                            int** interval_approx);
   void perturb_vector_init(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw, const int* pa_old);
+  /** 8piG/3 times the matter, radiation and free-streaming radiation densities at an early time, every species
+      counted as matter or radiation (a non-cold, non-relativistic one split by its pressure). */
+  struct EarlyDensities {
+    double rho_m;
+    double rho_r;
+    double rho_nu;
+  };
+  EarlyDensities early_densities(const double* pvecback) const;
   void perturb_initial_conditions(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw);
   void perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);

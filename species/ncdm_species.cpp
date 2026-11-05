@@ -1,5 +1,6 @@
 #include "ncdm_species.h"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -432,22 +433,59 @@ void NCDMSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
     return;
   }
 
-  const int lmax = layout.l_max;
+  const int lmax    = layout.l_max;
+  const double norm = InitialQuadratureNorm(ctx);
   for (int index_q = 0; index_q < layout.q_size; ++index_q) {
     const int idx           = layout.index_per_q[index_q];
     const double q          = q_[index_q];
     const double epsilon    = std::sqrt(q * q + ctx.a * ctx.a * M_ * M_);
-    const double dlnf0_dlnq = dlnf0_dlnq_[index_q];
+    const double dlnf0_dlnq = norm * dlnf0_dlnq_[index_q];
 
     y[idx + 0] = -0.25 * ctx.delta_ur * dlnf0_dlnq;
     if (lmax >= 1) {
       y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * dlnf0_dlnq;
     }
     if (lmax >= 2) {
-      y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
+      /* Psi_2 = -F_2/4 dlnf0/dlnq with F_2 = 2 s_2 shear_ur in curved space (see the ur shear equation) */
+      y[idx + 2] = -0.5 * ctx.ppw->s_l[2] * ctx.shear_ur * dlnf0_dlnq;
     }
     if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;
+    }
+  }
+}
+
+/* The perturbation quadrature (q_, w_; tol_ncdm_synchronous) is coarser than the background one, so the density it
+   gives, rho_q = -1/4 factor/a^4 sum_q q^2 eps w_q dlnf0/dlnq (the delta_rho of Psi_0 = -1/4 delta dlnf0/dlnq for
+   delta = 1), differs from Rho() at the level of tol_ncdm_synchronous. For relativistic q the momentum and the
+   shear reduce to the same sum. Scaling the initial Psi_l by Rho()/rho_q makes delta_rho, (rho+p) theta and
+   (rho+p) shear what the initial conditions assume, with the species fractions of the background. This matters
+   for niv: its photon and neutrino momenta must cancel at order tau^0, and a residual of 1e-3 makes
+   eta' ~ 1/tau^2, so the C_l grew without bound as the start moved earlier (x240 at l = 2 for m = 0.06 eV between
+   om*tau = 0.01 and 0.0005). For the other modes the Psi_l start at higher orders and the factor is negligible. */
+double NCDMSpecies::InitialQuadratureNorm(const PerturbIcContext& ctx) const {
+  double sum = 0.;
+  for (size_t iq = 0; iq < q_.size(); ++iq) {
+    const double q  = q_[iq];
+    sum            += q * q * std::sqrt(q * q + ctx.a * ctx.a * M_ * M_) * w_[iq] * dlnf0_dlnq_[iq];
+  }
+  const double rho_q = -0.25 * factor_ * std::pow(1. / ctx.a, 4) * sum;
+  return Rho(ctx.ppw->pvecback.data()) / rho_q;
+}
+
+void NCDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                                double* y,
+                                                const PerturbIcContext& ctx) {
+  NCDMBaseSpecies::PerturbSynchronousToNewtonian(base, y, ctx);
+  const auto& layout = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
+    return;
+  }
+  const double norm = InitialQuadratureNorm(ctx);
+  for (int index_q = 0; index_q < layout.q_size; ++index_q) {
+    const int idx = layout.index_per_q[index_q];
+    for (int l = 0; l <= std::min(layout.l_max, 3); ++l) {
+      y[idx + l] *= norm;
     }
   }
 }

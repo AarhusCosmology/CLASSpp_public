@@ -76,6 +76,10 @@ class NCDMSpecies : public NCDMBaseSpecies {
   void ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
                               double* y,
                               const PerturbIcContext& ctx) override;
+  /** The base conversion, then the same quadrature normalisation as ApplyInitialConditions. */
+  void PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout& base,
+                                     double* y,
+                                     const PerturbIcContext& ctx) override;
 
   /** Fused override: eliminates four virtual dispatches.  Handles the FA
    *  approximation branch with a single check, then runs ONE fused q-loop
@@ -117,6 +121,10 @@ class NCDMSpecies : public NCDMBaseSpecies {
   }
 
  protected:
+  /** Rho() over the density of the perturbation quadrature at the start, -1/4 factor/a^4 sum_q q^2 eps w dlnf0/dlnq:
+      the factor by which the initial Psi_l are scaled (see ApplyInitialConditions). */
+  double InitialQuadratureNorm(const PerturbIcContext& ctx) const;
+
   // Deferred-init constructor for subclasses (e.g. GreyBodyNCDMSpecies) that
   // must configure an overridden PSD before quadrature is built.
   NCDMSpecies(FileContent* pfc,

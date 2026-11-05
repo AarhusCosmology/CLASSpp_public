@@ -630,7 +630,7 @@ void DrPsdSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
         y[idx + 1] = -1. / 3. / ctx.k * ctx.theta_ur * D[j];
       }
       if (lmax >= 2) {
-        y[idx + 2] = -0.5 * ctx.shear_ur * D[j];
+        y[idx + 2] = -0.5 * ctx.ppw->s_l[2] * ctx.shear_ur * D[j];
       }
       if (lmax >= 3) {
         y[idx + 3] = -0.25 * ctx.l3_ur * D[j];
@@ -653,7 +653,7 @@ void DrPsdSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
       y[idx + 1] = -epsilon / 3. / q / ctx.k * ctx.theta_ur * df0_dlnq;
     }
     if (lmax >= 2) {
-      y[idx + 2] = -0.5 * ctx.shear_ur * df0_dlnq;
+      y[idx + 2] = -0.5 * ctx.ppw->s_l[2] * ctx.shear_ur * df0_dlnq;
     }
     if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * df0_dlnq;

@@ -789,7 +789,7 @@ void NCDMBaseSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLa
       y[idx + 1] = -epsilon / 3. / q / ctx.k * theta_ur * dlnf0_dlnq;
     }
     if (lmax >= 2) {
-      y[idx + 2] = -0.5 * ctx.shear_ur * dlnf0_dlnq;
+      y[idx + 2] = -0.5 * ctx.ppw->s_l[2] * ctx.shear_ur * dlnf0_dlnq;
     }
     if (lmax >= 3) {
       y[idx + 3] = -0.25 * ctx.l3_ur * dlnf0_dlnq;

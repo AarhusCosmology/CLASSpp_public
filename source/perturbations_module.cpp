@@ -2317,6 +2317,20 @@ void PerturbationsModule::perturb_solve(int index_md,
     }
   }
 
+  /* and for the non-adiabatic modes, on om*tau (see the bisection below): otherwise every midpoint would fail
+     and the bisection would return a start that violates start_isocurvature_at_omega_tau */
+  if (_scalars_ && !(ppt->has_ad && index_ic == index_ic_ad_)) {
+    const EarlyDensities early = early_densities(ppw->pvecback.data());
+    const double om_tau_lower  = ppw->pvecback[background_module_->index_bg_a_] * early.rho_m /
+                                 sqrt(early.rho_r) * tau_lower;
+    class_test(om_tau_lower > ppr->start_isocurvature_at_omega_tau,
+               "your choice of initial time for integrating wavenumbers is inappropriate: it "
+               "corresponds to a time before that at which the background has been integrated. You "
+               "should increase 'start_isocurvature_at_omega_tau' up to at least %g, or decrease "
+               "'a_ini_over_a_today_default'\n",
+               om_tau_lower);
+  }
+
   /* is at most the time at which sources must be sampled */
   tau_upper = tau_sampling_[0];
 
@@ -2360,6 +2374,21 @@ void PerturbationsModule::perturb_solve(int index_md,
                ppw->pvecback[background_module_->index_bg_H_] >
            ppr->start_large_k_at_tau_h_over_tau_k)) {
         is_early_enough = false;
+      }
+
+      /* The non-adiabatic initial conditions are series in om*tau (Bucher, Moodley & Turok 1999),
+         om = a rho_m / sqrt(rho_r) (see perturb_initial_conditions), in which om*tau is the leading
+         order of the mode and not, as in the adiabatic mode, a correction suppressed by (k tau)^2. The
+         two conditions above start small k at om*tau ~ 1 (0.65 for start_small_k_at_tau_c_over_tau_h =
+         0.0015, 1.5 for 0.006), where the series is wrong at the percent level, so these modes also
+         need om*tau < start_isocurvature_at_omega_tau. */
+      if (is_early_enough && _scalars_ && !(ppt->has_ad && index_ic == index_ic_ad_)) {
+        const EarlyDensities early = early_densities(ppw->pvecback.data());
+        const double om            = ppw->pvecback[background_module_->index_bg_a_] * early.rho_m /
+                                     sqrt(early.rho_r);
+        if (om * tau_mid > ppr->start_isocurvature_at_omega_tau) {
+          is_early_enough = false;
+        }
       }
     }
 
@@ -3654,6 +3683,40 @@ void PerturbationsModule::perturb_vector_init(
 }
 
 /**
+ * 8piG/3 times the matter, radiation and free-streaming radiation densities at an early time: photons and
+ * baryons seed rho_r and rho_m, every other species is counted by its energy type, a mixed one (ncdm leaving
+ * the relativistic regime) split by its pressure, dark energy left out. Shared by the initial conditions and
+ * by the start time of the non-adiabatic modes, so both use the same om = a rho_m / sqrt(rho_r).
+ */
+PerturbationsModule::EarlyDensities PerturbationsModule::early_densities(
+    const double* pvecback) const {
+  EarlyDensities d{all_species_.baryons().Rho(pvecback), all_species_.photons().Rho(pvecback), 0.};
+  for (const auto& [name, sp] : all_species_) {
+    if (name == "Photons" || name == "Baryons") {
+      continue;
+    }
+    const double rho = sp->Rho(pvecback);
+    switch (sp->energy_type()) {
+      case BaseSpecies::EnergyType::Matter:
+        d.rho_m += rho;
+        break;
+      case BaseSpecies::EnergyType::Radiation:
+        d.rho_r += rho;
+        break;
+      case BaseSpecies::EnergyType::Other:
+        // Mixed (e.g. NCDM semi-relativistic): split by equation of state
+        d.rho_r += 3. * sp->P(pvecback);
+        d.rho_m += rho - 3. * sp->P(pvecback);
+        break;
+      default:  // DarkEnergy: no rho_r/rho_m contribution
+        break;
+    }
+    d.rho_nu += sp->FreestreamingRho(pvecback);
+  }
+  return d;
+}
+
+/**
  * For each mode, wavenumber and initial condition, this function
  * initializes in the vector all values of perturbed variables (in a
  * given gauge). It is assumed here that all values have previously been
@@ -3691,40 +3754,12 @@ void PerturbationsModule::perturb_initial_conditions(
 
     double a_prime_over_a = ppw->pvecback[background_module_->index_bg_H_] * a;
 
-    /* 8piG/3 rho_r(t_i) */
-    /* 8piG/3 rho_m(t_i) */
-    /* 8piG/3 rho_nu(t_i) (all neutrinos and collisionless relics being relativistic at that time) */
-    // ── Seed rho_r from photons, rho_m from baryons ──────────────────────────
-    double rho_r  = all_species_.photons().Rho(ppw->pvecback.data());
-    double rho_m  = all_species_.baryons().Rho(ppw->pvecback.data());
-    double rho_nu = 0.;
-
-    // ── Dispatch over all other species ──────────────────────────────────────
-    for (const auto& [name, sp] : all_species_) {
-      if (name == "Photons" || name == "Baryons") {
-        continue;
-      }
-
-      const double rho = sp->Rho(ppw->pvecback.data());
-
-      switch (sp->energy_type()) {
-        case BaseSpecies::EnergyType::Matter:
-          rho_m += rho;
-          break;
-        case BaseSpecies::EnergyType::Radiation:
-          rho_r += rho;
-          break;
-        case BaseSpecies::EnergyType::Other:
-          // Mixed (e.g. NCDM semi-relativistic): split by equation of state
-          rho_r += 3. * sp->P(ppw->pvecback.data());
-          rho_m += rho - 3. * sp->P(ppw->pvecback.data());
-          break;
-        default:  // DarkEnergy: no rho_r/rho_m contribution
-          break;
-      }
-
-      rho_nu += sp->FreestreamingRho(ppw->pvecback.data());
-    }
+    /* 8piG/3 rho_r(t_i), rho_m(t_i) and rho_nu(t_i) (all neutrinos and collisionless relics being
+       relativistic at that time) */
+    const EarlyDensities early = early_densities(ppw->pvecback.data());
+    const double rho_r         = early.rho_r;
+    const double rho_m         = early.rho_m;
+    const double rho_nu        = early.rho_nu;
 
     class_test(rho_r == 0., "stop to avoid division by zero");
 
@@ -3828,7 +3863,10 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.shear_ur = ktau_two / (45. + 12. * fracnu) * (3. * s2_squared - 1.) *
                         (1. + (4. * fracnu - 5.) / 4. / (2. * fracnu + 15.) * tau * om) *
                         ppr->curvature_ini;
-      ic_ctx.l3_ur    = ktau_three * 2. / 7. / (12. * fracnu + 45.) * ppr->curvature_ini;
+      /* from the l=3 equation, l3_ur' = k/7 (6 s_2 s_3 shear_ur - ...): twice the value used before
+         2026-11, which was half of what shear_ur implies */
+      ic_ctx.l3_ur = ktau_three * 2. / 7. / (12. * fracnu + 45.) * (3. * s2_squared - 1.) *
+                     ppw->s_l[2] * ppw->s_l[3] * ppr->curvature_ini;
 
       ic_ctx.eta = ppr->curvature_ini * (1. - ktau_two / 12. / (15. + 4. * fracnu) *
                                                   (5. + 4. * s2_squared * fracnu -
@@ -3841,10 +3879,13 @@ void PerturbationsModule::perturb_initial_conditions(
        Turok 99, with just a different normalization convention for
        tau and the scale factor. [k tau] from BMT99 is left invariant
        because it is the ratio [k/aH]. But [Omega_i,0 tau] from BMT99
-       must be replaced by [frac_i*om*tau/4]. Some doubts remain about
-       the niv formulas, that should be recheked at some point. We
-       also checked that for bi,cdi,nid, everything coincides exactly
-       with the CAMB formulas. */
+       must be replaced by [frac_i*om*tau/4]. We also checked that for
+       bi,cdi,nid, everything coincides exactly with the CAMB formulas.
+       All five modes were rechecked in 2026-11 against the power-series
+       solution of the equations (scripts/initial_conditions_series.py),
+       which corrected the niv shear_ur, l3_ur and eta and the adiabatic
+       l3_ur. Since om*tau is the leading order of these modes, they
+       start no later than om*tau = start_isocurvature_at_omega_tau. */
 
     /** - --> (b.2.) Cold dark matter Isocurvature */
 
@@ -3902,7 +3943,8 @@ void PerturbationsModule::perturb_initial_conditions(
       ic_ctx.delta_ur   = ppr->entropy_ini * (1. - ktau_two / 6.);
       ic_ctx.theta_ur   = ppr->entropy_ini * k * k * tau / 4.;
       ic_ctx.shear_ur   = ppr->entropy_ini * ktau_two / (4. * fracnu + 15.) / 2.;
-      ic_ctx.l3_ur      = 0.;
+      ic_ctx.l3_ur      = ppr->entropy_ini * ktau_three / 7. / (4. * fracnu + 15.) * ppw->s_l[2] *
+                          ppw->s_l[3]; /* l3_ur' = 6/7 k s_2 s_3 shear_ur */
       ic_ctx.eta        = -ppr->entropy_ini * fracnu / (4. * fracnu + 15.) / 6. * ktau_two;
       dispatch_species_ic();
     }
@@ -3924,13 +3966,21 @@ void PerturbationsModule::perturb_initial_conditions(
                           (1. + 3. / 16. * fracb * fracnu / fracg * om * tau);
       ic_ctx.theta_ur   = ppr->entropy_ini * 3. / 4. * k *
                           (1. - 1. / 6. * ktau_two * (4. * fracnu + 9.) / (4. * fracnu + 5.));
-      ic_ctx.shear_ur   = ppr->entropy_ini / (4. * fracnu + 15.) * k * tau *
-                          (1. + 3. * om * tau * fracnu / (4. * fracnu + 15.));
-      ic_ctx.l3_ur      = 0.;
-      ic_ctx.eta        = ppr->entropy_ini * fracnu * k * tau *
-                          (-1. / (4. * fracnu + 5.) +
-                           (-3. / 64. * fracb / fracg +
-                            15. / 4. / (4. * fracnu + 15.) / (4. * fracnu + 5.) * om * tau));
+      /* shear_ur, l3_ur and eta checked (2026-11) against the power-series solution of the synchronous-gauge
+         equations: shear_ur' = (1/2)(8/15 theta_ur + 8/5 eta') with theta_ur = 3/4 k and
+         eta' = -fracnu k/(4 fracnu+5) gives 1/(4 fracnu+5) at leading order (it was 1/(4 fracnu+15)),
+         l3_ur follows from l3_ur' = 6/7 k s_2 s_3 shear_ur (it was 0), and the fracb term of eta is of order
+         om*tau (it was added at leading order). The old values made the C_l's depend on the starting
+         time by orders of magnitude. */
+      ic_ctx.shear_ur = ppr->entropy_ini / (4. * fracnu + 5.) * k * tau *
+                        (1. + 3. * om * tau * fracnu / (4. * fracnu + 15.));
+      ic_ctx.l3_ur    = ppr->entropy_ini * 3. / 7. / (4. * fracnu + 5.) * ktau_two * ppw->s_l[2] *
+                        ppw->s_l[3];
+      ic_ctx.eta =
+          ppr->entropy_ini * fracnu * k * tau *
+          (-1. / (4. * fracnu + 5.) +
+           (-3. / 64. * fracb / fracg + 15. / 4. / (4. * fracnu + 15.) / (4. * fracnu + 5.)) * om *
+               tau);
       dispatch_species_ic();
     }
 
