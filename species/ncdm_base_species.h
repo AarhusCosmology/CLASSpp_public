@@ -218,6 +218,13 @@ class NCDMBaseSpecies : public BaseSpecies {
                            double* dy,
                            const perturb_parameters_and_workspace& ppaw) const override;
 
+  /** Psi_0(q) = -1/4 dlnf0/dlnq F_0 in each momentum bin, when the tensor hierarchy is evolved
+   *  (tensor_method = exact). */
+  void ApplyTensorInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                    double* y,
+                                    double f0,
+                                    const double* pvecback) const override;
+
   // ── Tensor GW source contribution ────────────────────────────────────────
   /** Contributes this species' anisotropic-stress integral to ppw->gw_source.
    *  Uses the species's per-pv NCDMBaseSpecies::PerturbLayout slot. */

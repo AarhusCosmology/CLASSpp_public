@@ -300,6 +300,9 @@ class PerturbationsModule : public BaseModule {
     double rho_nu;
   };
   EarlyDensities early_densities(const double* pvecback) const;
+  /** 8piG/3 times the density of the species on the tensor hierarchy of relativistic neutrinos: ur, and ncdm
+      in the massless approximation (3 p). */
+  double tensor_ur_hierarchy_rho(const double* pvecback) const;
   void perturb_initial_conditions(
       int index_md, int index_ic, double k, double tau, perturb_workspace* ppw);
   void perturb_approximations(int index_md, double k, double tau, perturb_workspace* ppw);

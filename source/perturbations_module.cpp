@@ -3733,6 +3733,19 @@ PerturbationsModule::EarlyDensities PerturbationsModule::early_densities(
   return d;
 }
 
+double PerturbationsModule::tensor_ur_hierarchy_rho(const double* pvecback) const {
+  double rho = 0.;
+  for (const BaseSpecies* sp : resolved_.ur) {
+    rho += sp->Rho(pvecback);
+  }
+  if (ppt->tensor_method == tm_massless_approximation && all_species_.has_ncdm()) {
+    for (const auto& sp : all_species_) {
+      rho += sp->TensorMasslessRelativisticRho(pvecback);
+    }
+  }
+  return rho;
+}
+
 /**
  * For each mode, wavenumber and initial condition, this function
  * initializes in the vector all values of perturbed variables (in a
@@ -4217,6 +4230,46 @@ void PerturbationsModule::perturb_initial_conditions(
       else {
         ppw->pv->y[ppw->pv->index_pt_gw] = 0.;
       }
+    }
+
+    /** Term of order (k tau)^2 (C. Pitrou, class_public v3.3.0). In the radiation era a^2 rho_tot = 1/tau^2
+        and the equation of the gravitational wave is
+
+        \f[ h'' + \frac{2}{\tau} h' + (k^2+2K) h = -\frac{8}{5} \frac{\rho_{fs}}{\rho_r} \frac{h - h_{ini}}{\tau^2} \f]
+
+        The right-hand side is the anisotropic stress of the free-streaming species, whose monopole
+        follows \f$ F_0 = \sqrt{6} (h - h_{ini}) \f$ at this order. Thus
+
+        \f[ h = h_{ini} \left[ 1 - \frac{(k^2+2K) \tau^2}{6 + \frac{8}{5} \rho_{fs}/\rho_r} \right] \f]
+
+        A mode that starts with h' = 0 keeps an error of this order for ever, so that the tensor C_l's depend
+        on the starting time. rho_fs counts the species whose stress enters the equation of h in
+        perturb_einstein(): those of the relativistic neutrino hierarchy, and ncdm when its own hierarchy is
+        evolved. The photons are tightly coupled at this time and have no stress. */
+    background_module_->background_at_tau(tau,
+                                          pba->normal_info,
+                                          pba->inter_normal,
+                                          &(ppw->last_index_back),
+                                          ppw->pvecback.data());
+    const double* pvecback = ppw->pvecback.data();
+    double rho_fs          = evolve_tensor_ur_ ? tensor_ur_hierarchy_rho(pvecback) : 0.;
+    if (evolve_tensor_ncdm_) {
+      for (const auto& sp : all_species_) {
+        rho_fs += sp->TensorMasslessRelativisticRho(pvecback);
+      }
+    }
+    const double h_corr_2 = -ppw->pv->y[ppw->pv->index_pt_gw] * (k2 + 2. * pba->K) /
+                            (6. + 8. / 5. * rho_fs / early_densities(pvecback).rho_r) * tau * tau;
+    ppw->pv->y[ppw->pv->index_pt_gw]    += h_corr_2;
+    ppw->pv->y[ppw->pv->index_pt_gwdot]  = 2. * h_corr_2 / tau;
+
+    /* F_0' = sqrt(6) h' + ... for a massless free-streaming species */
+    const double f0 = _SQRT6_ * h_corr_2;
+    if (evolve_tensor_ur_) {
+      ppw->pv->y[ppw->pv->tensor_ur_layout.idx_delta] = f0;
+    }
+    for (const auto& [species, layout] : ppw->pv->active_species) {
+      species->ApplyTensorInitialConditions(*layout, ppw->pv->y.data(), f0, pvecback);
     }
   }
 }
@@ -4827,19 +4880,7 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - --> ur contribution to gravitational wave source: */
     if (evolve_tensor_ur_) {
-      double rho_relativistic = 0.;
-
-      for (const BaseSpecies* sp : resolved_.ur) {
-        rho_relativistic += sp->Rho(ppw->pvecback.data());
-      }
-
-      if (ppt->tensor_method == tm_massless_approximation) {
-        if (all_species_.has_ncdm()) {
-          for (const auto& sp : all_species_) {
-            rho_relativistic += sp->TensorMasslessRelativisticRho(ppw->pvecback.data());
-          }
-        }
-      }
+      const double rho_relativistic = tensor_ur_hierarchy_rho(ppw->pvecback.data());
 
       const auto& ur_tens_lay  = ppw->pv->tensor_ur_layout;
       ppw->gw_source          += (-_SQRT6_ * 4 * a2 * rho_relativistic *

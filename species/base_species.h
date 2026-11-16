@@ -394,6 +394,16 @@ class BaseSpecies {
                                    double* /*dy*/,
                                    const perturb_parameters_and_workspace& /*ppaw*/) const {}
 
+  /** Tensor modes: set the monopole of this species' own hierarchy at the initial time. @p f0 is its
+   *  value for a massless free-streaming species, \f$ F_0 = \sqrt{6}\,\delta h \f$, where
+   *  \f$ \delta h \f$ is the term of order \f$ (k\tau)^2 \f$ of the gravitational wave (see
+   *  PerturbationsModule::perturb_initial_conditions). Default: no-op, for a species without a tensor
+   *  hierarchy of its own. */
+  virtual void ApplyTensorInitialConditions(const PerturbLayout& /*layout*/,
+                                            double* /*y*/,
+                                            double /*f0*/,
+                                            const double* /*pvecback*/) const {}
+
   /** Write this species' tensor-mode output column titles. Default: no-op. */
   virtual void WriteTensorOutputColumnTitles(std::string& /*tensor_titles*/) const {}
 

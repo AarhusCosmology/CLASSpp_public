@@ -894,6 +894,26 @@ double NCDMBaseSpecies::GetW0ForGwSource(int iq, const double* /*pvecback*/) con
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ApplyTensorInitialConditions
+//
+// The hierarchy has Psi_0' = ... - sqrt(6)/4 h' dlnf0/dlnq where a massless species has
+// F_0' = ... + sqrt(6) h', so Psi_0 = -1/4 dlnf0/dlnq F_0 while both are of order (k tau)^2.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void NCDMBaseSpecies::ApplyTensorInitialConditions(const BaseSpecies::PerturbLayout& base,
+                                                   double* y,
+                                                   double f0,
+                                                   const double* pvecback) const {
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  if (layout.q_size <= 0 || layout.index_per_q.empty()) {
+    return;
+  }
+  for (int iq = 0; iq < layout.q_size; ++iq) {
+    y[layout.index_per_q[iq]] = -0.25 * f0 * GetDlnf0Dlnq(iq, pvecback);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ContributeTensorGwSource
 // Ports the per-species GW source integral from perturb_total_stress_energy.
 // Uses the species's NCDMBaseSpecies::PerturbLayout slot from ppw->pv.
