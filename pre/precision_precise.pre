@@ -58,3 +58,6 @@ transfer_neglect_l_half_S_t0 = 0
 transfer_neglect_l_half_S_t1 = 0
 transfer_neglect_l_half_S_t2 = 0
 transfer_neglect_l_half_S_e = 0
+# Pinned 2026-11-16, when the compiled default went to 30: the value this file was measured
+# with. C_L^phiphi at L = 30-39 is 1.6e-4 from a run without Limber, against 7e-4 with 30.
+l_switch_limber = 40

@@ -1,0 +1,27 @@
+# CLASS++ precision: the defaults as they were from 2026-11-05 to 2026-11-16.
+#
+# On 2026-11-16 start_small_k_at_tau_c_over_tau_h went back from 0.006 to 0.0015, its value
+# before 2026-08-21 and the value of class_public: the smallest wavenumbers start when
+# tau_c/tau_H = 0.0015. The later start was chosen on a likelihood that begins at l = 30. It
+# saves no run time, and it leaves an error in the C_l at l < 30 and in P(k) at k < 1e-3/Mpc.
+# For LambdaCDM, against a start at tau_c/tau_H = 1e-4 with the other settings at their
+# defaults: lensed EE 0.22% (l = 6), TE 0.14% and TT 0.02% with 0.006, and 0.02%, 0.01% and
+# 0.002% with 0.0015; P(k) at k < 1e-3/Mpc 1.5e-4 and 3e-5. Against a converged reference the
+# lensed EE at l = 6 is 0.32% off with 0.006 and 0.11% off with 0.0015. Tensor TT and BB at
+# l = 2, against a start at 4e-4: 0.16% and 0.35% with 0.006, 0.03% and 0.07% with 0.0015.
+# Above l = 30 the C_l change by less than 2e-7. One thread is as fast (within 0.4% for
+# LambdaCDM, with a 0.06 eV neutrino and with tensors).
+#
+# The same day l_switch_limber went from 40 to 30, the value of class_public: the Limber
+# approximation for C_L^phiphi starts at L = 30. For LambdaCDM against a run without Limber
+# below L = 300, C_L^phiphi at L = 30-39 is 7e-4 off with 30 and 1.6e-4 with 40; at L < 30 and
+# at L >= 40 the two are equally far off (3.5e-4 and 3.7e-4 below 30, 5.7e-4 and 6.9e-4 at
+# L = 40-99), and the lensed TT and EE differ by 2e-6. One thread is 2% faster with 30, since
+# the time step of the lensing integral is proportional to 1/l_switch_limber.
+#
+# Pass this file to reproduce a result computed in that period, or to bisect.
+#
+# For earlier periods use precision_pre_2026_11_05.pre, precision_pre_2026_10_27.pre,
+# precision_pre_2026_10_21.pre, precision_pre_2026_10_09.pre or precision_pre_2026_08_21.pre.
+start_small_k_at_tau_c_over_tau_h = 0.006
+l_switch_limber = 40

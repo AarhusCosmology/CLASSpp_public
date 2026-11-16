@@ -27,7 +27,12 @@
 #
 # Pass this file to reproduce a result computed in that period, or to bisect.
 #
-# For earlier periods use precision_pre_2026_10_27.pre, precision_pre_2026_10_21.pre,
-# precision_pre_2026_10_09.pre or precision_pre_2026_08_21.pre.
+# For the next period use precision_pre_2026_11_16.pre; for earlier ones
+# precision_pre_2026_10_27.pre, precision_pre_2026_10_21.pre, precision_pre_2026_10_09.pre or
+# precision_pre_2026_08_21.pre.
 ncdm_driver_normalisation = 0
 tol_perturb_newtonian_k_over_a0H0 = 0
+# On 2026-11-16 the smallest wavenumbers began to start at tau_c/tau_H = 0.0015 instead of 0.006, and
+# the Limber approximation for C_L^phiphi at L = 30 instead of 40 (see precision_pre_2026_11_16.pre).
+start_small_k_at_tau_c_over_tau_h = 0.006
+l_switch_limber = 40

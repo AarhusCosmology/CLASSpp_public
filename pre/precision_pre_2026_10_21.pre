@@ -52,3 +52,7 @@ hyper_sampling_flat = 8
 # precision_pre_2026_11_05.pre).
 ncdm_driver_normalisation = 0
 tol_perturb_newtonian_k_over_a0H0 = 0
+# On 2026-11-16 the smallest wavenumbers began to start at tau_c/tau_H = 0.0015 instead of 0.006, and
+# the Limber approximation for C_L^phiphi at L = 30 instead of 40 (see precision_pre_2026_11_16.pre).
+start_small_k_at_tau_c_over_tau_h = 0.006
+l_switch_limber = 40

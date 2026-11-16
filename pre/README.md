@@ -20,13 +20,14 @@ exactly that. S ≈ 2 × the induced parameter bias in σ, so S = 0.5 is roughly
 
 | file | S | speed vs defaults | use it for |
 |---|---|---|---|
-| *(compiled defaults)* | 0.387 ³ ⁴ ⁵ ⁶ | 1.00× | everything |
+| *(compiled defaults)* | 0.387 ³ ⁴ ⁵ ⁶ ⁷ | 1.00× | everything |
 | `precision_precise.pre` | 0.009 | ~60× slower | reference-grade, for convergence tests |
 | `precision_pre_2026_08_21.pre` | 1.725 | 2.2× slower | reproducing results from before 2026-08-21 |
 | `precision_pre_2026_10_09.pre` | 0.387 | 2% faster on one thread | reproducing results from 2026-08-21 to 2026-10-09 |
 | `precision_pre_2026_10_21.pre` | 0.387 ³ | 15% slower on one thread, 20% with halofit | reproducing results from 2026-10-09 to 2026-10-21 |
 | `precision_pre_2026_10_27.pre` | 0.387 ³ | 8% slower on one thread, 61% on w0waCDM | reproducing results from 2026-10-21 to 2026-10-27 |
 | `precision_pre_2026_11_05.pre` | 0.387 ³ | as fast | reproducing results from 2026-10-27 to 2026-11-05 |
+| `precision_pre_2026_11_16.pre` | 0.387 ³ | 2% slower on one thread | reproducing results from 2026-11-05 to 2026-11-16 |
 | `act_dr6.pre` | — ¹ | 3.3× slower ² | ACT DR6 and SPT-3G D1: temperature, polarisation and lensing |
 
 ¹ Not scored on `plik_lite`. Its own metric is the distance to a converged reference
@@ -89,6 +90,19 @@ in Newtonian gauge only, modes with k < 5 a₀H₀ began to be integrated at a t
 3aHθ/k² there, and P(k) at k = 1e-5 h/Mpc was 18% off synchronous for a 1 eV neutrino. A
 Newtonian CMB + P(k) run is 1% slower. See #497.
 
+⁷ On 2026-11-16 `start_small_k_at_tau_c_over_tau_h` went back from 0.006 to 0.0015, its value
+before 2026-08-21 and the value of class_public. The later start saves no run time, and it left
+the lensed EE of ΛCDM 0.32% off a converged reference at ℓ = 6. It is 0.11% off now. TE at
+ℓ < 30 and P(k) at k < 1e-3/Mpc were 0.14% and 1.5e-4 off a run that starts at τ_c/τ_H = 1e-4,
+and are 0.01% and 3e-5 off now. Tensor TT and BB at ℓ = 2 were 0.16% and 0.35% off a run that
+starts at 4e-4, and are 0.03% and 0.07% off now. Above ℓ = 30 the C_l change by less than 2e-7,
+so S does not change. One thread is as fast. See the table under **Tensors** below.
+
+The same day `l_switch_limber` went from 40 to 30, the value of class_public. C_L^φφ at
+L = 30–39 is 7e-4 off a run without Limber, against 1.6e-4 with 40. At L < 30 and L ≥ 40 the
+two are equally far off, and the lensed TT and EE differ by 2e-6. One thread is 2% faster.
+`act_dr6` and `precise` keep 40.
+
 ## Two things these files do not cover
 
 **Low-ℓ EE.** `plik_lite` starts at ℓ = 30, so nothing below that entered the
@@ -111,7 +125,7 @@ spectrum is continued past the last mode in its high-k form and trusted up to
 solves the modes to 10/Mpc, because the continuation has the high-k form of cold dark matter,
 which dark acoustic oscillations break.
 
-**What the presets still carry.** The compiled defaults hold seven knobs back from
+**What the presets still carry.** The compiled defaults hold eight knobs back from
 the campaign's configuration (table above). `precise` no longer overrides
 `k_max_tau0_over_l_max`, because a reference-grade preset that is 12% wrong on
 tensor BB is not a reference; that cost S 0.0083 → 0.0087. Its header names the
@@ -123,7 +137,7 @@ time, and 0.301 at 1.7× slower), so they reintroduced the low-ℓ EE, P(k)-trun
 lensing-headroom and tensor-BB issues, and since then the defaults have become fast
 enough that they no longer earned their place.
 
-**Tensors.** The campaign scored scalars only, at ℓ ≥ 30, with no `mPk`. **Seven**
+**Tensors.** The campaign scored scalars only, at ℓ ≥ 30, with no `mPk`. **Eight**
 knobs are therefore held at their pre-2026-08-21 values in the compiled defaults,
 because that objective could not constrain them:
 
@@ -135,6 +149,7 @@ because that objective could not constrain them:
 | `k_max_tau0_over_l_max` | tensors need a wider k range per ℓ than scalars; a tensor scenario went to 2.5% |
 
 | `ncdm_fluid_trigger_tau_over_tau_k`, `l_max_ncdm`, `tol_ncdm_synchronous` | P(k) with massive neutrinos: 1.3e-3 low at k = 1/Mpc, 3.8e-3 at k = 5/Mpc (restored 2026-10-09) |
+| `start_small_k_at_tau_c_over_tau_h` | low-ℓ EE, hence τ: 0.32% off at ℓ = 6 instead of 0.11%, for no gain in run time (restored 2026-11-16) |
 
 Each was caught by running the reference-comparison workflow and asking, for
 every failing scenario, whether the new defaults are *closer to a converged

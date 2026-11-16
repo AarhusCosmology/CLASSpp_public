@@ -1,6 +1,6 @@
 // The non-adiabatic initial conditions (cdi, nid, niv) are series in om*tau, om = a rho_m / sqrt(rho_r), in which
 // om*tau is the leading order of the mode. With only the adiabatic start-time conditions the small-k modes start
-// at om*tau ~ 1.5 (start_small_k_at_tau_c_over_tau_h = 0.006), where the series is wrong at the percent level,
+// at om*tau ~ 0.65 (start_small_k_at_tau_c_over_tau_h = 0.0015), where the series is wrong at the percent level,
 // so start_isocurvature_at_omega_tau starts them no later than om*tau = 0.01.
 //
 // With the defaults, each mode must then agree with a start four times earlier. Measured 2026-11-05 on

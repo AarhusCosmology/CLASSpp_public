@@ -60,6 +60,9 @@ nonlinear_min_k_max = 10
 # no measurable effect on the two lensing likelihoods, and free; it keeps C_L^phiphi from
 # scattering by 1e-3 at L > 1400 between runs that solve different k ranges
 q_logstep_limber = 1.025
+# Pinned 2026-11-16, when the compiled default went to 30: the value this file was measured
+# with. C_L^phiphi at L = 30-39 is 1.6e-4 from a run without Limber, against 7e-4 with 30.
+l_switch_limber = 40
 
 # recombination: CosmoRec, ACT DR6's baseline, is matched by both of CLASS++'s
 # recombination codes by default since 2026-10-08 (recfast_calibration and

@@ -398,7 +398,7 @@ struct precision {
       4.0; /**< in ln(k) space, width of the BAO region where sampling is finer: this number gives roughly the number of BAO oscillations well resolved on both sides of the central value (recommended: 4, i.e. finest sampling from before first up to 3+4=7th peak) */
 
   double start_small_k_at_tau_c_over_tau_h =
-      0.006; /**< largest wavelengths start being sampled when universe is sufficiently opaque. This is quantified in terms of the ratio of thermo to hubble time scales, \f$ \tau_c/\tau_H \f$. Start when start_largek_at_tau_c_over_tau_h equals this ratio. Decrease this value to start integrating the wavenumbers earlier in time. */
+      0.0015; /**< largest wavelengths start being sampled when universe is sufficiently opaque. This is quantified in terms of the ratio of thermo to hubble time scales, \f$ \tau_c/\tau_H \f$. Start when start_largek_at_tau_c_over_tau_h equals this ratio. Decrease this value to start integrating the wavenumbers earlier in time. */
 
   double start_large_k_at_tau_h_over_tau_k =
       0.07; /**< largest wavelengths start being sampled when mode is sufficiently outside Hubble scale. This is quantified in terms of the ratio of hubble time scale to wavenumber time scale, \f$ \tau_h/\tau_k \f$ which is roughly equal to (k*tau). Start when this ratio equals start_large_k_at_tau_k_over_tau_h. Decrease this value to start integrating the wavenumbers earlier in time. */
@@ -861,7 +861,7 @@ struct precision {
       400.0; /**< value of l below which the CMB source functions can be neglected at late time, excepted when there is a Late ISW contribution */
 
   double l_switch_limber =
-      40.; /**< when to use the Limber approximation for project gravitational potential cl's */
+      30.; /**< when to use the Limber approximation for project gravitational potential cl's */
   double cmb_lensing_sampling_factor =
       1.; /**< logarithmic time step of the CMB lensing line-of-sight integral at late times, Delta tau = (tau0-tau) cmb_lensing_sampling_factor / min(l_switch_limber, l_max_scalars). Decrease for more precision. */
   double cmb_lensing_sampling_fraction =
