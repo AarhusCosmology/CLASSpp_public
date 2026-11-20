@@ -86,6 +86,9 @@ from libcpp.pair cimport pair
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
+cdef extern from "common.h":
+    ctypedef vector[pair[string, vector[double]]] NamedColumns
+
 """
 
 
@@ -278,7 +281,7 @@ allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'std::string'
                  'std::vector<std::vector<double>>', 'std::vector<std::vector<short>>',
                  'std::vector<std::vector<int>>',
                  'std::vector<double>', 'std::vector<int>', 'std::vector<short>',
-                 'std::vector<std::string>'] + struct_names
+                 'std::vector<std::string>', 'std::vector<NamedColumns>', 'NamedColumns'] + struct_names
 
 keywords_to_be_ignored = ['static', 'constexpr', 'const']
 

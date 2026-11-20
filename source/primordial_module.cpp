@@ -2893,7 +2893,7 @@ void PrimordialModule::primordial_external_spectrum_init() {
 
 void PrimordialModule::primordial_output_titles(std::string& titles) const {
   class_store_columntitle(titles, "k [1/Mpc]", true);
-  class_store_columntitle(titles, "P_scalar(k)", true);
+  class_store_columntitle(titles, "P_scalar(k)", ppt->has_scalars);
   class_store_columntitle(titles, "P_tensor(k)", ppt->has_tensors);
 }
 
@@ -2909,11 +2909,19 @@ void PrimordialModule::primordial_output_data(int number_of_titles, double* data
     class_store_double(dataptr, exp(lnk_[index_k]), true, storeidx);
     class_store_double(dataptr,
                        exp(lnpk_[perturbations_module_->index_md_scalars_][index_k]),
-                       true,
+                       ppt->has_scalars,
                        storeidx);
     class_store_double(dataptr,
                        exp(lnpk_[perturbations_module_->index_md_tensors_][index_k]),
                        ppt->has_tensors,
                        storeidx);
   }
+}
+
+NamedColumns PrimordialModule::GetOutputColumns() const {
+  std::string titles;
+  primordial_output_titles(titles);
+  std::vector<double> data(static_cast<size_t>(get_number_of_titles(titles)) * lnk_size_);
+  primordial_output_data(get_number_of_titles(titles), data.data());
+  return SplitIntoColumns(titles, data.data(), lnk_size_);
 }

@@ -14,6 +14,7 @@ extract cosmological parameters.
 from libc.math cimport exp, log
 from libc.stdlib cimport malloc, calloc, free
 from libc.stdio cimport snprintf
+from libc.string cimport memcpy
 
 from libcpp cimport bool
 from libcpp.memory cimport nullptr
@@ -142,6 +143,22 @@ cdef viewdictitems(dict d):
         return d.items()
     else:
         return d.viewitems()
+
+cdef object _ndarray(const vector[double]& values):
+    """A numpy copy of a C++ vector, which the C++ object may free after this call."""
+    array = np.empty(values.size(), np.double)
+    cdef double[::1] view = array
+    if values.size() > 0:
+        memcpy(&view[0], values.data(), values.size()*sizeof(double))
+    return array
+
+cdef dict _columns_dict(const NamedColumns& columns):
+    """A table of named columns from the C++ modules as a dict of arrays, in column order."""
+    cdef dict out = {}
+    cdef size_t index
+    for index in range(columns.size()):
+        out[(<bytes> columns[index].first).decode()] = _ndarray(columns[index].second)
+    return out
 
 cdef extern from "bessel_table_cache.h":
     cdef cppclass BesselTableCache:
@@ -498,6 +515,9 @@ cdef class PyCosmology:
     cdef const NonlinearModule* _nonlinear(self) except NULL:
         return deref(self._cosmo()).GetNonlinearModule().get()
 
+    cdef const PerturbationsModule* _perturbations(self) except NULL:
+        return deref(self._cosmo()).GetPerturbationsModule().get()
+
     cdef _update_fc_from_pars(self):
         cdef:
             FileContent new_file_content
@@ -594,7 +614,6 @@ cdef class PyCosmology:
     cdef general_cl(self, int lmax, bool is_lensed):
         cdef:
             dict out_dict
-            int lmaxpp
             map[string, vector[double]] cl_data
 
         if is_lensed:
@@ -607,13 +626,10 @@ cdef class PyCosmology:
             if lmax == -1:
                 lmax = deref(sp).l_max_tot_
             cl_data = deref(sp).cl_output(lmax)
-        lmaxpp = lmax + 1
 
         out_dict = {}
         for element in cl_data:
-            key = <bytes> element.first
-            key = str(key.decode())
-            out_dict[key] = np.asarray(<double[:lmaxpp]> &element.second[0]).copy()
+            out_dict[(<bytes> element.first).decode()] = _ndarray(element.second)
         out_dict['ell'] = np.arange(lmax + 1)
         return out_dict
 
@@ -659,53 +675,28 @@ cdef class PyCosmology:
         cl_data = deref(le).cl_output_computed()
         out_dict = {}
         for element in cl_data:
-            key = <bytes> element.first
-            key = str(key.decode())
-            out_dict[key] = np.asarray(<double[:element.second.size()]> &element.second[0]).copy()
+            out_dict[(<bytes> element.first).decode()] = _ndarray(element.second)
         out_dict['ell'] = out_dict['ell'].astype(int)
         return out_dict
 
     cpdef z_of_r (self, double[::1] z_array):
         cdef:
-            double tau
-            int last_index
-            int bg_size
-            short long_info
-            short inter_normal
-            int index_bg_conf_distance
-            int index_bg_H
             Py_ssize_t i
-            Py_ssize_t z_array_size
-            double z
             vector[double] pvecback
             double[::1] r
             double[::1] dzdr
+            const BackgroundModule* background_module = self._background()
 
-        z_array_size = z_array.shape[0]
-        r_arr = np.empty(z_array_size, np.double)
+        r_arr = np.empty(z_array.shape[0], np.double)
         r = r_arr
-        dzdr_arr = np.empty(z_array_size, np.double)
+        dzdr_arr = np.empty(z_array.shape[0], np.double)
         dzdr = dzdr_arr
 
-        long_info = self.ba().long_info
-        inter_normal = self.ba().inter_normal
-
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        bg_size = deref(background_module).bg_size_
-        index_bg_conf_distance = deref(background_module).index_bg_conf_distance_
-        index_bg_H = deref(background_module).index_bg_H_
-
-        pvecback.resize(bg_size)
-
-        for i in range(z_array_size):
-            z = z_array[i]
-            deref(background_module).background_tau_of_z(z, &tau)
-            deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
-
-            # store r
-            r[i] = pvecback[index_bg_conf_distance]
-            # store dz/dr = H
-            dzdr[i] = pvecback[index_bg_H]
+        for i in range(z_array.shape[0]):
+            pvecback = background_module.GetBackgroundAtZ(z_array[i])
+            r[i] = pvecback[background_module.index_bg_conf_distance_]
+            # dz/dr = H
+            dzdr[i] = pvecback[background_module.index_bg_H_]
 
         return r_arr, dzdr_arr
 
@@ -713,10 +704,7 @@ cdef class PyCosmology:
         """
         luminosity_distance(z)
         """
-        cdef int index_bg_lum_distance
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_lum_distance = deref(background_module).index_bg_lum_distance_
-        return self.get_background_value_at_z(z, index_bg_lum_distance)
+        return self.get_background_value_at_z(z, self._background().index_bg_lum_distance_)
 
     cdef pk_outputs _pk_output_default(self) except *:
         """Which P(k) a bare pk()/get_pk() call means: non-linear if one was asked for."""
@@ -826,19 +814,7 @@ cdef class PyCosmology:
         combines them, as get_Weyl_pk_and_k_and_z does, is aligned by
         construction rather than by coincidence.
         """
-        cdef Py_ssize_t index_tau
-        cdef Py_ssize_t ln_tau_size
-
-        perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
-        ln_tau_size = deref(perturbations_module).ln_tau_size_
-
-        z = np.empty(ln_tau_size, np.double)
-        for index_tau in range(ln_tau_size - 1):
-            z[index_tau] = self.z_of_tau(exp(deref(perturbations_module).ln_tau_[index_tau]))
-        # The grid ends at today; say so exactly rather than to interpolation accuracy.
-        z[ln_tau_size - 1] = 0.
-
-        return z
+        return _ndarray(self._perturbations().GetLateTimeRedshifts())
 
     def get_pk_and_k_and_z(self, nonlinear=True, only_clustering_species=False, h_units=False):
         """
@@ -875,9 +851,9 @@ cdef class PyCosmology:
         deref(nonlinear_module).GetPkGrid(pk_output, index_pk, k_vector, pk_vector)
 
         z = self._z_grid_for_output()
-        k = np.asarray(<double[:k_vector.size()]> k_vector.data()).copy()
+        k = _ndarray(k_vector)
         # GetPkGrid hands back the table in its stored order, z-major.
-        pk = np.asarray(<double[:pk_vector.size()]> pk_vector.data()).reshape(z.size, k.size).T.copy()
+        pk = _ndarray(pk_vector).reshape(z.size, k.size).T.copy()
 
         if h_units:
             k = k/self.ba().h
@@ -907,28 +883,25 @@ cdef class PyCosmology:
         k : vector of k values, k[index_k]
         z : vector of z values, z[index_z]
         """
-        cdef Py_ssize_t index_k
-        cdef Py_ssize_t k_size
+        cdef const PerturbationsModule* perturbations_module
         cdef int index_md
 
         if (not self.pt().has_density_transfers) and (not self.pt().has_velocity_transfers):
             raise CosmoSevereError(
                 "No transfer functions were computed. Add 'dTk' and/or 'vTk' to the list of outputs.")
 
-        perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
-        index_md = deref(perturbations_module).index_md_scalars_
+        perturbations_module = self._perturbations()
+        index_md = perturbations_module.index_md_scalars_
 
-        if deref(perturbations_module).ic_size_[index_md] > 1:
+        if perturbations_module.ic_size_[index_md] > 1:
             raise CosmoSevereError(
                 "get_transfer_and_k_and_z() assumes adiabatic initial conditions: the grids it "
                 "returns have no axis to hold several of them.")
 
         z = self._z_grid_for_output()
 
-        k_size = deref(perturbations_module).k_size_[index_md]
-        k = np.empty(k_size, np.double)
-        for index_k in range(k_size):
-            k[index_k] = deref(perturbations_module).k_[index_md][index_k]
+        k = _ndarray(perturbations_module.k_[index_md])
+        k_size = k.size
         if h_units:
             k = k/self.ba().h
 
@@ -1152,60 +1125,11 @@ cdef class PyCosmology:
     cpdef z_reio(self):
         return self._thermo().z_reionization_
 
-    cdef get_background_value_at_z(self, double z, int index_bg):
-        cdef:
-            double output_value
-            double tau
-            int bg_size
-            int last_index
-            short inter_normal
-            short long_info
-            vector[double] pvecback
+    cdef double get_background_value_at_z(self, double z, int index_bg) except? -1.:
+        return self._background().GetBackgroundAtZ(z)[index_bg]
 
-        long_info = self.ba().long_info
-        inter_normal = self.ba().inter_normal
-
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        bg_size = deref(background_module).bg_size_
-
-        pvecback.resize(bg_size)
-        deref(background_module).background_tau_of_z(z, &tau)
-        deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
-        output_value = pvecback[index_bg]
-        return output_value
-
-    cdef get_thermodynamics_value_at_z(self, double z, int index_th):
-        cdef:
-            double tau
-            int last_index
-            vector[double] pvecback
-            vector[double] pvecthermo
-            short long_info
-            short inter_normal
-            int bg_size
-            int th_size
-            short inter_mode
-            double output_value
-
-        long_info = self.ba().long_info
-        inter_normal = self.ba().inter_normal
-
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-        bg_size = deref(background_module).bg_size_
-        th_size = deref(thermodynamics_module).th_size_
-
-        pvecback.resize(bg_size)
-        pvecthermo.resize(th_size)
-
-        inter_mode = deref(thermodynamics_module).inter_normal_
-
-        deref(background_module).background_tau_of_z(z, &tau)
-        deref(background_module).background_at_tau(tau, long_info, inter_normal, &last_index, &pvecback[0])
-        deref(thermodynamics_module).thermodynamics_at_z(z, inter_mode, &last_index, &pvecback[0], &pvecthermo[0])
-
-        output_value = pvecthermo[index_th]
-        return output_value
+    cdef double get_thermodynamics_value_at_z(self, double z, int index_th) except? -1.:
+        return self._thermo().GetThermodynamicsAtZ(z)[index_th]
 
     cpdef angular_distance(self, double z):
         """
@@ -1219,10 +1143,7 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_bg_ang_distance
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_ang_distance = deref(background_module).index_bg_ang_distance_
-        return self.get_background_value_at_z(z, index_bg_ang_distance)
+        return self.get_background_value_at_z(z, self._background().index_bg_ang_distance_)
 
     def angular_distance_from_to(self, z1, z2):
         """
@@ -1246,8 +1167,7 @@ cdef class PyCosmology:
         if z1 >= z2:
             return 0.
 
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_conf_distance = deref(background_module).index_bg_conf_distance_
+        index_bg_conf_distance = self._background().index_bg_conf_distance_
         chi1 = self.get_background_value_at_z(z1, index_bg_conf_distance)
         chi2 = self.get_background_value_at_z(z2, index_bg_conf_distance)
 
@@ -1270,10 +1190,7 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_bg_D
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_D = deref(background_module).index_bg_D_
-        return self.get_background_value_at_z(z, index_bg_D)
+        return self.get_background_value_at_z(z, self._background().index_bg_D_)
 
     cpdef scale_independent_growth_factor_f(self, z):
         """
@@ -1287,12 +1204,8 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_bg_f
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_f = deref(background_module).index_bg_f_
-        return self.get_background_value_at_z(z, index_bg_f)
+        return self.get_background_value_at_z(z, self._background().index_bg_f_)
 
-    @cython.cdivision(True)
     cpdef z_of_tau(self, double tau):
         """
         Redshift corresponding to a given conformal time.
@@ -1302,27 +1215,7 @@ cdef class PyCosmology:
         tau : float
                 Conformal time
         """
-        cdef:
-            double output_value
-            double z
-            int bg_size_short
-            int index_bg_a
-            int last_index
-            short inter_normal
-            short short_info
-            vector[double] pvecback
-
-        short_info = self.ba().short_info
-        inter_normal = self.ba().inter_normal
-
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        bg_size_short = deref(background_module).bg_size_short_
-        index_bg_a = deref(background_module).index_bg_a_
-
-        pvecback.resize(bg_size_short)
-        deref(background_module).background_at_tau(tau, short_info, inter_normal, &last_index, &pvecback[0])
-        z = 1./pvecback[index_bg_a] - 1.
-        return z
+        return self._background().GetZOfTau(tau)
 
     cpdef Hubble(self, double z):
         """
@@ -1336,10 +1229,7 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_bg_H
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_H = deref(background_module).index_bg_H_
-        return self.get_background_value_at_z(z, index_bg_H)
+        return self.get_background_value_at_z(z, self._background().index_bg_H_)
 
     cpdef Om_m(self, double z):
         """
@@ -1353,10 +1243,7 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_bg_Omega_m
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        index_bg_Omega_m = deref(background_module).index_bg_Omega_m_
-        return self.get_background_value_at_z(z, index_bg_Omega_m)
+        return self.get_background_value_at_z(z, self._background().index_bg_Omega_m_)
 
 
     cpdef ionization_fraction(self, double z):
@@ -1370,10 +1257,7 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_th_xe
-        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-        index_th_xe = deref(thermodynamics_module).index_th_xe_
-        return self.get_thermodynamics_value_at_z(z, index_th_xe)
+        return self.get_thermodynamics_value_at_z(z, self._thermo().index_th_xe_)
 
     cpdef baryon_temperature(self, double z):
         """
@@ -1386,10 +1270,7 @@ cdef class PyCosmology:
         z : float
                 Desired redshift
         """
-        cdef int index_th_Tb
-        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-        index_th_Tb = deref(thermodynamics_module).index_th_Tb_
-        return self.get_thermodynamics_value_at_z(z, index_th_Tb)
+        return self.get_thermodynamics_value_at_z(z, self._thermo().index_th_Tb_)
 
     cpdef T_cmb(self):
         """
@@ -1416,33 +1297,7 @@ cdef class PyCosmology:
         -------
         background : dictionary containing background.
         """
-        cdef:
-            dict background
-            double[:,::1] view
-            int i
-            int number_of_titles
-            int timesteps
-            string titles
-            vector[double] data
-
-        background_module = deref(self._cosmo()).GetBackgroundModule()
-        deref(background_module).background_output_titles(titles)
-
-        tmp = <bytes> titles
-        tmp = str(tmp.decode())
-        names = tmp.strip("\t").split("\t")
-        number_of_titles = len(names)
-        timesteps = deref(background_module).bt_size_
-
-        data.resize(timesteps*number_of_titles)
-        deref(background_module).background_output_data(number_of_titles, &data[0])
-
-        background = {}
-        view = <double[:timesteps,:number_of_titles]> &data[0]
-        for i in range(number_of_titles):
-            background[names[i]] = np.asarray(view[:, i]).copy()
-
-        return background
+        return _columns_dict(self._background().GetOutputColumns())
 
     cpdef get_thermodynamics(self):
         """
@@ -1452,35 +1307,7 @@ cdef class PyCosmology:
         -------
         thermodynamics : dictionary containing thermodynamics.
         """
-        cdef:
-            dict thermodynamics
-            double[:,::1] view
-            int i
-            int number_of_titles
-            int timesteps
-            string titles
-            vector[double] data
-
-        thermodynamics_module = deref(self._cosmo()).GetThermodynamicsModule()
-
-        deref(thermodynamics_module).thermodynamics_output_titles(titles)
-
-        tmp = <bytes> titles
-        tmp = str(tmp.decode())
-        names = tmp.strip("\t").split("\t")
-        number_of_titles = len(names)
-        timesteps = deref(thermodynamics_module).tt_size_
-
-        data.resize(timesteps*number_of_titles)
-
-        deref(thermodynamics_module).thermodynamics_output_data(number_of_titles, &data[0])
-
-        thermodynamics = {}
-        view = <double[:timesteps,:number_of_titles]> &data[0]
-        for i in range(number_of_titles):
-            thermodynamics[names[i]] = np.asarray(view[:, i]).copy()
-
-        return thermodynamics
+        return _columns_dict(self._thermo().GetOutputColumns())
 
     cpdef get_primordial(self):
         """
@@ -1491,41 +1318,9 @@ cdef class PyCosmology:
         -------
         primordial : dictionary containing k-vector and primordial scalar and tensor P(k).
         """
-        cdef:
-            string titles
-            vector[double] data
-            int timesteps
-            int number_of_titles
-            double[:,::1] view
-            dict primordial
-            int i
-
-        primordial_module = deref(self._cosmo()).GetPrimordialModule()
-
-        deref(primordial_module).primordial_output_titles(titles)
-
-        tmp = <bytes> titles
-        tmp = str(tmp.decode())
-        names = tmp.strip("\t").split("\t")
-        number_of_titles = len(names)
-        timesteps = deref(primordial_module).lnk_size_
-
-        data.resize(timesteps*number_of_titles)
-        deref(primordial_module).primordial_output_data(number_of_titles, &data[0])
-
-        primordial = {}
-        view = <double[:timesteps,:number_of_titles]> &data[0]
-        for i in range(number_of_titles):
-            primordial[names[i]] = np.asarray(view[:, i]).copy()
-
-        return primordial
+        return _columns_dict(self._primordial().GetOutputColumns())
 
 
-    @cython.returns(dict)
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.ccall
     cpdef get_perturbations(self):
         """
         Return scalar, vector and/or tensor perturbations as arrays for requested
@@ -1544,58 +1339,25 @@ cdef class PyCosmology:
                 Similar for perturbations['vector'] and perturbations['tensor'].
         """
 
+        cdef:
+            const PerturbationsModule* perturbations_module
+            vector[NamedColumns] tables
+            size_t index_k
+
         perturbations = {}
 
         if self.pt().k_output_values_num<1:
             return perturbations
 
-        cdef:
-            Py_ssize_t i
-            Py_ssize_t j
-            Py_ssize_t k_size
-            Py_ssize_t number_of_titles
-            Py_ssize_t timesteps
-            dict tmpdict
-            double[:,::1] view
-            double* thedata_ptr
-            int* thesizes
-            list names
-            list tmparray
-
-        perturbation_module = deref(self._cosmo()).GetPerturbationsModule()
-        k_size = self.pt().k_output_values_num
-        for mode in ['scalar','vector','tensor']:
-            if mode=='scalar' and self.pt().has_scalars:
-                thetitles = <bytes> deref(perturbation_module).scalar_titles_
-                thesizes = <int*> deref(perturbation_module).size_scalar_perturbation_data_
-            elif mode=='vector' and self.pt().has_vectors:
-                thetitles = <bytes> deref(perturbation_module).vector_titles_
-                thesizes = <int*> deref(perturbation_module).size_vector_perturbation_data_
-            elif mode=='tensor' and self.pt().has_tensors:
-                thetitles = <bytes> deref(perturbation_module).tensor_titles_
-                thesizes = <int*> deref(perturbation_module).size_tensor_perturbation_data_
-            else:
+        perturbations_module = self._perturbations()
+        for mode, has_mode, index_md in (
+                ('scalar', self.pt().has_scalars, perturbations_module.index_md_scalars_),
+                ('vector', self.pt().has_vectors, perturbations_module.index_md_vectors_),
+                ('tensor', self.pt().has_tensors, perturbations_module.index_md_tensors_)):
+            if not has_mode:
                 continue
-            thetitles = str(thetitles.decode())
-            names = thetitles.strip("\t").split("\t")
-            number_of_titles = len(names)
-            tmparray = []
-            if number_of_titles == 0:
-                continue
-            for j in range(k_size):
-                timesteps = thesizes[j]//number_of_titles
-                tmpdict = {}
-                if mode == 'scalar':
-                    thedata_ptr = <double*>deref(perturbation_module).scalar_perturbations_data_[j].data()
-                elif mode == 'vector':
-                    thedata_ptr = <double*>deref(perturbation_module).vector_perturbations_data_[j].data()
-                else:
-                    thedata_ptr = <double*>deref(perturbation_module).tensor_perturbations_data_[j].data()
-                view = <double[:timesteps,:number_of_titles]> thedata_ptr
-                for i in range(number_of_titles):
-                    tmpdict[names[i]] = np.asarray(view[:,i])
-                tmparray.append(tmpdict)
-            perturbations[mode] = tmparray
+            tables = perturbations_module.GetPerturbationColumns(index_md)
+            perturbations[mode] = [_columns_dict(tables[index_k]) for index_k in range(tables.size())]
 
         return perturbations
 
@@ -1623,20 +1385,12 @@ cdef class PyCosmology:
         -- at that node of the stored late-time sampling, which is exact where
         converting the node to a redshift and back is not."""
         cdef:
-            string titles
-            vector[double] data
             string ic_info
             string ic_suffix
             file_format outf
-            Py_ssize_t number_of_titles
-            Py_ssize_t timesteps
-            Py_ssize_t size_ic_data
-            Py_ssize_t ic_num
-            dict tmpdict
-            dict transfers
-            double[:,:,::1] view
+            const PerturbationsModule* perturbations_module
+            vector[NamedColumns] tables
             int index_ic
-            int i
 
         if (not self.pt().has_density_transfers) and (not self.pt().has_velocity_transfers):
             return {}
@@ -1646,44 +1400,19 @@ cdef class PyCosmology:
         else:
             outf = file_format.class_format
 
-        perturbations_module = deref(self._cosmo()).GetPerturbationsModule()
-        index_md = deref(perturbations_module).index_md_scalars_
-
-        deref(perturbations_module).perturb_output_titles(outf, titles)
-
-        tmp = <bytes> titles
-        tmp = str(tmp.decode())
-        names = tmp.strip("\t").split("\t")
-        number_of_titles = len(names)
-        timesteps = deref(perturbations_module).k_size_[index_md]
-
-        size_ic_data = timesteps*number_of_titles
-        ic_num = deref(perturbations_module).ic_size_[index_md]
-
-        data.resize(size_ic_data*ic_num)
-
+        perturbations_module = self._perturbations()
         if index_tau < 0:
-            deref(perturbations_module).perturb_output_data(outf, z, number_of_titles, &data[0])
+            tables = perturbations_module.GetTransferColumns(outf, z)
         else:
-            deref(perturbations_module).perturb_output_data_at_index_tau(outf, index_tau, number_of_titles, &data[0])
+            tables = perturbations_module.GetTransferColumnsAtIndexTau(outf, index_tau)
+
+        if tables.size() == 1:
+            return _columns_dict(tables[0])
 
         transfers = {}
-        view = <double[:ic_num,:timesteps,:number_of_titles]> &data[0]
-
-        for index_ic in range(ic_num):
-            deref(perturbations_module).perturb_output_firstline_and_ic_suffix(index_ic, ic_info, ic_suffix)
-            ic_key = <bytes> ic_suffix
-            ic_key = str(ic_key.decode())
-
-            tmpdict = {}
-            for i in range(number_of_titles):
-                tmpdict[names[i]] = np.asarray(view[index_ic, :, i]).copy()
-
-            if ic_num == 1:
-                transfers = tmpdict
-            else:
-                transfers[ic_key] = tmpdict
-
+        for index_ic in range(tables.size()):
+            perturbations_module.perturb_output_firstline_and_ic_suffix(index_ic, ic_info, ic_suffix)
+            transfers[(<bytes> ic_suffix).decode()] = _columns_dict(tables[index_ic])
         return transfers
 
     @cython.cdivision(True)

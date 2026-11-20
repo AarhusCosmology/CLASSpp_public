@@ -64,6 +64,18 @@ class PerturbationsModule : public BaseModule {
   void perturb_output_firstline_and_ic_suffix(int index_ic,
                                               std::string& first_line,
                                               std::string& ic_suffix) const;
+  /** The transfer functions at redshift z, column by column: one table per initial
+      condition, in the order of index_ic. */
+  std::vector<NamedColumns> GetTransferColumns(file_format output_format, double z) const;
+  /** As GetTransferColumns, at a node of the late-time (ln_tau) sampling. */
+  std::vector<NamedColumns> GetTransferColumnsAtIndexTau(file_format output_format,
+                                                         int index_tau) const;
+  /** The evolution of the perturbations of mode index_md at each of the k_output_values,
+      as in the perturbations_k*.dat files: one table per k, in the order of the input. */
+  std::vector<NamedColumns> GetPerturbationColumns(int index_md) const;
+  /** The redshifts of the late-time sampling ln_tau_, on which P(k,z) and the transfer
+      functions are tabulated, decreasing to today. */
+  std::vector<double> GetLateTimeRedshifts() const;
 
   /** Accessors that expose protected BaseModule pointers to species code. */
   const background* GetBackground() const noexcept {

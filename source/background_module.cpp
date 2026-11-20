@@ -1110,6 +1110,30 @@ void BackgroundModule::background_output_data(int number_of_titles, double* data
   }
 }
 
+NamedColumns BackgroundModule::GetOutputColumns() const {
+  std::string titles;
+  background_output_titles(titles);
+  std::vector<double> data(static_cast<size_t>(get_number_of_titles(titles)) * bt_size_);
+  background_output_data(get_number_of_titles(titles), data.data());
+  return SplitIntoColumns(titles, data.data(), bt_size_);
+}
+
+std::vector<double> BackgroundModule::GetBackgroundAtZ(double z) const {
+  double tau = 0.;
+  background_tau_of_z(z, &tau);
+  std::vector<double> pvecback(bg_size_);
+  int last_index = 0;
+  background_at_tau(tau, pba->long_info, pba->inter_normal, &last_index, pvecback.data());
+  return pvecback;
+}
+
+double BackgroundModule::GetZOfTau(double tau) const {
+  std::vector<double> pvecback(bg_size_short_);
+  int last_index = 0;
+  background_at_tau(tau, pba->short_info, pba->inter_normal, &last_index, pvecback.data());
+  return 1. / pvecback[index_bg_a_] - 1.;
+}
+
 /**
  * Computes background ODE derivatives with respect to conformal time
  * of quantities which are integrated (a, t, etc).

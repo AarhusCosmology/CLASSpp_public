@@ -160,6 +160,16 @@ int get_number_of_titles(const std::string& titlestring);
  * unique. A column's title is its key in classy's dicts and in readers of the
  * .dat files, so a repeated title silently hides one of the two columns. */
 std::string first_duplicate_title(const std::string& titlestring);
+/* An output table as (title, column) pairs, in the order of the titles: what classy
+ * turns into a dict of arrays. A vector rather than a map keeps the .dat file's column
+ * order, which is the order of the keys classy has always returned; SplitIntoColumns
+ * refuses repeated titles. */
+using NamedColumns = std::vector<std::pair<std::string, std::vector<double>>>;
+/* The columns of a table written as the .dat files are: one title per column in a
+ * title string (class_store_columntitle), and the rows one after the other. */
+NamedColumns SplitIntoColumns(const std::string& titlestring,
+                              const double* rows,
+                              int number_of_rows);
 #endif
 
 #endif

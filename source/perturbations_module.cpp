@@ -188,6 +188,13 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
 
   /* if 0 <= z_pk <= z_max_pk, interpolation needed, */
   else {
+    /* ln_tau_ is filled only when there is a late-time sampling to interpolate in. */
+    class_test_severe(ln_tau_size_ <= 1,
+                      "there is no late-time sampling to interpolate in at z=%g: the sources were "
+                      "stored at z=0 only. Pass either a list of redshifts in 'z_pk' or one "
+                      "non-zero value in 'z_max_pk'.",
+                      z);
+
     /* check the time corresponding to the highest redshift requested in output plus one */
     background_module_->background_tau_of_z(z, &tau);
 
@@ -479,6 +486,94 @@ void PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic,
     ic_suffix  = "niv";
     first_line = "for neutrino velocity isocurvature (NIV) mode (normalized to initial entropy=1)";
   }
+}
+
+namespace {
+
+/* One table per initial condition from a block laid out as perturb_store_columns
+   writes it: initial conditions, then k, then titles. */
+std::vector<NamedColumns> SplitPerInitialCondition(const std::string& titles,
+                                                   const std::vector<double>& data,
+                                                   int ic_size,
+                                                   int k_size) {
+  const size_t size_ic_data = static_cast<size_t>(get_number_of_titles(titles)) * k_size;
+  std::vector<NamedColumns> tables;
+  tables.reserve(ic_size);
+  for (int index_ic = 0; index_ic < ic_size; index_ic++) {
+    tables.push_back(SplitIntoColumns(titles, data.data() + index_ic * size_ic_data, k_size));
+  }
+  return tables;
+}
+
+}  // namespace
+
+std::vector<NamedColumns> PerturbationsModule::GetTransferColumns(file_format output_format,
+                                                                  double z) const {
+  const int index_md = index_md_scalars_;
+  std::string titles;
+  perturb_output_titles(output_format, titles);
+  const int number_of_titles = get_number_of_titles(titles);
+  std::vector<double> data(static_cast<size_t>(number_of_titles) * k_size_[index_md] *
+                           ic_size_[index_md]);
+  perturb_output_data(output_format, z, number_of_titles, data.data());
+  return SplitPerInitialCondition(titles, data, ic_size_[index_md], k_size_[index_md]);
+}
+
+std::vector<NamedColumns> PerturbationsModule::GetTransferColumnsAtIndexTau(
+    file_format output_format, int index_tau) const {
+  const int index_md = index_md_scalars_;
+  std::string titles;
+  perturb_output_titles(output_format, titles);
+  const int number_of_titles = get_number_of_titles(titles);
+  std::vector<double> data(static_cast<size_t>(number_of_titles) * k_size_[index_md] *
+                           ic_size_[index_md]);
+  perturb_output_data_at_index_tau(output_format, index_tau, number_of_titles, data.data());
+  return SplitPerInitialCondition(titles, data, ic_size_[index_md], k_size_[index_md]);
+}
+
+std::vector<NamedColumns> PerturbationsModule::GetPerturbationColumns(int index_md) const {
+  class_test_severe(!ppt->has_perturbations,
+                    "the perturbations at k_output_values are stored while the perturbations are "
+                    "computed, and this run computes none. Add an output that needs them, such "
+                    "as tCl or mPk.");
+  // An absent mode has index -1, so the range is checked before the indices are compared.
+  class_test_severe(index_md < 0 || index_md >= md_size_,
+                    "index_md=%d is not a mode of this run",
+                    index_md);
+  const std::string* titles       = &scalar_titles_;
+  const std::vector<double>* data = scalar_perturbations_data_;
+  const int* size_data            = size_scalar_perturbation_data_;
+  if (index_md == index_md_vectors_) {
+    titles    = &vector_titles_;
+    data      = vector_perturbations_data_;
+    size_data = size_vector_perturbation_data_;
+  }
+  else if (index_md == index_md_tensors_) {
+    titles    = &tensor_titles_;
+    data      = tensor_perturbations_data_;
+    size_data = size_tensor_perturbation_data_;
+  }
+  const int number_of_titles = get_number_of_titles(*titles);
+
+  std::vector<NamedColumns> tables;
+  tables.reserve(ppt->k_output_values_num);
+  for (int index_ikout = 0; index_ikout < ppt->k_output_values_num; index_ikout++) {
+    const int number_of_rows = number_of_titles > 0 ? size_data[index_ikout] / number_of_titles : 0;
+    tables.push_back(SplitIntoColumns(*titles, data[index_ikout].data(), number_of_rows));
+  }
+  return tables;
+}
+
+std::vector<double> PerturbationsModule::GetLateTimeRedshifts() const {
+  std::vector<double> z(ln_tau_size_);
+  for (int index_tau = 0; index_tau < ln_tau_size_ - 1; index_tau++) {
+    z[index_tau] = background_module_->GetZOfTau(exp(ln_tau_[index_tau]));
+  }
+  // The sampling ends today: say so exactly rather than to interpolation accuracy.
+  if (ln_tau_size_ > 0) {
+    z[ln_tau_size_ - 1] = 0.;
+  }
+  return z;
 }
 
 /**

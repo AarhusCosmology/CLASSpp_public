@@ -73,3 +73,29 @@ std::string first_duplicate_title(const std::string& titlestring) {
   }
   return {};
 }
+
+NamedColumns SplitIntoColumns(const std::string& titlestring,
+                              const double* rows,
+                              int number_of_rows) {
+  // The background and perturbation titles are checked where they are built; this check
+  // covers every table, so a repeated title can never hide a column in classy's dicts.
+  const std::string duplicate = first_duplicate_title(titlestring);
+  class_test_severe(!duplicate.empty(),
+                    "two columns of one output table are titled '%s'",
+                    duplicate.c_str());
+  // Every title ends with the delimiter, so the delimiters count the columns.
+  const int number_of_titles = get_number_of_titles(titlestring);
+  NamedColumns columns;
+  columns.reserve(number_of_titles);
+  size_t start = 0;
+  for (int index_title = 0; index_title < number_of_titles; index_title++) {
+    const size_t end = titlestring.find('\t', start);
+    std::vector<double> column(number_of_rows);
+    for (int index_row = 0; index_row < number_of_rows; index_row++) {
+      column[index_row] = rows[index_row * number_of_titles + index_title];
+    }
+    columns.emplace_back(titlestring.substr(start, end - start), std::move(column));
+    start = end + 1;
+  }
+  return columns;
+}

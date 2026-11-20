@@ -3825,6 +3825,22 @@ void ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, doub
   }
 }
 
+NamedColumns ThermodynamicsModule::GetOutputColumns() const {
+  std::string titles;
+  thermodynamics_output_titles(titles);
+  std::vector<double> data(static_cast<size_t>(get_number_of_titles(titles)) * tt_size_);
+  thermodynamics_output_data(get_number_of_titles(titles), data.data());
+  return SplitIntoColumns(titles, data.data(), tt_size_);
+}
+
+std::vector<double> ThermodynamicsModule::GetThermodynamicsAtZ(double z) const {
+  const std::vector<double> pvecback = background_module_->GetBackgroundAtZ(z);
+  std::vector<double> pvecthermo(th_size_);
+  int last_index = 0;
+  thermodynamics_at_z(z, inter_normal_, &last_index, pvecback.data(), pvecthermo.data());
+  return pvecthermo;
+}
+
 void ThermodynamicsModule::thermodynamics_tanh(
     double x, double center, double before, double after, double width, double* result) {
   *result = before + (after - before) * (tanh((x - center) / width) + 1.) / 2.;

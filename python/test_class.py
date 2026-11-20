@@ -2549,6 +2549,56 @@ class TestLazyLifecycle(unittest.TestCase):
         self.assertNotEqual(d_before, d_after)
         self.assertAlmostEqual(d_after / d_expected, 1.0, places=10)
 
+    def test_returned_tables_are_the_callers_own(self):
+        # A table must be a copy, not a view into the C++ modules: set() replaces the
+        # Cosmology, and a view would then read freed memory. get_perturbations() used
+        # to return views.
+        cosmo = Class({'output': 'tCl,mPk,dTk', 'k_output_values': '0.01', 'modes': 's,t',
+                       'r': 0.1})
+        try:
+            tables = {
+                'background': lambda: cosmo.get_background()['H [1/Mpc]'],
+                'thermodynamics': lambda: cosmo.get_thermodynamics()['x_e'],
+                'primordial': lambda: cosmo.get_primordial()['P_scalar(k)'],
+                'transfer': lambda: cosmo.get_transfer()['d_cdm'],
+                'scalar perturbations':
+                    lambda: cosmo.get_perturbations()['scalar'][0]['delta_cdm'],
+                'tensor perturbations':
+                    lambda: cosmo.get_perturbations()['tensor'][0]['H (gw)'],
+            }
+            first = {name: table() for name, table in tables.items()}
+            kept = {name: values.copy() for name, values in first.items()}
+            for name, table in tables.items():
+                self.assertFalse(np.shares_memory(first[name], table()), name)
+            cosmo.set({'h': 0.70})
+            cosmo.compute()
+            for name in tables:
+                np.testing.assert_array_equal(first[name], kept[name], err_msg=name)
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_transfers_of_several_initial_conditions_keep_their_order(self):
+        cosmo = Class({'output': 'mPk,dTk', 'ic': 'ad,cdi,nid', 'f_cdi': 0.5, 'f_nid': 0.5})
+        try:
+            transfers = cosmo.get_transfer()
+            self.assertEqual(list(transfers), ['ad', 'cdi', 'nid'])
+            self.assertFalse(np.array_equal(transfers['ad']['d_cdm'], transfers['cdi']['d_cdm']))
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
+    def test_primordial_table_of_a_tensor_only_run(self):
+        # The table used to read the scalar spectrum at mode index -1 and crash.
+        cosmo = Class({'output': 'tCl', 'modes': 't', 'r': 0.1})
+        try:
+            primordial = cosmo.get_primordial()
+            self.assertEqual(list(primordial), ['k [1/Mpc]', 'P_tensor(k)'])
+            self.assertTrue(np.all(primordial['P_tensor(k)'] > 0.))
+        finally:
+            cosmo.struct_cleanup()
+            cosmo.empty()
+
     def test_unread_parameter_raises_at_first_access(self):
         # After set() with a bogus parameter, the first access (not just
         # compute()) must surface the input error instead of silently
@@ -2800,6 +2850,8 @@ class TestQueriesTheRunCannotAnswer(unittest.TestCase):
         'halofit_for_lensing': {'output': 'tCl,lCl', 'lensing': 'yes', 'non_linear': 'halofit',
                                 'l_max_scalars': 300},
         'sigma8_input_no_pk': {'output': 'tCl', 'sigma8': 0.8, 'l_max_scalars': 300},
+        'k_output_without_perturbations': {'output': '', 'k_output_values': '0.1'},
+        'transfers_today_only': {'output': 'mPk,dTk', 'z_max_pk': 0.},
     }
 
     @classmethod
@@ -2832,6 +2884,10 @@ class TestQueriesTheRunCannotAnswer(unittest.TestCase):
         ('raw_cl_above_l_max', 'lensed', lambda c: c.raw_cl(1301)),
         ('raw_cl_no_copy_above_l_max', 'lensed', lambda c: c.raw_cl_no_copy(1301)),
         ('lensed_cl_above_l_max', 'lensed', lambda c: c.lensed_cl(301)),
+        ('perturbations_without_computing_them', 'k_output_without_perturbations',
+         lambda c: c.get_perturbations()),
+        # used to read an empty late-time sampling and crash the interpreter
+        ('transfer_above_z_max_pk_of_zero', 'transfers_today_only', lambda c: c.get_transfer(0.5)),
     ])
     def test_is_severe(self, name, cosmology, query):
         with self.assertRaises(CosmoSevereError):

@@ -32,6 +32,10 @@ class ThermodynamicsModule : public BaseModule {
   ~ThermodynamicsModule();
   void thermodynamics_output_titles(std::string& titles) const;
   void thermodynamics_output_data(int number_of_titles, double* data) const;
+  /** The thermodynamics.dat table, column by column. */
+  NamedColumns GetOutputColumns() const;
+  /** The thermodynamics vector at redshift z; index it with index_th_*. */
+  std::vector<double> GetThermodynamicsAtZ(double z) const;
   void thermodynamics_at_z(double z,
                            short inter_mode,
                            int* last_index,
