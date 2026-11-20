@@ -86,7 +86,7 @@ jobs:
         # in the file, failing, unread. The classyref-comparison tests among them
         # skip themselves when classyref is not installed, which it is not here.
         python -m pytest -v -m "not test_scenario" test_class.py
-        python -m pytest -v test_greybody.py test_hyperspherical.py test_transfer_totals.py
+        python -m pytest -v test_package.py test_greybody.py test_hyperspherical.py test_transfer_totals.py
         # Cobaya's own classy theory driving this wrapper. REQUIRE makes a
         # missing Cobaya fail here instead of skipping the module green.
         pip install cobaya

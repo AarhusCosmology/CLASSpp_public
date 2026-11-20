@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <map>
 #include <utility>
 #include <vector>
@@ -64,27 +65,73 @@ double BackgroundModule::GetOmega0Species(const std::string& key) const {
   return 0.;
 }
 
-bool BackgroundModule::HasSpecies(const std::string& key) const {
-  return all_species_.find(key) != nullptr;
+const DerivedParameterTable<BackgroundModule>& BackgroundModule::DerivedParameters() {
+  // Each value is what classy computed before these moved here, in the same order of
+  // operations.
+  static const DerivedParameterTable<BackgroundModule> table = {
+      {"age", [](const BackgroundModule& m) { return m.age_; }},
+      {"conformal_age", [](const BackgroundModule& m) { return m.conformal_age_; }},
+      // 93.14 eV is the neutrino mass that gives omega = 1.
+      {"m_ncdm_tot",
+       [](const BackgroundModule& m) {
+         return m.GetOmega0NcdmTot() * m.pba->h * m.pba->h * 93.14;
+       }},
+      {"Neff", [](const BackgroundModule& m) { return m.Neff_; }},
+      {"Omega_m", [](const BackgroundModule& m) { return m.Omega0_m_; }},
+      {"omega_m", [](const BackgroundModule& m) { return m.Omega0_m_ * m.pba->h * m.pba->h; }},
+      {"Omega_r", [](const BackgroundModule& m) { return m.Omega0_r_; }},
+      {"Omega_nu", [](const BackgroundModule& m) { return m.GetOmega0NcdmTot(); }},
+      {"k_eq", [](const BackgroundModule& m) { return m.a_eq_ * m.H_eq_; }},
+  };
+  return table;
 }
 
-bool BackgroundModule::HasSpeciesParam(const std::string& key, const std::string& param) const {
-  if (const auto* ptr = all_species_.find(key)) {
-    return (*ptr)->GetParam(param).has_value() || PeakEnergyFraction(**ptr, param).has_value();
+std::vector<std::pair<std::string, double>> BackgroundModule::SpeciesAnswers(
+    const std::string& name) const {
+  std::vector<std::pair<std::string, double>> answers;
+  for (const auto& entry : all_species_) {
+    if (const auto value = entry->GetParam(name)) {
+      answers.emplace_back(entry.key, *value);
+    }
   }
-  return false;
+  return answers;
 }
 
-double BackgroundModule::GetSpeciesParam(const std::string& key, const std::string& param) const {
-  if (const auto* ptr = all_species_.find(key)) {
-    if (auto val = (*ptr)->GetParam(param)) {
-      return *val;
-    }
-    if (auto val = PeakEnergyFraction(**ptr, param)) {
-      return *val;
-    }
+double BackgroundModule::GetInstanceParameter(const std::string& name,
+                                              const std::string& instance,
+                                              const std::string& field) const {
+  const auto* species = all_species_.find(instance);
+  class_test_severe(species == nullptr,
+                    "%s is not a derived parameter of this cosmology: it has no species '%s'",
+                    name.c_str(),
+                    instance.c_str());
+  if (const auto value = (*species)->GetParam(field)) {
+    return *value;
   }
-  return 0.;
+  const auto peak = PeakEnergyFraction(**species, field);
+  class_test_severe(!peak.has_value(),
+                    "%s is not a derived parameter of this cosmology: species '%s' does not "
+                    "report '%s'",
+                    name.c_str(),
+                    instance.c_str(),
+                    field.c_str());
+  return *peak;
+}
+
+double BackgroundModule::GetAngularDistanceFromTo(double z1, double z2) const {
+  if (z1 >= z2) {
+    return 0.;
+  }
+  const double chi1 = GetBackgroundAtZ(z1)[index_bg_conf_distance_];
+  const double chi2 = GetBackgroundAtZ(z2)[index_bg_conf_distance_];
+  const double K    = pba->K;
+  if (K == 0.) {
+    return (chi2 - chi1) / (1 + z2);
+  }
+  if (K > 0.) {
+    return std::sin(std::sqrt(K) * (chi2 - chi1)) / std::sqrt(K) / (1 + z2);
+  }
+  return std::sinh(std::sqrt(-K) * (chi2 - chi1)) / std::sqrt(-K) / (1 + z2);
 }
 
 std::optional<double> BackgroundModule::PeakEnergyFraction(const BaseSpecies& species,
@@ -433,22 +480,6 @@ void BackgroundModule::background_w_fld(double a,
   *w_fld          = -1.;
   *dw_over_da_fld = 0.;
   *integral_fld   = 0.;
-}
-
-double BackgroundModule::f_idr_drmd() const {
-  if (!all_species_.contains("IDM_DRMD_IDR_DRMD")) {
-    return 0.;
-  }
-  return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
-      .f_idr_drmd();
-}
-
-double BackgroundModule::z_dec_drmd() const {
-  if (!all_species_.contains("IDM_DRMD_IDR_DRMD")) {
-    return -1.;
-  }
-  return static_cast<const IDM_DRMD_IDR_DRMD_Species&>(*all_species_.at("IDM_DRMD_IDR_DRMD"))
-      .z_dec_drmd();
 }
 
 /**

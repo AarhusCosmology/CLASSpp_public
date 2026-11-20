@@ -38,9 +38,9 @@ set(CLASS_ARCH_FLAGS "" CACHE STRING
   "Additional architecture flags, e.g. -march=x86-64-v3 or /arch:AVX2")
 
 # The lvl2 nose tests install a second wrapper built from master under the
-# name `classyref`; the import name must therefore be configurable.
+# name `classyref`; the package name must therefore be configurable.
 set(CLASS_PYTHON_MODULE_NAME classy CACHE STRING
-  "Import name of the Python extension module")
+  "Import name of the Python package")
 
 # Single-config generators default to Release (-O3 / /O2, matching the old builds).
 get_property(_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
@@ -286,47 +286,76 @@ if(CLASS_BUILD_PYTHON)
     VERBATIM
   )
 
-  # 2) Cython transpile. Cython derives the module name (PyInit_*) from the
-  #    source filename, so stage classy.pyx in the build dir under the
-  #    requested module name. (cclassy.pxi is found via -I <build dir>.)
-  set(_class_pyx ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME}.pyx)
+  # 2) Cython transpile of the core. The module is always classy._core (PyInit__core); a
+  #    renamed build (CLASS_PYTHON_MODULE_NAME) installs the package under another name, and
+  #    --module-name makes its classes and tracebacks say so (classyref._core.PyCosmology).
+  #    (cclassy.pxi is found via -I <build dir>.)
+  set(_class_pkg_src ${PROJECT_SOURCE_DIR}/src/classy)
   add_custom_command(
-    OUTPUT ${_class_pyx}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/classy.pyx ${_class_pyx}
-    DEPENDS ${PROJECT_SOURCE_DIR}/classy.pyx
-    COMMENT "Staging ${CLASS_PYTHON_MODULE_NAME}.pyx"
-    VERBATIM
-  )
-  add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME}.cpp
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_core.cpp
     COMMAND Python::Interpreter -m cython -3 --cplus
+            --module-name ${CLASS_PYTHON_MODULE_NAME}._core
             -I ${CMAKE_CURRENT_BINARY_DIR}
-            -o ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME}.cpp
-            ${_class_pyx}
-    DEPENDS ${_class_pyx} ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxi
-    COMMENT "Cythonizing ${CLASS_PYTHON_MODULE_NAME}.pyx"
+            -o ${CMAKE_CURRENT_BINARY_DIR}/_core.cpp
+            ${_class_pkg_src}/_core.pyx
+    DEPENDS ${_class_pkg_src}/_core.pyx ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxi
+    COMMENT "Cythonizing _core.pyx"
     VERBATIM
   )
 
-  # 3) The extension module.
-  python_add_library(${CLASS_PYTHON_MODULE_NAME} MODULE
-    ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME}.cpp WITH_SOABI)
-  target_link_libraries(${CLASS_PYTHON_MODULE_NAME} PRIVATE classpp Python::NumPy)
-  target_compile_definitions(${CLASS_PYTHON_MODULE_NAME} PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
-  set_target_properties(${CLASS_PYTHON_MODULE_NAME} PROPERTIES
+  # 3) The extension module, built straight into a package directory in the build tree, so
+  #    that PYTHONPATH=<build dir> imports a runnable package (see 4).
+  set(_class_pkg_dir ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME})
+  python_add_library(classy_core MODULE ${CMAKE_CURRENT_BINARY_DIR}/_core.cpp WITH_SOABI)
+  target_link_libraries(classy_core PRIVATE classpp Python::NumPy)
+  target_compile_definitions(classy_core PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
+  set_target_properties(classy_core PROPERTIES
+    OUTPUT_NAME _core
+    # $<1:...>: multi-config generators (Xcode, Visual Studio) would add a per-config
+    # subdirectory to a plain path, and the package would not be importable from the build tree.
+    LIBRARY_OUTPUT_DIRECTORY $<1:${_class_pkg_dir}>
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
   )
 
-  # 4) Wheel layout — identical to the old setup.py wheel:
-  #    classy.<soabi>.so at the root, data under classy/{bbn,hyrec}.
-  #    (The data stays under classy/ even for a renamed module — that matches
-  #    the old classyref wheels and classy.pyx's runtime lookup.)
+  # 4) The rest of the package next to it in the build tree: the plain-Python modules, copied
+  #    on every build so that edits are picked up, and the data, linked (copied where links
+  #    are not possible).
+  file(GLOB _class_pkg_py CONFIGURE_DEPENDS ${_class_pkg_src}/*.py)
+  set(_class_pkg_py_out)
+  foreach(_py ${_class_pkg_py})
+    get_filename_component(_py_name ${_py} NAME)
+    add_custom_command(
+      OUTPUT ${_class_pkg_dir}/${_py_name}
+      COMMAND ${CMAKE_COMMAND} -E copy ${_py} ${_class_pkg_dir}/${_py_name}
+      DEPENDS ${_py}
+      VERBATIM
+    )
+    list(APPEND _class_pkg_py_out ${_class_pkg_dir}/${_py_name})
+  endforeach()
+  add_custom_target(classy_python_files ALL DEPENDS ${_class_pkg_py_out})
+  add_dependencies(classy_core classy_python_files)
+  file(GLOB _class_bbn_data CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/bbn/*.dat)
+  file(GLOB _class_hyrec_data CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/hyrec/*.dat)
+  foreach(_subdir bbn hyrec)
+    file(MAKE_DIRECTORY ${_class_pkg_dir}/data/${_subdir})
+  endforeach()
+  foreach(_dat ${_class_bbn_data})
+    get_filename_component(_dat_name ${_dat} NAME)
+    file(CREATE_LINK ${_dat} ${_class_pkg_dir}/data/bbn/${_dat_name} SYMBOLIC COPY_ON_ERROR)
+  endforeach()
+  foreach(_dat ${_class_hyrec_data})
+    get_filename_component(_dat_name ${_dat} NAME)
+    file(CREATE_LINK ${_dat} ${_class_pkg_dir}/data/hyrec/${_dat_name} SYMBOLIC COPY_ON_ERROR)
+  endforeach()
+
+  # 5) Wheel layout: the package <name>/ with __init__.py and the other modules, _core.<soabi>.so
+  #    and data/{bbn,hyrec}. Each renamed build (classyref) carries its own data, so two of
+  #    them never share a file.
   if(SKBUILD)
-    install(TARGETS ${CLASS_PYTHON_MODULE_NAME} LIBRARY DESTINATION .)
-    file(GLOB _class_bbn_data ${PROJECT_SOURCE_DIR}/bbn/*.dat)
-    file(GLOB _class_hyrec_data ${PROJECT_SOURCE_DIR}/hyrec/*.dat)
-    install(FILES ${_class_bbn_data} DESTINATION classy/bbn)
-    install(FILES ${_class_hyrec_data} DESTINATION classy/hyrec)
+    install(TARGETS classy_core LIBRARY DESTINATION ${CLASS_PYTHON_MODULE_NAME})
+    install(FILES ${_class_pkg_py} DESTINATION ${CLASS_PYTHON_MODULE_NAME})
+    install(FILES ${_class_bbn_data} DESTINATION ${CLASS_PYTHON_MODULE_NAME}/data/bbn)
+    install(FILES ${_class_hyrec_data} DESTINATION ${CLASS_PYTHON_MODULE_NAME}/data/hyrec)
   endif()
 endif()

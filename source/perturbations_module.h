@@ -76,6 +76,10 @@ class PerturbationsModule : public BaseModule {
   /** The redshifts of the late-time sampling ln_tau_, on which P(k,z) and the transfer
       functions are tabulated, decreasing to today. */
   std::vector<double> GetLateTimeRedshifts() const;
+  /** The k axis of the scalar transfer grids (classy's get_transfer_and_k_and_z). Refuses
+   *  (severe) without dTk or vTk in the output, without scalar modes, and with more than one
+   *  initial condition, which the grids have no axis for. */
+  std::vector<double> GetScalarTransferK() const;
 
   /** Accessors that expose protected BaseModule pointers to species code. */
   const background* GetBackground() const noexcept {

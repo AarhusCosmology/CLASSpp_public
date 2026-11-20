@@ -170,10 +170,14 @@ class BaseSpecies {
    */
   virtual void SetPerturbs(const perturbs* /*ppt*/) {}
 
-  /** Generic species-param accessor for the Python wrapper layer and
-   *  cross-module readers that don't want to downcast.  Each species
-   *  may opt in by overriding this and returning the named param;
-   *  default is std::nullopt. */
+  /** The derived parameters this species answers, by name; std::nullopt for any other
+   *  name. Overriding this is all it takes to offer a new one: Cosmology::GetDerivedParameter
+   *  (classy's get_current_derived_parameters) asks every species for a name no module owns,
+   *  and "<instance>.<name>" asks this instance alone. Two species answering one plain name
+   *  is an error that tells the caller to use the dotted form. A name a module owns keeps the
+   *  module's meaning: NEDE's z_star is reachable only as "NEDE.z_star". Every species also
+   *  gives f_peak, a_peak and z_peak, the peak of its energy fraction, in the dotted form,
+   *  from the background table. A composite answers for its children. */
   virtual std::optional<double> GetParam(const std::string& /*name*/) const {
     return std::nullopt;
   }

@@ -36,6 +36,8 @@ class ThermodynamicsModule : public BaseModule {
   NamedColumns GetOutputColumns() const;
   /** The thermodynamics vector at redshift z; index it with index_th_*. */
   std::vector<double> GetThermodynamicsAtZ(double z) const;
+  /** The named derived parameters this module answers (see DerivedParameterTable). */
+  static const DerivedParameterTable<ThermodynamicsModule>& DerivedParameters();
   void thermodynamics_at_z(double z,
                            short inter_mode,
                            int* last_index,

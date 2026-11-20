@@ -12,7 +12,7 @@ import sys
 import sysconfig
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Never import a stray in-repo classy/ directory (dev symlink hack).
+# Never import from the repository root (an old dev symlink hack put a classy/ there).
 sys.path = [p for p in sys.path
             if os.path.abspath(p if p else os.getcwd()) != repo_root]
 import classy  # noqa: E402
@@ -22,7 +22,7 @@ libdir = os.path.join(
     'lib.{}.{}-{}'.format(sys.version, sysconfig.get_platform(),
                           sys.implementation.cache_tag))
 os.makedirs(libdir, exist_ok=True)
-shutil.copy2(classy.__file__, libdir)
-data_dir = os.path.join(os.path.dirname(classy.__file__), 'classy')
-shutil.copytree(data_dir, os.path.join(libdir, 'classy'), dirs_exist_ok=True)
+# classy is a package (classy/__init__.py, _core.<soabi>.so, data/): copy it whole.
+shutil.copytree(os.path.dirname(classy.__file__), os.path.join(libdir, 'classy'),
+                dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))
 print('MontePython layout created at', libdir)

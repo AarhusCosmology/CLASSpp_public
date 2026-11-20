@@ -21,13 +21,17 @@ void IDM_DR_IDR_Species::RegisterTransferSourceIndices(int& index_tp,
 }
 
 std::optional<double> IDM_DR_IDR_Species::GetParam(const std::string& name) const {
-  if (name == "T_idr") {
+  // The composite exists when either part does; each name needs the part it reads.
+  if (name == "T_idr" && has_idr()) {
     return idr().T_idr();
   }
-  if (name == "a_idm_dr") {
+  if ((name == "a_idm_dr" || name == "a_dark") && has_idm_dr()) {
     return idm_dr().a_idm_dr();
   }
-  return std::nullopt;
+  if (name == "Gamma_0_nadm" && has_idm_dr() && has_idr()) {
+    return idm_dr().a_idm_dr() * (4. / 3.) * (pba_.h * pba_.h * idr().GetOmega0());
+  }
+  return CompositeSpecies::GetParam(name);  // N_dg and xi_idr from the IDR
 }
 
 void IDM_DR_IDR_Species::WarnIfNonlinearUnreliable(double m_ev_threshold) const {

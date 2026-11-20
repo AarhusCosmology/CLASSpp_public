@@ -55,7 +55,7 @@ class AxionEDEFluid : public FluidSpecies {
   void SetBackgroundModule(const BackgroundModule* bgm) override;
 
   /** Derived diagnostics, reached from the Python wrapper as
-   *  "Fluid.<name>" (BackgroundModule::GetSpeciesParam): the input transition
+   *  "Fluid.<name>" (Cosmology::GetDerivedParameter): the input transition
    *  scale "a_c" and exponent "n_axion", and the scales DeriveAxionScales
    *  reconstructs from them -- "m_fld" (axion mass in units of H0), "alpha_fld"
    *  (decay constant, reduced-Planck units) and "omega_axion" (oscillation

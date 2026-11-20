@@ -5,6 +5,7 @@
 #include "primordial_module.h"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 #include "dei_rkck.h"
@@ -2916,6 +2917,82 @@ void PrimordialModule::primordial_output_data(int number_of_titles, double* data
                        ppt->has_tensors,
                        storeidx);
   }
+}
+
+namespace {
+// Euler's constant and ln 2, with numpy's digits (classy used numpy.math's EULER and LOGE2).
+constexpr double kEulerGamma = 0.577215664901532860606512090082402431;
+constexpr double kLogOf2     = 0.693147180559945309417232121458176568;
+
+/** The slow-roll parameters epsilon_1, epsilon_2 and epsilon_2 epsilon_3 from r, n_s and
+ *  alpha_s at the pivot scale, to second order. */
+struct SlowRoll {
+  double eps1;
+  double eps2;
+  double eps23;
+};
+
+SlowRoll SlowRollParameters(const PrimordialModule& m) {
+  const double r       = m.r_;
+  const double n_s     = m.n_s_;
+  const double alpha_s = m.alpha_s_;
+  const double C       = kEulerGamma + kLogOf2 - 2.0;
+  SlowRoll sr{};
+  sr.eps1  = r * (1. / 16. + C / 16. * (r / 8. + n_s - 1.));
+  sr.eps2  = -n_s + 1. + C * alpha_s - r * (1. / 8. + 1. / 8. * (n_s - 1.) * (C - 1.5)) -
+             (r / 8.) * (r / 8.) * (C - 1.);
+  sr.eps23 = 1. / 8. * (r * r / 8. + (n_s - 1.) * r - 8. * alpha_s);
+  return sr;
+}
+}  // namespace
+
+const DerivedParameterTable<PrimordialModule>& PrimordialModule::DerivedParameters() {
+  using M = PrimordialModule;
+  // Each value is what classy computed before these moved here, in the same order of
+  // operations.
+  static const DerivedParameterTable<M> table = {
+      {"A_s", [](const M& m) { return m.A_s_; }},
+      {"ln10^{10}A_s", [](const M& m) { return std::log(1.e10 * m.A_s_); }},
+      {"n_s", [](const M& m) { return m.n_s_; }},
+      {"alpha_s", [](const M& m) { return m.alpha_s_; }},
+      {"beta_s", [](const M& m) { return m.beta_s_; }},
+      {"r", [](const M& m) { return m.r_; }},  // at the pivot scale
+      {"r_0002",                               // at k = 0.002/Mpc
+       [](const M& m) {
+         const double ratio = 0.002 / m.ppm->k_pivot;
+         return m.r_ * std::pow(ratio, m.n_t_ - m.n_s_ - 1 + 0.5 * m.alpha_s_ * std::log(ratio));
+       }},
+      {"n_t", [](const M& m) { return m.n_t_; }},
+      {"alpha_t", [](const M& m) { return m.alpha_t_; }},
+      {"V_0", [](const M& m) { return m.ppm->V0; }},
+      {"V_1", [](const M& m) { return m.ppm->V1; }},
+      {"V_2", [](const M& m) { return m.ppm->V2; }},
+      {"V_3", [](const M& m) { return m.ppm->V3; }},
+      {"V_4", [](const M& m) { return m.ppm->V4; }},
+      {"epsilon_V",
+       [](const M& m) {
+         const SlowRoll sr = SlowRollParameters(m);
+         const double f    = (1. - sr.eps1 / 3. + sr.eps2 / 6.) / (1. - sr.eps1 / 3.);
+         return sr.eps1 * (f * f);
+       }},
+      {"eta_V",
+       [](const M& m) {
+         const SlowRoll sr = SlowRollParameters(m);
+         return (2. * sr.eps1 - sr.eps2 / 2. - 2. / 3. * (sr.eps1 * sr.eps1) +
+                 5. / 6. * sr.eps1 * sr.eps2 - sr.eps2 * sr.eps2 / 12. - sr.eps23 / 6.) /
+                (1. - sr.eps1 / 3.);
+       }},
+      {"ksi_V^2",
+       [](const M& m) {
+         const SlowRoll sr = SlowRollParameters(m);
+         const double d    = 1. - sr.eps1 / 3.;
+         return 2. * (1. - sr.eps1 / 3. + sr.eps2 / 6.) *
+                (2. * (sr.eps1 * sr.eps1) - 3. / 2. * sr.eps1 * sr.eps2 + sr.eps23 / 4.) / (d * d);
+       }},
+      {"phi_min", [](const M& m) { return m.phi_min_; }},
+      {"phi_max", [](const M& m) { return m.phi_max_; }},
+  };
+  return table;
 }
 
 NamedColumns PrimordialModule::GetOutputColumns() const {

@@ -30,6 +30,14 @@ class LambdaSpecies : public BaseSpecies {
     return Omega0_lambda_;
   }
 
+  /** Derived parameters (Cosmology::GetDerivedParameter): Omega_Lambda, also as Omega0_lambda. */
+  std::optional<double> GetParam(const std::string& name) const override {
+    if (name == "Omega_Lambda" || name == "Omega0_lambda") {
+      return Omega0_lambda_;
+    }
+    return std::nullopt;
+  }
+
   // ── Perturbation Layout ────────────────────────────────────────────────────
   // Lambda has no perturbation slots; the layout is empty.
   struct PerturbLayout : BaseSpecies::PerturbLayout {};

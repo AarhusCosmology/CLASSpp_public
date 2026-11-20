@@ -259,6 +259,24 @@ class CompositeSpecies : public BaseSpecies {
     return k_fs;
   }
 
+  /** A composite answers for its children (IDR inside IDM_DR_IDR answers N_dg as a lone IDR
+   *  would). A composite with names of its own, such as its coupling, answers those and
+   *  falls back to this. Two children answering one name is an error: the caller could not
+   *  tell which one it got. */
+  std::optional<double> GetParam(const std::string& param) const override {
+    std::optional<double> answer;
+    for (const auto& c : children_) {
+      if (const auto value = c->GetParam(param)) {
+        class_test_severe(answer.has_value(),
+                          "two parts of the composite species '%s' answer '%s'",
+                          name().c_str(),
+                          param.c_str());
+        answer = value;
+      }
+    }
+    return answer;
+  }
+
   /** Looks the name up among the children only. */
   std::optional<double> ChildOmega0(const std::string& name) const override {
     for (const auto& c : children_) {

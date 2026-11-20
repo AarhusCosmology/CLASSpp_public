@@ -892,6 +892,26 @@ void NonlinearModule::GetPkGrid(enum pk_outputs pk_output,
  * @return sigma8
  */
 
+double NonlinearModule::GetSigma(double R, double z, int index_pk) const {
+  class_test_severe(!ppt->has_pk_matter,
+                    "Power spectrum not computed. In order to get sigma(R, z) you must add mPk to "
+                    "the list of outputs.");
+  class_test_severe(ppt->k_max_for_pk < pba->h,
+                    "In order to get sigma(R,z) you must set 'P_k_max_h/Mpc' to 1 or bigger, in "
+                    "order to have k_max > 1 h/Mpc.");
+  double sigma = 0.;
+  nonlinear_sigmas_at_z(R, z, index_pk, out_sigma, &sigma);
+  return sigma;
+}
+
+const DerivedParameterTable<NonlinearModule>& NonlinearModule::DerivedParameters() {
+  static const DerivedParameterTable<NonlinearModule> table = {
+      {"sigma8", [](const NonlinearModule& m) { return m.GetSigma8(m.index_pk_m_); }},
+      {"sigma8_cb", [](const NonlinearModule& m) { return m.GetSigma8(m.index_pk_cluster_); }},
+  };
+  return table;
+}
+
 double NonlinearModule::GetSigma8(int index_pk) const {
   class_test_severe(!has_pk_m_,
                     "sigma8 needs the matter power spectrum, which was not computed. Add 'mPk' to "
@@ -1000,6 +1020,11 @@ void NonlinearModule::nonlinear_sigmas_at_z(
  */
 
 void NonlinearModule::nonlinear_k_nl_at_z(double z, double* k_nl, double* k_nl_cb) const {
+  // k_nl_ is filled by the nonlinear method only; without one it is empty, and reading it
+  // crashed (classy's nonlinear_scale in a linear run, until 2026-11-20).
+  class_test_severe(pnl->method == nl_none,
+                    "the nonlinear scale k_nl is computed only by a nonlinear method; set "
+                    "'non_linear' to 'halofit' or 'hmcode'");
   double tau;
 
   /** - convert input redshift into a conformal time */

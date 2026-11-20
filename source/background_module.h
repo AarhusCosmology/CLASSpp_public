@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base_module.h"
@@ -34,6 +35,21 @@ class BackgroundModule : public BaseModule {
   std::vector<double> GetBackgroundAtZ(double z) const;
   /** The redshift at conformal time tau. */
   double GetZOfTau(double tau) const;
+  /** Angular diameter distance of an object at z2 as seen by an observer at z1,
+   *  sin_K((chi2 - chi1) sqrt|K|)/sqrt|K|/(1 + z2). Zero if z1 >= z2. */
+  double GetAngularDistanceFromTo(double z1, double z2) const;
+
+  /** The named derived parameters this module answers (see DerivedParameterTable). */
+  static const DerivedParameterTable<BackgroundModule>& DerivedParameters();
+  /** Every species that answers `name` through GetParam, as (instance key, value), in
+   *  all_species_ order. A composite answers for its children. */
+  std::vector<std::pair<std::string, double>> SpeciesAnswers(const std::string& name) const;
+  /** `field` of the species instance `instance` alone: its GetParam, else the peak of its
+   *  energy fraction (f_peak, a_peak, z_peak). Severe if there is no such instance, or if
+   *  it does not answer. `name` is the whole request, for the message. */
+  double GetInstanceParameter(const std::string& name,
+                              const std::string& instance,
+                              const std::string& field) const;
   void background_w_fld(double a,
                         double* w_fld,
                         double* dw_over_da_fld,
@@ -42,24 +58,6 @@ class BackgroundModule : public BaseModule {
   /** Sum of GetOmega0() across all NCDM-family species (NCDM, NCDMInteracting,
    *  and the DNCDMSpecies child of every DNCDM_DR_Species composite). */
   double GetOmega0NcdmTot() const;
-
-  /** True iff a species with this all_species_ key is present. Lets a caller
-   *  (the Python wrapper) refuse an unknown key instead of reporting the 0.0
-   *  GetSpeciesParam returns for a species that is not there. */
-  bool HasSpecies(const std::string& key) const;
-
-  /** Generic look-up: find species by all_species_ key, then call
-   *  GetParam(param).  Falls back to the table-derived parameters every
-   *  species can answer (see PeakEnergyFraction).  Returns 0.0 if the
-   *  species or the parameter is absent.  Used by the Python wrapper to read
-   *  species-specific quantities without downcasting. */
-  double GetSpeciesParam(const std::string& key, const std::string& param) const;
-
-  /** True iff `key` names a present species that answers `param`.  This is the
-   *  existence question behind GetSpeciesParam's 0.0-when-absent value: without
-   *  it a caller cannot tell "this species has no such parameter" (say
-   *  `CDM.m_fld`) from "the parameter is zero", since both read back as 0.0. */
-  bool HasSpeciesParam(const std::string& key, const std::string& param) const;
 
   /** @name - all indices for the vector of background (=bg) quantities stored in table */
 
@@ -126,12 +124,6 @@ class BackgroundModule : public BaseModule {
   double Omega0_idr_drmd_ = 0.0;
   double Omega0_idm_drmd_ = 0.0;
   double Omega0_idm_      = 0.0;
-
-  // DRMD diagnostics exposed to the Python wrapper. The data now lives on
-  // IDM_DRMD_IDR_DRMD_Species (#319); these delegate to it (neutral values if
-  // no DRMD species is present).
-  double f_idr_drmd() const;
-  double z_dec_drmd() const;
 
   /** True while background_functions is filling a STORED row of background_table_
    *  (return_format == long_info), false during the trial evaluations the evolver

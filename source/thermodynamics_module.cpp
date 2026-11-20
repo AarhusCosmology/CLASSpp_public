@@ -3833,6 +3833,67 @@ NamedColumns ThermodynamicsModule::GetOutputColumns() const {
   return SplitIntoColumns(titles, data.data(), tt_size_);
 }
 
+namespace {
+// The abundances other than Y_He come from the solved BBN network only: the sBBN
+// interpolation table gives Y_He alone. A zero would look like a result, so refuse.
+double BbnNetworkAbundance(const ThermodynamicsModule& thermo, const char* name, double value) {
+  class_test_severe(!thermo.bbn_network_ran_,
+                    "%s is only computed by the solved BBN network. Set 'YHe' to 'network' to "
+                    "obtain it; the sBBN interpolation table provides Y_He only.",
+                    name);
+  return value;
+}
+
+// The photon damping scale is computed only on request.
+double DampingAngle100(bool damping_scale_computed, double rd_rec, double ra_rec) {
+  class_test_severe(!damping_scale_computed,
+                    "Photon damping scale has not been computed - you must add "
+                    "'compute damping scale':'yes'.");
+  return 100. * rd_rec / ra_rec;
+}
+}  // namespace
+
+const DerivedParameterTable<ThermodynamicsModule>& ThermodynamicsModule::DerivedParameters() {
+  using M = ThermodynamicsModule;
+  // Each value is what classy computed before these moved here, in the same order of
+  // operations.
+  static const DerivedParameterTable<M> table = {
+      {"tau_reio", [](const M& m) { return m.tau_reionization_; }},
+      {"z_reio", [](const M& m) { return m.z_reionization_; }},
+      {"z_rec", [](const M& m) { return m.z_rec_; }},
+      {"tau_rec", [](const M& m) { return m.tau_rec_; }},
+      {"rs_rec", [](const M& m) { return m.rs_rec_; }},
+      {"ds_rec", [](const M& m) { return m.ds_rec_; }},
+      {"ra_rec", [](const M& m) { return m.ra_rec_; }},
+      {"da_rec", [](const M& m) { return m.da_rec_; }},
+      {"z_star", [](const M& m) { return m.z_star_; }},
+      {"tau_star", [](const M& m) { return m.tau_star_; }},
+      {"rs_star", [](const M& m) { return m.rs_star_; }},
+      {"ds_star", [](const M& m) { return m.ds_star_; }},
+      {"ra_star", [](const M& m) { return m.ra_star_; }},
+      {"da_star", [](const M& m) { return m.da_star_; }},
+      {"rd_star", [](const M& m) { return m.rd_star_; }},
+      {"z_d", [](const M& m) { return m.z_d_; }},
+      {"tau_d", [](const M& m) { return m.tau_d_; }},
+      {"ds_d", [](const M& m) { return m.ds_d_; }},
+      {"rs_d", [](const M& m) { return m.rs_d_; }},
+      {"100*theta_s", [](const M& m) { return 100. * m.rs_rec_ / m.ra_rec_; }},
+      {"100*theta_star", [](const M& m) { return 100. * m.rs_star_ / m.ra_star_; }},
+      {"100*theta_d",
+       [](const M& m) {
+         return DampingAngle100(m.pth->compute_damping_scale, m.rd_rec_, m.ra_rec_);
+       }},
+      {"YHe", [](const M& m) { return m.YHe_; }},
+      {"D_H", [](const M& m) { return BbnNetworkAbundance(m, "D_H", m.DoverH_); }},
+      {"He3_H", [](const M& m) { return BbnNetworkAbundance(m, "He3_H", m.He3overH_); }},
+      {"Li7_H", [](const M& m) { return BbnNetworkAbundance(m, "Li7_H", m.Li7overH_); }},
+      {"Li6_H", [](const M& m) { return BbnNetworkAbundance(m, "Li6_H", m.Li6overH_); }},
+      {"eta10", [](const M& m) { return BbnNetworkAbundance(m, "eta10", m.bbn_eta10_); }},
+      {"n_e", [](const M& m) { return m.n_e_; }},
+  };
+  return table;
+}
+
 std::vector<double> ThermodynamicsModule::GetThermodynamicsAtZ(double z) const {
   const std::vector<double> pvecback = background_module_->GetBackgroundAtZ(z);
   std::vector<double> pvecthermo(th_size_);

@@ -48,6 +48,7 @@ class_unit_test(test-scf-multi-instance species/scalar_field_multi_instance_test
 class_unit_test(test-axion-ede-fluid species/axion_ede_fluid_test.cpp)
 class_unit_test(test-fluid-closure species/fluid_closure_test.cpp)
 class_unit_test(test-dark-energy-budget source/dark_energy_budget_test.cpp)
+class_unit_test(test-derived-parameters source/derived_parameters_test.cpp)
 class_unit_test(test-dcdm-wdm species/dcdm_wdm_test.cpp)
 class_unit_test(test-axion-ncdm species/axion_ncdm_test.cpp)
 class_unit_test(test-dncdm-switch-copy species/dncdm_switch_copy_test.cpp)

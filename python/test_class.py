@@ -1617,11 +1617,11 @@ class TestReviewRegressions(TestClass):
         for name in ('Fluid.m_fld', 'Fluid.alpha_fld', 'Fluid.omega_axion'):
             self.assertGreater(derived[name], 0., msg=name)
 
-        # GetSpeciesParam answers an unknown name with 0.0, so the wrapper must
-        # keep refusing names it does not know rather than reporting that 0:
-        # an unlisted field, a species that is not there, and -- the case the
-        # whitelist alone cannot catch -- a listed field this species does not
-        # answer. Raised in Copilot's review of PR #428.
+        # A name nothing answers must be refused, not reported as 0: a field
+        # no species knows, a species that is not there, and a field another
+        # species knows but this one does not answer. Raised in Copilot's
+        # review of PR #428; the refusals are Cosmology::GetDerivedParameter's
+        # since #504.
         for bad in ('Fluid.f_pea', 'NoSuchSpecies.f_peak', 'CDM.m_fld',
                     'Fluid.M_2'):
             with self.assertRaises(CosmoSevereError, msg=bad):
@@ -3459,6 +3459,68 @@ class TestHMcode(unittest.TestCase):
         with self.assertRaises(CosmoComputationError) as ctx:
             self.cosmo.compute()
         self.assertIn('extrapolated beyond k_max', str(ctx.exception))
+
+@pytest.mark.test_scenario
+class TestDerivedParametersMatchReference(unittest.TestCase):
+    """The derived parameters and the scalar getters give classyref's values.
+
+    They are computed in C++ since #504 (Cosmology::GetDerivedParameter); before, classy
+    read each from a struct field by name. A name routed to the wrong field (rs_drag reading
+    rs_rec, say) shows here, in CI's level-2 job, where classyref is master. omega_m is left
+    out: master returned Omega_m/h^2 until #504. Values agree to 1e-3, as the C_l comparisons
+    allow 3e-3: a PR that changes the physics by more fails here too, by design. Two builds of
+    the same code (fast-math on and off) differ by 5e-7. Names closer than 1e-3 (ra_rec and
+    ra_star are 1e-4 apart) are pinned by test_package.py's relations instead."""
+
+    COSMOLOGIES = {
+        'lcdm': {'output': 'tCl,mPk', 'P_k_max_h/Mpc': 1., 'compute damping scale': 'yes'},
+        'tensors_ncdm': {'output': 'tCl,mPk', 'P_k_max_h/Mpc': 1., 'modes': 's,t', 'r': 0.1,
+                         'N_ur': 2.0328, 'N_ncdm': 1, 'm_ncdm': 0.06},
+        'idm_dr': {'output': 'tCl', 'Omega_idm_dr': 0.12, 'xi_idr': 0.3, 'a_idm_dr': 1e-4},
+        'pheno_axion': {'output': 'tCl', 'fluid_equation_of_state': 'pheno_axion',
+                        'n_pheno_axion': 3, 'log10_axion_ac': -3.5, 'fraction_fld_ac': 0.1,
+                        'Theta_initial_fld': 2.8},
+    }
+    NAMES = [
+        'h', 'H0', 'Omega0_lambda', 'Omega_Lambda', 'Omega0_fld', 'age', 'conformal_age',
+        'm_ncdm_tot', 'Neff', 'Omega_m', 'Omega_g', 'xi_idr', 'N_dg', 'Gamma_0_nadm', 'a_dark',
+        'tau_reio', 'z_reio', 'z_rec', 'tau_rec', 'rs_rec', 'ds_rec', 'ra_rec', 'da_rec',
+        'z_star', 'tau_star', 'rs_star', 'ds_star', 'ra_star', 'da_star', 'rd_star', 'z_d',
+        'tau_d', 'ds_d', 'rs_d', '100*theta_s', '100*theta_star', '100*theta_d', 'YHe', 'D_H',
+        'n_e', 'A_s', 'ln10^{10}A_s', 'n_s', 'alpha_s', 'r', 'r_0002', 'n_t', 'epsilon_V',
+        'eta_V', 'ksi_V^2', 'exp_m_2_tau_As', 'sigma8', 'sigma8_cb', 'k_eq', 'z_dec_drmd',
+        'f_idr_drmd', 'rs_rec_h', 'ds_d_h', 'rs_d_h', 'Fluid.f_peak', 'Fluid.a_c',
+        'no_such_parameter',
+    ]
+    GETTERS = ['A_s', 'Neff', 'Omega0_cdm', 'Omega0_k', 'Omega0_m', 'Omega_Lambda', 'Omega_b',
+               'Omega_g', 'Omega_m', 'Omega_r', 'T_cmb', 'age', 'h', 'k_eq', 'n_s', 'omega_b',
+               'rs_drag', 'sigma8', 'tau_reio', 'theta_s_100', 'theta_star_100', 'z_reio']
+
+    @staticmethod
+    def _result_of(f):
+        try:
+            return f()
+        except Exception as e:  # the exception class is part of the behaviour
+            return type(e).__name__
+
+    def test_derived_parameters_match_reference(self):
+        if not COMPARE_OUTPUT_REF:
+            self.skipTest('compares with classyref: set COMPARE_OUTPUT_REF=1')
+        for case, pars in self.COSMOLOGIES.items():
+            candidate, reference = Class(pars), classyref.Class(pars)
+            asked = [('derived ' + name, name,
+                      lambda c, n=name: c.get_current_derived_parameters([n])[n])
+                     for name in self.NAMES]
+            asked += [('getter ' + g, g, lambda c, g=g: getattr(c, g)()) for g in self.GETTERS]
+            for label, name, ask in asked:
+                with self.subTest(case=case, asked=label):
+                    new, ref = self._result_of(lambda: ask(candidate)), self._result_of(lambda: ask(reference))
+                    if isinstance(ref, str) or isinstance(new, str):
+                        self.assertEqual(new, ref)
+                    else:
+                        np.testing.assert_allclose(new, ref, rtol=1e-3, atol=1e-300)
+            candidate.struct_cleanup()
+            reference.struct_cleanup()
 
 if __name__ == '__main__':
     toto = TestClass()

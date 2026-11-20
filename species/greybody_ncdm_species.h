@@ -70,7 +70,7 @@ class GreyBodyNCDMSpecies : public NCDMSpecies {
 
   static std::vector<Named> CreateAll(const SpeciesBuildContext& ctx);
 
-  // Per-species derived parameters surfaced via BackgroundModule::GetSpeciesParam.
+  // Per-species derived parameters, asked for through Cosmology::GetDerivedParameter.
   std::optional<double> GetParam(const std::string& name) const override;
 
  protected:

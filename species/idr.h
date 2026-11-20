@@ -36,6 +36,18 @@ class IDRSpecies : public BaseSpecies {
   double T_idr() const {
     return T_idr_;
   }
+
+  /** Derived parameters (Cosmology::GetDerivedParameter): N_dg, the effective number of
+   *  dark-radiation species, and xi_idr = T_idr/T_cmb. */
+  std::optional<double> GetParam(const std::string& name) const override {
+    if (name == "N_dg") {
+      return GetOmega0() / pba_.Omega0_g * 8. / 7. * std::pow(11. / 4., 4. / 3.);
+    }
+    if (name == "xi_idr") {
+      return T_idr_ / pba_.T_cmb;
+    }
+    return std::nullopt;
+  }
   int l_max_idr() const {
     return l_max_idr_;
   }

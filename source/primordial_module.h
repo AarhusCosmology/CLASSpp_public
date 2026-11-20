@@ -18,6 +18,8 @@ class PrimordialModule : public BaseModule {
   void primordial_output_data(int number_of_titles, double* data) const;
   /** The primordial spectra table (primordial_Pk.dat), column by column. */
   NamedColumns GetOutputColumns() const;
+  /** The named derived parameters this module answers (see DerivedParameterTable). */
+  static const DerivedParameterTable<PrimordialModule>& DerivedParameters();
 
   std::vector<int>
       ic_size_; /**< for a given mode, ic_size[index_md] = number of initial conditions included in computation */

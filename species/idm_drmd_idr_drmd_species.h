@@ -75,6 +75,18 @@ class IDM_DRMD_IDR_DRMD_Species : public CompositeSpecies {
   double f_idr_drmd() const {
     return f_idr_drmd_;
   }
+
+  /** Derived parameters (Cosmology::GetDerivedParameter): f_idr_drmd and z_dec_drmd, then
+   *  whatever the parts answer. */
+  std::optional<double> GetParam(const std::string& name) const override {
+    if (name == "f_idr_drmd") {
+      return f_idr_drmd_;
+    }
+    if (name == "z_dec_drmd") {
+      return z_dec_drmd_;
+    }
+    return CompositeSpecies::GetParam(name);
+  }
   double Gamma0_drmd_ic() const {
     return Gamma0_drmd_ic_;
   }

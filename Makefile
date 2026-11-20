@@ -38,9 +38,9 @@ classy:
 # with 12 parallel jobs. This assumes build dependencies are already installed.
 # Direct CMake can be faster still:
 #   cmake -S . -B build/dev -DCLASS_BUILD_PYTHON=ON
-#   cmake --build build/dev --target classy --parallel
-# but that only builds the extension in build/dev; it does not install the
-# package or recreate the python/build/lib.* layout.
+#   cmake --build build/dev --target classy_core --parallel
+# which leaves a runnable package in build/dev/classy/ (PYTHONPATH=build/dev),
+# but neither installs it nor recreates the python/build/lib.* layout.
 classy-pip-dev:
 	rm -rf python/build && mkdir -p python/build
 	pip install . --no-build-isolation -Cbuild-dir=build/skbuild -Cbuild.tool-args=-j12

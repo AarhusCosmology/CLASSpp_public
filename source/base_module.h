@@ -2,6 +2,7 @@
 #define BASE_MODULE_H
 
 /* class modules */
+#include <map>
 #include <memory>
 #include <string>
 
@@ -21,6 +22,14 @@
 
 class BaseSpecies;
 class NCDMSpecies;
+
+/** The named derived parameters a module answers (classy's get_current_derived_parameters,
+ *  through Cosmology::GetDerivedParameter): name -> reader. The table is static, so that
+ *  Cosmology can find the owner of a name without building any module. A reader may refuse
+ *  with class_test_severe when this run cannot answer, giving the reason.
+ *  Design: docs/superpowers/specs/2026-11-20-classy-package-design.md, section 3. */
+template <class Module>
+using DerivedParameterTable = std::map<std::string, double (*)(const Module&)>;
 
 class BaseModule {
  public:

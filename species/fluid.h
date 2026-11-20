@@ -53,6 +53,14 @@ class FluidSpecies : public BaseSpecies {
     return Omega0_fld_;
   }
 
+  /** Derived parameters (Cosmology::GetDerivedParameter): Omega0_fld. */
+  std::optional<double> GetParam(const std::string& name) const override {
+    if (name == "Omega0_fld") {
+      return GetOmega0();
+    }
+    return std::nullopt;
+  }
+
   equation_of_state fluid_eos() const {
     return fluid_eos_;
   }

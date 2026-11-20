@@ -43,6 +43,14 @@ class CDMSpecies : public BaseSpecies {
     return Omega0_cdm_;
   }
 
+  /** Derived parameters (Cosmology::GetDerivedParameter): Omega0_cdm. */
+  std::optional<double> GetParam(const std::string& name) const override {
+    if (name == "Omega0_cdm") {
+      return GetOmega0();
+    }
+    return std::nullopt;
+  }
+
   // ── Background ─────────────────────────────────────────────────────────────
   void RegisterBackgroundIndices(int& index_bg) override;
   void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;

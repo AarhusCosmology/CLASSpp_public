@@ -400,7 +400,7 @@ for file in h_files:
         variable_name = variable_name.replace('enum ','')
         variable_name = variable_name.replace(' [', '[')
         if is_function:
-            # classy.pyx defines the handler before it includes this file. It
+            # src/classy/_core.pyx defines the handler before it includes this file. It
             # turns std::invalid_argument into CosmoSevereError and
             # std::runtime_error into CosmoComputationError; a plain `except +`
             # would hand callers ValueError/RuntimeError instead.

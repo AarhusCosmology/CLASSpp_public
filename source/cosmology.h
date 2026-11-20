@@ -2,6 +2,7 @@
 #define COSMOLOGY_H
 
 #include <memory>
+#include <string>
 
 #include "bessel_table_cache.h"
 #include "input_module.h"
@@ -29,6 +30,12 @@ class Cosmology {
   TransferModulePtr& GetTransferModule();
   SpectraModulePtr& GetSpectraModule();
   LensingModulePtr& GetLensingModule();
+
+  /** One named derived parameter (classy's get_current_derived_parameters). Builds only the
+   *  module that owns the name, and none for a name read from the input (h, T_cmb, ...). "<instance>.<field>" asks that species instance alone; a name
+   *  no module owns is asked of every species. See
+   *  docs/superpowers/specs/2026-11-20-classy-package-design.md, section 3. */
+  double GetDerivedParameter(const std::string& name);
 
  private:
   bool shot_ = false;  // GetInputModule runs DoShooting once, on first use

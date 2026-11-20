@@ -57,6 +57,12 @@ class NonlinearModule : public BaseModule {
                  std::vector<double>& k,
                  std::vector<double>& pk) const;
   double GetSigma8(int index_pk) const;
+  /** sigma(R, z) of the spectrum index_pk, R in Mpc. Refuses (severe) without mPk in the
+   *  output, or with P_k_max below 1 h/Mpc, where the integral would be cut off. The internal
+   *  nonlinear_sigmas_at_z stays unchecked: the module computes sigma8 with it without mPk. */
+  double GetSigma(double R, double z, int index_pk) const;
+  /** The named derived parameters this module answers (see DerivedParameterTable). */
+  static const DerivedParameterTable<NonlinearModule>& DerivedParameters();
   void nonlinear_sigmas_at_z(
       double R, double z, int index_pk, enum out_sigmas sigma_output, double* result) const;
   void nonlinear_pk_tilt_at_k_and_z(

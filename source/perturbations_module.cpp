@@ -564,6 +564,19 @@ std::vector<NamedColumns> PerturbationsModule::GetPerturbationColumns(int index_
   return tables;
 }
 
+std::vector<double> PerturbationsModule::GetScalarTransferK() const {
+  class_test_severe(!ppt->has_density_transfers && !ppt->has_velocity_transfers,
+                    "No transfer functions were computed. Add 'dTk' and/or 'vTk' to the list of "
+                    "outputs.");
+  class_test_severe(!ppt->has_scalars,
+                    "get_transfer_and_k_and_z() returns the scalar transfer functions; add 's' "
+                    "to 'modes'.");
+  class_test_severe(ic_size_[index_md_scalars_] > 1,
+                    "get_transfer_and_k_and_z() assumes adiabatic initial conditions: the grids it "
+                    "returns have no axis to hold several of them.");
+  return k_[index_md_scalars_];
+}
+
 std::vector<double> PerturbationsModule::GetLateTimeRedshifts() const {
   std::vector<double> z(ln_tau_size_);
   for (int index_tau = 0; index_tau < ln_tau_size_ - 1; index_tau++) {
