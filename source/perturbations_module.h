@@ -47,32 +47,24 @@ class PerturbationsModule : public BaseModule {
                       BackgroundModulePtr background_module,
                       ThermodynamicsModulePtr thermodynamics_module);
   ~PerturbationsModule();
-  void perturb_output_data(file_format output_format,
-                           double z,
-                           int number_of_titles,
-                           double* data) const;
-  /* As above, but reading the stored table at a node of the late-time (ln_tau)
-     sampling instead of interpolating to a redshift. Exact, cheaper, and the
-     only way to reach the topmost node, whose round trip through z lands just
-     outside the tabulation range.
-     Design: docs/superpowers/specs/2026-09-16-classy-lss-methods-design.md */
-  void perturb_output_data_at_index_tau(file_format output_format,
-                                        int index_tau,
-                                        int number_of_titles,
-                                        double* data) const;
-  void perturb_output_titles(file_format output_format, std::string& titles) const;
   void perturb_output_firstline_and_ic_suffix(int index_ic,
                                               std::string& first_line,
                                               std::string& ic_suffix) const;
-  /** The transfer functions at redshift z, column by column: one table per initial
-      condition, in the order of index_ic. */
-  std::vector<NamedColumns> GetTransferColumns(file_format output_format, double z) const;
-  /** As GetTransferColumns, at a node of the late-time (ln_tau) sampling. */
-  std::vector<NamedColumns> GetTransferColumnsAtIndexTau(file_format output_format,
-                                                         int index_tau) const;
+  /** The transfer functions at redshift z, as named columns: one table per initial
+      condition, in the order of index_ic. Nothing is checked at initialisation: a repeated
+      column name (two species instances named alike) fails here. */
+  std::vector<OutputTable> GetTransferTables(file_format output_format, double z) const;
+  /** As GetTransferTables, at a node of the late-time (ln_tau) sampling instead of an
+      interpolation to a redshift. Exact, cheaper, and the only way to reach the topmost node,
+      whose round trip through z lands just outside the tabulation range.
+      Design: docs/superpowers/specs/2026-09-16-classy-lss-methods-design.md */
+  std::vector<OutputTable> GetTransferTablesAtIndexTau(file_format output_format,
+                                                       int index_tau) const;
   /** The evolution of the perturbations of mode index_md at each of the k_output_values,
-      as in the perturbations_k*.dat files: one table per k, in the order of the input. */
-  std::vector<NamedColumns> GetPerturbationColumns(int index_md) const;
+      as in the perturbations_k*.dat files: one table per k, in the order of the input. With
+      several initial conditions, the rows of each follow those of the one before, in the
+      order of index_ic. */
+  std::vector<OutputTable> GetPerturbationTables(int index_md) const;
   /** The redshifts of the late-time sampling ln_tau_, on which P(k,z) and the transfer
       functions are tabulated, decreasing to today. */
   std::vector<double> GetLateTimeRedshifts() const;
@@ -208,26 +200,10 @@ class PerturbationsModule : public BaseModule {
       index_k_output_values_; /**< List of indices corresponding to k-values close to k_output_values for each mode.
                                      index_k_output_values[index_md*k_output_values_num+ik]*/
 
-  std::string
-      scalar_titles_; /**< _DELIMITER_ separated string of titles for scalar perturbation output files. */
-  std::string
-      vector_titles_; /**< _DELIMITER_ separated string of titles for vector perturbation output files. */
-  std::string
-      tensor_titles_; /**< _DELIMITER_ separated string of titles for tensor perturbation output files. */
-
-  std::vector<double> scalar_perturbations_data_
-      [_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for scalars */
-  std::vector<double> vector_perturbations_data_
-      [_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for vectors */
-  std::vector<double> tensor_perturbations_data_
-      [_MAX_NUMBER_OF_K_FILES_]; /**< Array of double pointers to perturbation output for tensors */
-
-  int size_scalar_perturbation_data_
-      [_MAX_NUMBER_OF_K_FILES_]{}; /**< Array of sizes of scalar double pointers  */
-  int size_vector_perturbation_data_
-      [_MAX_NUMBER_OF_K_FILES_]{}; /**< Array of sizes of vector double pointers  */
-  int size_tensor_perturbation_data_
-      [_MAX_NUMBER_OF_K_FILES_]{}; /**< Array of sizes of tensor double pointers  */
+  std::vector<std::vector<std::vector<OutputTable>>>
+      k_output_tables_; /**< The perturbations at k_output_values, k_output_tables_[index_md][index_ic][index_ikout],
+                             one row per output time. Each table is filled by the one task that integrates its mode,
+                             initial condition and wavenumber. */
   //@}
 
   /** @name - source functions interpolation table */
@@ -276,10 +252,10 @@ class PerturbationsModule : public BaseModule {
   double k_max_ = 0.0;                 /**< maximum value (over all modes) */
 
  private:
-  void perturb_store_columns(file_format output_format,
-                             const std::vector<double>& tkfull,
-                             int number_of_titles,
-                             double* data) const;
+  std::vector<double> perturb_transfers_at_z(double z) const;
+  std::vector<double> perturb_transfers_at_index_tau(int index_tau) const;
+  std::vector<OutputTable> TransferTables(file_format output_format,
+                                          const std::vector<double>& tkfull) const;
   void perturb_sources_at_tau(
       int index_md, int index_ic, int index_tp, double tau, double* psource) const;
   void perturb_init();
@@ -369,12 +345,6 @@ class PerturbationsModule : public BaseModule {
                                             [index_tau * perturbations_module_->k_size_ + index_k] */
 
   //@}
-  int number_of_scalar_titles_ =
-      0; /**< number of titles/columns in scalar perturbation output files */
-  int number_of_vector_titles_ =
-      0; /**< number of titles/columns in vector perturbation output files*/
-  int number_of_tensor_titles_ =
-      0; /**< number of titles/columns in tensor perturbation output files*/
 
   /** @name - list of k values for each mode */
 

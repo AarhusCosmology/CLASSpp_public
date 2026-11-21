@@ -60,8 +60,7 @@ class DCDM_WDM_Species : public CompositeSpecies {
   void ComputeBackground(double a, const double* pvecback_B, double* pvecback) override;
   void BackgroundDerivs(double tau, const double* y, double* dy, const double* pvecback) override;
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   /** Combined sector density today (pinned/shot Omega_dcdmwdm), mirroring
    *  DNCDMSector::GetOmega0: at closure time the daughter's density is

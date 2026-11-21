@@ -71,14 +71,9 @@ double FluidSpecies::PPrime(double a,
   return a * H * (a * dw_over_da_fld - 3. * (1. + w_fld) * w_fld) * pvecback[index_bg_rho_fld_];
 }
 
-void FluidSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_fld", 0.);
-  w.Add("(.)w_fld", 0.);
-}
-
-void FluidSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_fld", pvecback[index_bg_rho_fld_]);
-  w.Add("(.)w_fld", pvecback[index_bg_w_fld_]);
+void FluidSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_fld", pvecback[index_bg_rho_fld_]);
+  row.Set("(.)w_fld", pvecback[index_bg_w_fld_]);
 }
 
 void FluidSpecies::RegisterPerturbationIndices(BaseSpecies::PerturbLayout& base,
@@ -186,42 +181,45 @@ void FluidSpecies::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base
                         ctx.ppr->curvature_ini * ctx.s2_squared;
 }
 
-void FluidSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                      const PerturbationsModule& mod,
-                                      file_format fmt,
-                                      BaseSpecies::TransferColumnSection section) const {
+void FluidSpecies::AddTransferOutput(OutputTable& row,
+                                     const double* tk,
+                                     const PerturbationsModule& mod,
+                                     file_format fmt,
+                                     BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_fld", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_fld", tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_fld", index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_fld", tk[index_tp_theta_]);
+      }
     }
   }
 }
 
-void FluidSpecies::PrintVariables(PerturbColumnWriter& w,
-                                  const BaseSpecies::PerturbLayout* base,
-                                  double /*tau*/,
-                                  const double* y,
-                                  const PerturbationsModule& mod,
-                                  const perturb_workspace* ppw) const {
+void FluidSpecies::AddPerturbationOutput(OutputTable& row,
+                                         const BaseSpecies::PerturbLayout& base,
+                                         double /*tau*/,
+                                         const double* y,
+                                         const PerturbationsModule& mod,
+                                         const perturb_workspace* ppw) const {
   double delta_rho_fld        = 0.;
   double rho_plus_p_theta_fld = 0.;
   double delta_p_fld          = 0.;
 
-  if (!w.IsTitleMode()) {
-    const auto& layout   = static_cast<const PerturbLayout&>(*base);
-    const auto se        = StressEnergy(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
-    delta_rho_fld        = se.delta_rho;
-    rho_plus_p_theta_fld = se.rho_plus_p_theta;
-    delta_p_fld          = se.delta_p;
-  }
+  const auto& layout   = static_cast<const PerturbLayout&>(base);
+  const auto se        = StressEnergy(layout, ppw->pv.get(), y, ppw->pvecback.data(), ppw);
+  delta_rho_fld        = se.delta_rho;
+  rho_plus_p_theta_fld = se.rho_plus_p_theta;
+  delta_p_fld          = se.delta_p;
 
-  w.Add("delta_rho_fld", delta_rho_fld, true);
-  w.Add("rho_plus_p_theta_fld", rho_plus_p_theta_fld, true);
-  w.Add("delta_p_fld", delta_p_fld, true);
+  row.Set("delta_rho_fld", delta_rho_fld);
+  row.Set("rho_plus_p_theta_fld", rho_plus_p_theta_fld);
+  row.Set("delta_p_fld", delta_p_fld);
 }
 
 BaseSpecies::StressEnergyContribution FluidSpecies::StressEnergy(

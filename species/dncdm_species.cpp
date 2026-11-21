@@ -561,32 +561,19 @@ void DNCDMSpecies::BackgroundDerivs(double /*tau*/,
 
 // ── Background column output ───────────────────────────────────────────────
 
-void DNCDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+void DNCDMSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
   const std::string& nm = name();
-  w.Add("(.)number_" + nm, 0.);
-  w.Add("(.)rho_" + nm, 0.);
-  w.Add("(.)p_" + nm, 0.);
-  for (int i = 0; i < q_size(); i++) {
-    const std::string suffix = "_" + nm + "[" + std::to_string(i) + "]";
-    w.Add("lnf" + suffix, 0.);
-    w.Add("dlnfdlnq" + suffix, 0.);
-    w.Add("dlnfdlnq_separate" + suffix, 0.);
-  }
-}
-
-void DNCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  const std::string& nm = name();
-  w.Add("(.)number_" + nm, pvecback[bg_number_index()]);
-  w.Add("(.)rho_" + nm, Rho(pvecback));
-  w.Add("(.)p_" + nm, P(pvecback));
+  row.Set("(.)number_" + nm, pvecback[bg_number_index()]);
+  row.Set("(.)rho_" + nm, Rho(pvecback));
+  row.Set("(.)p_" + nm, P(pvecback));
   const int bg_lnf_idx          = bg_lnf_index();
   const int bg_dlnfdlnq_idx     = bg_dlnfdlnq_index();
   const int bg_dlnfdlnq_sep_idx = bg_dlnfdlnq_sep_index();
   for (int i = 0; i < q_size(); i++) {
     const std::string suffix = "_" + nm + "[" + std::to_string(i) + "]";
-    w.Add("lnf" + suffix, pvecback[bg_lnf_idx + i]);
-    w.Add("dlnfdlnq" + suffix, pvecback[bg_dlnfdlnq_idx + i]);
-    w.Add("dlnfdlnq_separate" + suffix, pvecback[bg_dlnfdlnq_sep_idx + i]);
+    row.Set("lnf" + suffix, pvecback[bg_lnf_idx + i]);
+    row.Set("dlnfdlnq" + suffix, pvecback[bg_dlnfdlnq_idx + i]);
+    row.Set("dlnfdlnq_separate" + suffix, pvecback[bg_dlnfdlnq_sep_idx + i]);
   }
 }
 
@@ -904,19 +891,24 @@ void DNCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
   }
 }
 
-void DNCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                      const PerturbationsModule& mod,
-                                      file_format fmt,
-                                      BaseSpecies::TransferColumnSection section) const {
+void DNCDMSpecies::AddTransferOutput(OutputTable& row,
+                                     const double* tk,
+                                     const PerturbationsModule& mod,
+                                     file_format fmt,
+                                     BaseSpecies::TransferColumnSection section) const {
   if (fmt != file_format::class_format) {
     return;
   }
   const perturbs* ppt = mod.GetPerturbs();
   if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-    w.Add("d_ncdm_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
+    if (index_tp_delta_ >= 0) {
+      row.Set("d_ncdm_" + name(), tk[index_tp_delta_]);
+    }
   }
   if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-    w.Add("t_ncdm_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+    if (index_tp_theta_ >= 0) {
+      row.Set("t_ncdm_" + name(), tk[index_tp_theta_]);
+    }
   }
 }
 

@@ -263,18 +263,23 @@ void DarkRadiationSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void DarkRadiationSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                              const PerturbationsModule& mod,
-                                              file_format fmt,
-                                              BaseSpecies::TransferColumnSection section) const {
+void DarkRadiationSpecies::AddTransferOutput(OutputTable& row,
+                                             const double* tk,
+                                             const PerturbationsModule& mod,
+                                             file_format fmt,
+                                             BaseSpecies::TransferColumnSection section) const {
   if (fmt != file_format::class_format) {
     return;
   }
   const perturbs* ppt = mod.GetPerturbs();
   if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-    w.Add("d_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
+    if (index_tp_delta_ >= 0) {
+      row.Set("d_" + name(), tk[index_tp_delta_]);
+    }
   }
   if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-    w.Add("t_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+    if (index_tp_theta_ >= 0) {
+      row.Set("t_" + name(), tk[index_tp_theta_]);
+    }
   }
 }

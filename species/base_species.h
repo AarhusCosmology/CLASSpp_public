@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "../include/output_table.h"
 #include "shooting_target.h"
 
 // Forward declarations to avoid circular includes
@@ -18,58 +19,12 @@ struct perturb_workspace;
 struct perturb_parameters_and_workspace;
 
 #include "background_ic_context.h"
-#include "common.h"  // class_store_columntitle, class_store_double, true, false
+#include "common.h"
 #include "perturb_source_context.h"
 
 class BackgroundModule;      // forward declaration
 class ThermodynamicsModule;  // forward declaration
 
-// ── BackgroundColumnWriter ───────────────────────────────────────────────────
-/**
- * Thin helper for background output — analogous to PerturbColumnWriter.
- * Construct in title mode (titles != nullptr) or data mode (dataptr != nullptr).
- * Call Add() once per column in both modes; the writer handles the branching.
- */
-class BackgroundColumnWriter {
- public:
-  explicit BackgroundColumnWriter(std::string& titles, std::vector<std::string>* notes = nullptr)
-      : titles_(&titles), notes_(notes) {}
-  BackgroundColumnWriter(double* dataptr, int& storeidx)
-      : dataptr_(dataptr), storeidx_(&storeidx) {}
-
-  bool IsTitleMode() const {
-    return titles_ != nullptr;
-  }
-
-  void Add(const char* title, double value, bool condition = true) {
-    if (titles_) {
-      class_store_columntitle(*titles_, title, condition ? true : false);
-    }
-    else if (dataptr_) {
-      class_store_double(dataptr_, value, condition ? true : false, (*storeidx_));
-    }
-  }
-  void Add(const std::string& title, double value, bool condition = true) {
-    Add(title.c_str(), value, condition);
-  }
-
-  /** A note on the units or meaning of the columns a species writes, for the header of
-   *  background.dat, one header line per line of the note. Title mode only, and only when the
-   *  caller asked for notes. A note several species give (every scalar field gives the
-   *  same one) is kept once. */
-  void Note(const std::string& note) {
-    if (titles_ != nullptr && notes_ != nullptr &&
-        std::find(notes_->begin(), notes_->end(), note) == notes_->end()) {
-      notes_->push_back(note);
-    }
-  }
-
- private:
-  std::string* titles_             = nullptr;
-  std::vector<std::string>* notes_ = nullptr;
-  double* dataptr_                 = nullptr;
-  int* storeidx_                   = nullptr;
-};
 struct perturbs;  // forward declaration
 
 /**
@@ -301,20 +256,12 @@ class BaseSpecies {
   }
 
   /**
-   * Write this species' background column titles into writer.
-   * Called by BackgroundModule::background_output_titles().
-   * Default: no-op (species with no background output need not override).
+   * This species' columns of the background table (background.dat, classy's
+   * get_background()), for one row: row.Set(name, value) per column, and row.AddNote(...)
+   * for a header line on their units. pvecback is the background at that row.
+   * Called by BackgroundModule::GetOutputTable(). Default: no columns.
    */
-  virtual void WriteBackgroundColumnTitles(BackgroundColumnWriter& /*writer*/) const {}
-
-  /**
-   * Write this species' background data values into writer.
-   * pvecback is the full background vector at the current time step.
-   * Called by BackgroundModule::background_output_data().
-   * Default: no-op.
-   */
-  virtual void WriteBackgroundData(const double* /*pvecback*/,
-                                   BackgroundColumnWriter& /*writer*/) const {}
+  virtual void AddBackgroundOutput(OutputTable& /*row*/, const double* /*pvecback*/) const {}
 
   /**
    * Called once after the full background table is built. Lets a species run
@@ -408,8 +355,15 @@ class BaseSpecies {
                                             double /*f0*/,
                                             const double* /*pvecback*/) const {}
 
-  /** Write this species' tensor-mode output column titles. Default: no-op. */
-  virtual void WriteTensorOutputColumnTitles(std::string& /*tensor_titles*/) const {}
+  /** This species' columns in one row of a tensor k_output_values table (perturbations_k*_t.dat):
+   *  row.Set(name, value) per column, at wavenumber k and scale factor a. Called only when the
+   *  tensor ncdm hierarchy is evolved. Default: no columns. */
+  virtual void AddTensorPerturbationOutput(OutputTable& /*row*/,
+                                           const PerturbLayout& /*layout*/,
+                                           double /*k*/,
+                                           double /*a*/,
+                                           const double* /*y*/,
+                                           const double* /*pvecback*/) const {}
 
   /** Contribute to the gravitational-wave source term (anisotropic stress) for tensor mode.
    *  Called after perturb_workspace::gw_source is reset to zero.  Default: no-op.
@@ -491,36 +445,34 @@ class BaseSpecies {
   // ── Stage 1: Output ──────────────────────────────────────────────────────
 
   /**
-   * Append this species' output columns (delta, theta) to writer.
-   * Called from perturb_output_titles (title mode) and perturb_output_data (data mode).
-   * In class_format, the module may call this separately for density and velocity
-   * sections to preserve the historical transfer-column ordering.
-   * Use writer.Add(title, mod.index_tp_XXX_, active) — writer looks up tk[tp_index].
+   * This species' transfer functions (delta, theta) in one row of a transfer table, one
+   * row per k: row.Set(name, tk[index_tp_...]) per column it has. tk is T_i(k) at that k,
+   * indexed by the source indices. Called by PerturbationsModule::TransferTables. In
+   * class_format the module asks for the density and the velocity sections separately, to
+   * keep the historical column order.
    */
-  virtual void WriteOutputColumns(
-      PerturbColumnWriter& /*writer*/,
+  virtual void AddTransferOutput(
+      OutputTable& /*row*/,
+      const double* /*tk*/,
       const PerturbationsModule& /*mod*/,
       file_format /*fmt*/,
       TransferColumnSection /*section*/ = TransferColumnSection::all) const {}
 
   /**
-   * Append this species' time-evolution variables to writer.
-   * Called from perturb_prepare_k_output (title mode, tau=0/y=nullptr/ppw=nullptr)
-   * and perturb_print_variables (data mode).
-   * Guard computation behind: if (!writer.IsTitleMode()) { ... compute ... }
-   * Use writer.Add(title, computed_value, active).
+   * This species' columns in one row of a scalar k_output_values table
+   * (perturbations_k*_s.dat), one row per output time: row.Set(name, value) per column it
+   * has. Called by perturb_print_variables during the integration of that wavenumber.
    *
-   * layout is NULL in title mode (there is no perturb_vector yet) and is the
-   * species' own sub-layout otherwise — passed in rather than resolved from
+   * layout is the species' own sub-layout, passed in rather than resolved from
    * collection_index_ so that CompositeSpecies can chain this to children, which
    * are not registered in the collection and have no valid collection_index_.
    */
-  virtual void PrintVariables(PerturbColumnWriter& /*writer*/,
-                              const PerturbLayout* /*base*/,
-                              double /*tau*/,
-                              const double* /*y*/,
-                              const PerturbationsModule& /*mod*/,
-                              const perturb_workspace* /*ppw*/) const {}
+  virtual void AddPerturbationOutput(OutputTable& /*row*/,
+                                     const PerturbLayout& /*base*/,
+                                     double /*tau*/,
+                                     const double* /*y*/,
+                                     const PerturbationsModule& /*mod*/,
+                                     const perturb_workspace* /*ppw*/) const {}
 
   // ── Stage 2: Source filling ───────────────────────────────────────────────
 

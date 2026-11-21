@@ -86,8 +86,16 @@ from libcpp.pair cimport pair
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
-cdef extern from "common.h":
-    ctypedef vector[pair[string, vector[double]]] NamedColumns
+cdef extern from "output_table.h":
+    cdef cppclass OutputColumn:
+        const double* data() const
+        size_t size() const
+
+    cdef cppclass OutputTable:
+        const vector[string]& names() const
+        OutputColumn column(size_t index) const
+        size_t rows() const
+        const vector[string]& notes() const
 
 """
 
@@ -281,7 +289,8 @@ allowed_types = ['double', 'int', 'short', 'char', 'bool', 'void', 'std::string'
                  'std::vector<std::vector<double>>', 'std::vector<std::vector<short>>',
                  'std::vector<std::vector<int>>',
                  'std::vector<double>', 'std::vector<int>', 'std::vector<short>',
-                 'std::vector<std::string>', 'std::vector<NamedColumns>', 'NamedColumns'] + struct_names
+                 'std::vector<std::string>', 'OutputTable',
+                 'std::vector<OutputTable>'] + struct_names
 
 keywords_to_be_ignored = ['static', 'constexpr', 'const']
 

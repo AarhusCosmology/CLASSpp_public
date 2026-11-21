@@ -3762,75 +3762,41 @@ void ThermodynamicsModule::thermodynamics_merge_reco_and_reio(recombination* pre
  * Subroutine for formatting thermodynamics output
  */
 
-void ThermodynamicsModule::thermodynamics_output_titles(std::string& titles) const {
-  class_store_columntitle(titles, "z", true);
-  class_store_columntitle(titles, "conf. time [Mpc]", true);
-  class_store_columntitle(titles, "x_e", true);
-  class_store_columntitle(titles, "kappa' [Mpc^-1]", true);
-  class_store_columntitle(titles, "exp(-kappa)", true);
-  class_store_columntitle(titles, "g [Mpc^-1]", true);
-  class_store_columntitle(titles, "Tb [K]", true);
-  class_store_columntitle(titles, "w_b", true);
-  class_store_columntitle(titles, "c_b^2", true);
-  class_store_columntitle(titles, "tau_d", true);
-  class_store_columntitle(titles, "r_d", pth->compute_damping_scale);
-
-  if (all_species_.contains("IDM_DR_IDR")) {
-    class_store_columntitle(titles, "dmu_idm_dr", true);
-    class_store_columntitle(titles, "tau_idm_dr", true);
-    class_store_columntitle(titles, "tau_idr", true);
-    class_store_columntitle(titles, "g_idm_dr [Mpc^-1]", true);
-    class_store_columntitle(titles, "c_idm_dr^2", true);
-    class_store_columntitle(titles, "T_idm_dr", true);
-    class_store_columntitle(titles, "dmu_idr", true);
-  }
-}
-
-void ThermodynamicsModule::thermodynamics_output_data(int number_of_titles, double* data) const {
-  int storeidx;
-  double* dataptr;
-  double z;
-  double tau;
-
-  /* Store quantities: */
+OutputTable ThermodynamicsModule::GetOutputTable() const {
+  OutputTable table("thermodynamics");
+  table.ReserveRows(tt_size_);
+  const bool has_idm_dr = all_species_.contains("IDM_DR_IDR");
   for (int index_z = 0; index_z < tt_size_; index_z++) {
-    dataptr                  = data + index_z * number_of_titles;
     const double* pvecthermo = thermodynamics_table_.data() + index_z * th_size_;
-    z                        = z_table_[index_z];
-    storeidx                 = 0;
-
+    const double z           = z_table_[index_z];
+    double tau               = 0.;
     background_module_->background_tau_of_z(z, &tau);
 
-    class_store_double(dataptr, z, true, storeidx);
-    class_store_double(dataptr, tau, true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_xe_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_dkappa_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_exp_m_kappa_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_g_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_Tb_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_wb_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_cb2_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_tau_d_], true, storeidx);
-    class_store_double(dataptr, pvecthermo[index_th_r_d_], pth->compute_damping_scale, storeidx);
-
-    if (all_species_.contains("IDM_DR_IDR")) {
-      class_store_double(dataptr, pvecthermo[index_th_dmu_idm_dr_], true, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_tau_idm_dr_], true, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_tau_idr_], true, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_g_idm_dr_], true, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_cidm_dr2_], true, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_Tidm_dr_], true, storeidx);
-      class_store_double(dataptr, pvecthermo[index_th_dmu_idr_], true, storeidx);
+    table.Set("z", z);
+    table.Set("conf. time [Mpc]", tau);
+    table.Set("x_e", pvecthermo[index_th_xe_]);
+    table.Set("kappa' [Mpc^-1]", pvecthermo[index_th_dkappa_]);
+    table.Set("exp(-kappa)", pvecthermo[index_th_exp_m_kappa_]);
+    table.Set("g [Mpc^-1]", pvecthermo[index_th_g_]);
+    table.Set("Tb [K]", pvecthermo[index_th_Tb_]);
+    table.Set("w_b", pvecthermo[index_th_wb_]);
+    table.Set("c_b^2", pvecthermo[index_th_cb2_]);
+    table.Set("tau_d", pvecthermo[index_th_tau_d_]);
+    if (pth->compute_damping_scale) {
+      table.Set("r_d", pvecthermo[index_th_r_d_]);
     }
+    if (has_idm_dr) {
+      table.Set("dmu_idm_dr", pvecthermo[index_th_dmu_idm_dr_]);
+      table.Set("tau_idm_dr", pvecthermo[index_th_tau_idm_dr_]);
+      table.Set("tau_idr", pvecthermo[index_th_tau_idr_]);
+      table.Set("g_idm_dr [Mpc^-1]", pvecthermo[index_th_g_idm_dr_]);
+      table.Set("c_idm_dr^2", pvecthermo[index_th_cidm_dr2_]);
+      table.Set("T_idm_dr", pvecthermo[index_th_Tidm_dr_]);
+      table.Set("dmu_idr", pvecthermo[index_th_dmu_idr_]);
+    }
+    table.EndRow();
   }
-}
-
-NamedColumns ThermodynamicsModule::GetOutputColumns() const {
-  std::string titles;
-  thermodynamics_output_titles(titles);
-  std::vector<double> data(static_cast<size_t>(get_number_of_titles(titles)) * tt_size_);
-  thermodynamics_output_data(get_number_of_titles(titles), data.data());
-  return SplitIntoColumns(titles, data.data(), tt_size_);
+  return table;
 }
 
 namespace {

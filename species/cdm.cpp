@@ -26,12 +26,8 @@ double CDMSpecies::P(const double* /*pvecback*/) const {
   return 0.;
 }
 
-void CDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_cdm", 0.);
-}
-
-void CDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_cdm", pvecback[index_bg_rho_cdm_]);
+void CDMSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_cdm", pvecback[index_bg_rho_cdm_]);
 }
 
 void CDMSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRequestContext& ctx) {
@@ -166,62 +162,67 @@ void CDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void CDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                    const PerturbationsModule& mod,
-                                    file_format fmt,
-                                    BaseSpecies::TransferColumnSection section) const {
+void CDMSpecies::AddTransferOutput(OutputTable& row,
+                                   const double* tk,
+                                   const PerturbationsModule& mod,
+                                   file_format fmt,
+                                   BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_cdm", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_cdm", tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_cdm", index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_cdm", tk[index_tp_theta_]);
+      }
     }
   }
   else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity) {
-      w.Add("-T_cdm/k2", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("-T_cdm/k2", tk[index_tp_delta_]);
+      }
     }
   }
 }
 
-void CDMSpecies::PrintVariables(PerturbColumnWriter& w,
-                                const BaseSpecies::PerturbLayout* base,
-                                double /*tau*/,
-                                const double* y,
-                                const PerturbationsModule& mod,
-                                const perturb_workspace* ppw) const {
+void CDMSpecies::AddPerturbationOutput(OutputTable& row,
+                                       const BaseSpecies::PerturbLayout& base,
+                                       double /*tau*/,
+                                       const double* y,
+                                       const PerturbationsModule& mod,
+                                       const perturb_workspace* ppw) const {
   double delta_cdm = 0.;
   double theta_cdm = 0.;
 
-  if (!w.IsTitleMode()) {
-    const auto& layout       = static_cast<const PerturbLayout&>(*base);
-    const double k           = ppw->scalar_ctx.k;
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
+  const auto& layout       = static_cast<const PerturbLayout&>(base);
+  const double k           = ppw->scalar_ctx.k;
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
 
-    delta_cdm           = y[layout.idx_delta];
-    const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous && !coupled_) {
-      theta_cdm = 0.;
-    }
-    else {
-      theta_cdm = (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
-    }
-
-    // Converting synchronous variables to Newtonian
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha  = pvecmetric[ppw->index_mt_alpha];
-      const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-      const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      delta_cdm          -= 3. * H * a * alpha;
-      theta_cdm          += k * k * alpha;
-    }
+  delta_cdm           = y[layout.idx_delta];
+  const perturbs* ppt = mod.GetPerturbs();
+  if (ppt->gauge == possible_gauges::synchronous && !coupled_) {
+    theta_cdm = 0.;
+  }
+  else {
+    theta_cdm = (layout.idx_theta >= 0) ? y[layout.idx_theta] : 0.;
   }
 
-  w.Add("delta_cdm", delta_cdm, true);
-  w.Add("theta_cdm", theta_cdm, true);
+  // Converting synchronous variables to Newtonian
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha  = pvecmetric[ppw->index_mt_alpha];
+    const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    delta_cdm          -= 3. * H * a * alpha;
+    theta_cdm          += k * k * alpha;
+  }
+
+  row.Set("delta_cdm", delta_cdm);
+  row.Set("theta_cdm", theta_cdm);
 }
 
 // ── Newtonian-gauge transform ─────────────────────────────────────────────────

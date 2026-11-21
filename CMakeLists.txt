@@ -110,7 +110,6 @@ set(CLASS_SPECIES_FILES
   species/ncdm_interacting_species.cpp
   species/ncdm_species.cpp
   species/nede_species.cpp
-  species/perturb_column_writer.cpp
   species/photons.cpp
   species/scalar_field.cpp
   species/scalar_tensor_species.cpp
@@ -130,6 +129,7 @@ set(CLASS_TOOLS_FILES
   tools/bbn_solver.cpp
   tools/bbn_weak.cpp
   tools/common.cpp
+  tools/output_table.cpp
   tools/decay_harness.cpp
   tools/decay_transition_kernel.cpp
   tools/dei_rkck.cpp

@@ -261,21 +261,21 @@ FileContent WithField(FileContent fc, const std::string& name) {
   return fc;
 }
 
+// The background column titles, each followed by a tab, as background.dat lists them.
 std::string BackgroundTitles(FileContent fc, std::vector<std::string>* notes) {
   Cosmology cosmo(fc);
+  const OutputTable table = cosmo.GetBackgroundModule()->GetOutputTable();
   std::string titles;
-  cosmo.GetBackgroundModule()->background_output_titles(titles);
+  for (const std::string& name : table.names()) {
+    titles += name + "\t";
+  }
   if (notes != nullptr) {
-    *notes = cosmo.GetBackgroundModule()->background_output_notes();
+    *notes = table.notes();
   }
   return titles;
 }
 
 void test_column_titles() {
-  assert(first_duplicate_title("").empty());
-  assert(first_duplicate_title("z\ta\tb\t").empty());
-  assert(first_duplicate_title("z\ta\tb\ta\t") == "a");
-
   // ── Two fields write their own columns, and the units note once ──
   {
     std::vector<std::string> notes;
@@ -313,9 +313,8 @@ void test_column_titles() {
     FileContent fc = WithField(k_out, "tot");
     Cosmology cosmo(fc);
     const auto& pt = cosmo.GetPerturbationsModule();
-    std::string titles;
     assert(Throws<std::invalid_argument>(
-        [&pt, &titles]() { pt->perturb_output_titles(file_format::class_format, titles); }));
+        [&pt]() { pt->GetTransferTables(file_format::class_format, 0.); }));
   }
 }
 

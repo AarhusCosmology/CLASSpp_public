@@ -425,23 +425,13 @@ void DrPsdSpecies::ComputeBackground(double a, const double* pvecback_B, double*
   pvecback[index_bg_pseudo_p_] = pseudo_p;
 }
 
-void DrPsdSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+void DrPsdSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
   const std::string nm = ColumnLabel();
-  w.Add("(.)number_dr_" + nm, 0.);
-  w.Add("(.)rho_dr_" + nm, 0.);
-  w.Add("(.)p_dr_" + nm, 0.);
+  row.Set("(.)number_dr_" + nm, Number(pvecback));
+  row.Set("(.)rho_dr_" + nm, Rho(pvecback));
+  row.Set("(.)p_dr_" + nm, P(pvecback));
   for (int i = 0; i < N_q_bg_; ++i) {
-    w.Add("f_dr_" + nm + "[" + std::to_string(i) + "]", 0.);
-  }
-}
-
-void DrPsdSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  const std::string nm = ColumnLabel();
-  w.Add("(.)number_dr_" + nm, Number(pvecback));
-  w.Add("(.)rho_dr_" + nm, Rho(pvecback));
-  w.Add("(.)p_dr_" + nm, P(pvecback));
-  for (int i = 0; i < N_q_bg_; ++i) {
-    w.Add("f_dr_" + nm + "[" + std::to_string(i) + "]", pvecback[index_bg_f_ + i]);
+    row.Set("f_dr_" + nm + "[" + std::to_string(i) + "]", pvecback[index_bg_f_ + i]);
   }
 }
 
@@ -782,18 +772,23 @@ void DrPsdSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void DrPsdSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                      const PerturbationsModule& mod,
-                                      file_format fmt,
-                                      BaseSpecies::TransferColumnSection section) const {
+void DrPsdSpecies::AddTransferOutput(OutputTable& row,
+                                     const double* tk,
+                                     const PerturbationsModule& mod,
+                                     file_format fmt,
+                                     BaseSpecies::TransferColumnSection section) const {
   if (fmt != file_format::class_format) {
     return;
   }
   const perturbs* ppt = mod.GetPerturbs();
   if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-    w.Add("d_dr_" + ColumnLabel(), index_tp_delta_, index_tp_delta_ >= 0);
+    if (index_tp_delta_ >= 0) {
+      row.Set("d_dr_" + ColumnLabel(), tk[index_tp_delta_]);
+    }
   }
   if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-    w.Add("t_dr_" + ColumnLabel(), index_tp_theta_, index_tp_theta_ >= 0);
+    if (index_tp_theta_ >= 0) {
+      row.Set("t_dr_" + ColumnLabel(), tk[index_tp_theta_]);
+    }
   }
 }

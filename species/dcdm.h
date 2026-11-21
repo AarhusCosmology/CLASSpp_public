@@ -97,17 +97,17 @@ class DCDMSpecies : public BaseSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
 
  private:
   const background& pba_;

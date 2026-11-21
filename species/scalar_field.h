@@ -106,8 +106,7 @@ class ScalarFieldSpecies : public BaseSpecies {
     return pvecback[index_bg_p_];
   }
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
   void PrintBackgroundDetails(const double* pvecback_today, double rho_crit_today) const override;
 
   // ── Perturbations ────────────────────────────────────────────────────────
@@ -179,18 +178,18 @@ class ScalarFieldSpecies : public BaseSpecies {
                                         const double* pvecback,
                                         const perturb_workspace* ppw) const override;
 
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
 
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
 
   double PPrime(double a,
                 double H,
@@ -206,7 +205,7 @@ class ScalarFieldSpecies : public BaseSpecies {
   }
 
   // Background pvecback slot accessors (used by the Type3 composite to replicate
-  // the scalar-field PrintVariables / coupling against its own nested layout).
+  // the scalar-field AddPerturbationOutput / coupling against its own nested layout).
   int index_bg_phi_prime_scf() const {
     return index_bg_phi_prime_scf_;
   }

@@ -144,21 +144,15 @@ void PerturbationsModule::perturb_sources_at_tau(
 }
 
 /**
- * Function called by the output module or the wrappers, which returns all
- * the source functions \f$ S^{X} (k, \tau) \f$ at a given conformal
- * time tau corresponding to the input redshift z.
+ * The source functions \f$ S^{X} (k, \tau) \f$ of the scalar mode at the conformal time tau
+ * of redshift z, for every k, initial condition and type: tkfull[(index_k * ic_size +
+ * index_ic) * tp_size + index_tp]. At z = 0 the stored table is read directly; at z > 0 it
+ * is interpolated in the late-time sampling.
  *
- * @param output_format    Input: choice of ordering and normalisation for the output quantities
- * @param z                Input: redshift
- * @param number_of_titles Input: number of requested source functions (found in perturb_output_titles)
- * @param data             Output: vector of all source functions for all k values and initial conditions (previously allocated with the right size)
- * @return the error status
+ * @param z Input: redshift
  */
 
-void PerturbationsModule::perturb_output_data(file_format output_format,
-                                              double z,
-                                              int number_of_titles,
-                                              double* data) const {
+std::vector<double> PerturbationsModule::perturb_transfers_at_z(double z) const {
   std::vector<double> tkfull;
   std::vector<double> pvecsources;
 
@@ -169,8 +163,6 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
   if (k_size_[index_md] * ic_size_[index_md] * tp_size_[index_md] > 0) {
     tkfull.resize(k_size_[index_md] * ic_size_[index_md] * tp_size_[index_md]);
   }
-
-  /** - compute \f$T_i(k)\f$ for each k (if several ic's, compute it for each ic; if z_pk = 0, this is done by directly reading inside the pre-computed table; if not, this is done by interpolating the table at the correct value of tau. */
 
   /* if z_pk = 0, no interpolation needed */
 
@@ -220,11 +212,11 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
     }
   }
 
-  perturb_store_columns(output_format, tkfull, number_of_titles, data);
+  return tkfull;
 }
 
 /**
- * Same as perturb_output_data, but at a node of the late-time (ln_tau) sampling
+ * Same as perturb_transfers_at_z, but at a node of the late-time (ln_tau) sampling
  * rather than at an arbitrary redshift.
  *
  * Reading the stored table at a node is both exact and cheaper than
@@ -232,16 +224,10 @@ void PerturbationsModule::perturb_output_data(file_format output_format,
  * way to get the topmost node at all, since converting it to z and back lands
  * marginally outside the tabulation range and trips the guard there.
  *
- * @param output_format    Input: output format (CLASS or CAMB)
- * @param index_tau        Input: index in the late-time sampling, in [0, ln_tau_size_)
- * @param number_of_titles Input: number of requested titles
- * @param data             Output: vector of all source functions for all k values and initial conditions (previously allocated with the right size)
+ * @param index_tau Input: index in the late-time sampling, in [0, ln_tau_size_)
  */
 
-void PerturbationsModule::perturb_output_data_at_index_tau(file_format output_format,
-                                                           int index_tau,
-                                                           int number_of_titles,
-                                                           double* data) const {
+std::vector<double> PerturbationsModule::perturb_transfers_at_index_tau(int index_tau) const {
   std::vector<double> tkfull;
 
   int index_md = index_md_scalars_;
@@ -250,11 +236,11 @@ void PerturbationsModule::perturb_output_data_at_index_tau(file_format output_fo
      into (perturb_indices_of_perturbs); with ln_tau_size_ == 1 its entries are
      still null, so the one-point case has to be refused rather than indexed.
      That case carries no node anyway: z=0 is reached through
-     perturb_output_data(0.), which reads sources_ directly. */
+     GetTransferTables(format, 0.), which reads sources_ directly. */
   class_test_severe(ln_tau_size_ <= 1,
                     "there is no late-time sampling to index: the sources were stored at z=0 "
                     "only. Pass either a list of redshifts in 'z_pk' or one non-zero value in "
-                    "'z_max_pk', or ask for z=0 through perturb_output_data.");
+                    "'z_max_pk', or ask for the transfer functions at z=0.");
 
   class_test_severe((index_tau < 0) || (index_tau >= ln_tau_size_),
                     "index_tau=%d is outside the late-time sampling [0,%d)",
@@ -275,174 +261,120 @@ void PerturbationsModule::perturb_output_data_at_index_tau(file_format output_fo
     }
   }
 
-  perturb_store_columns(output_format, tkfull, number_of_titles, data);
+  return tkfull;
 }
 
 /**
- * Lay a table of transfer functions out into the output columns, in the order
- * perturb_output_titles names them. Shared by the two entry points above, which
- * differ only in how they fill that table.
+ * The 'mTk, vTk' tables: one per initial condition, one row per k, each column named where
+ * its value is set. Shared by GetTransferTables and GetTransferTablesAtIndexTau, which
+ * differ only in how they fill tkfull.
  *
- * @param output_format    Input: output format (CLASS or CAMB)
- * @param tkfull           Input: T_i(k) for every k, initial condition and type
- * @param number_of_titles Input: number of requested titles
- * @param data             Output: vector of all source functions for all k values and initial conditions (previously allocated with the right size)
+ * @param output_format Input: output format (CLASS or CAMB)
+ * @param tkfull        Input: T_i(k) for every k, initial condition and type
  */
 
-void PerturbationsModule::perturb_store_columns(file_format output_format,
-                                                const std::vector<double>& tkfull,
-                                                int number_of_titles,
-                                                double* data) const {
-  double k;
-  double k_over_h;
-  double k2;
-  const double* tk;
-  double* dataptr;
+std::vector<OutputTable> PerturbationsModule::TransferTables(
+    file_format output_format, const std::vector<double>& tkfull) const {
+  const int index_md = index_md_scalars_;
 
-  int index_md = index_md_scalars_;
-
-  /** - store data */
+  std::vector<OutputTable> tables;
+  tables.reserve(ic_size_[index_md]);
 
   for (int index_ic = 0; index_ic < ic_size_[index_md]; index_ic++) {
+    OutputTable& row = tables.emplace_back("transfer functions");
+    row.ReserveRows(k_size_[index_md]);
     for (int index_k = 0; index_k < k_size_[index_md]; index_k++) {
-      int storeidx = 0;
-      dataptr      = data + index_ic * (k_size_[index_md] * number_of_titles) +
-                     index_k * number_of_titles;
-      tk           = &(tkfull[(index_k * ic_size_[index_md] + index_ic) * tp_size_[index_md]]);
-      k            = k_[index_md][index_k];
-      k2           = k * k;
-      k_over_h     = k / pba->h;
+      const double* tk = &(tkfull[(index_k * ic_size_[index_md] + index_ic) * tp_size_[index_md]]);
+      const double k   = k_[index_md][index_k];
 
-      class_store_double(dataptr, k_over_h, true, storeidx);
-
-      /* indices for species associated with a velocity transfer function in Fourier space */
+      row.Set("k (h/Mpc)", k / pba->h);
 
       if (output_format == file_format::class_format) {
         if (ppt->has_density_transfers) {
-          PerturbColumnWriter w(dataptr, tk, storeidx);
           for (const auto& [name, sp] : all_species_) {
-            sp->WriteOutputColumns(w,
-                                   *this,
-                                   output_format,
-                                   BaseSpecies::TransferColumnSection::density);
+            sp->AddTransferOutput(row,
+                                  tk,
+                                  *this,
+                                  output_format,
+                                  BaseSpecies::TransferColumnSection::density);
           }
-          class_store_double(dataptr, tk[index_tp_delta_m_], has_source_delta_m_, storeidx);
-          class_store_double(dataptr, tk[index_tp_delta_tot_], has_source_delta_tot_, storeidx);
-          class_store_double(dataptr, tk[index_tp_phi_], has_source_phi_, storeidx);
-          class_store_double(dataptr, tk[index_tp_psi_], has_source_psi_, storeidx);
-          class_store_double(dataptr, tk[index_tp_phi_prime_], has_source_phi_prime_, storeidx);
-          class_store_double(dataptr, tk[index_tp_h_], has_source_h_, storeidx);
-          class_store_double(dataptr, tk[index_tp_h_prime_], has_source_h_prime_, storeidx);
-          class_store_double(dataptr, tk[index_tp_eta_], has_source_eta_, storeidx);
-          class_store_double(dataptr, tk[index_tp_eta_prime_], has_source_eta_prime_, storeidx);
-          class_store_double(dataptr,
-                             tk[index_tp_H_T_Nb_prime_],
-                             has_source_H_T_Nb_prime_,
-                             storeidx);
-          class_store_double(dataptr, tk[index_tp_k2gamma_Nb_], has_source_k2gamma_Nb_, storeidx);
+          /* d_m, the total *matter* contrast, is the one P(k) is built from, and is
+             what turns a matter spectrum into a Weyl one. Written only when a
+             request that defines it (mPk, non-linear corrections, number counts)
+             set the source; same condition and same column position as
+             class_public. */
+          if (has_source_delta_m_) {
+            row.Set("d_m", tk[index_tp_delta_m_]);
+          }
+          if (has_source_delta_tot_) {
+            row.Set("d_tot", tk[index_tp_delta_tot_]);
+          }
+          if (has_source_phi_) {
+            row.Set("phi", tk[index_tp_phi_]);
+          }
+          if (has_source_psi_) {
+            row.Set("psi", tk[index_tp_psi_]);
+          }
+          if (has_source_phi_prime_) {
+            row.Set("phi_prime", tk[index_tp_phi_prime_]);
+          }
+          if (has_source_h_) {
+            row.Set("h", tk[index_tp_h_]);
+          }
+          if (has_source_h_prime_) {
+            row.Set("h_prime", tk[index_tp_h_prime_]);
+          }
+          if (has_source_eta_) {
+            row.Set("eta", tk[index_tp_eta_]);
+          }
+          if (has_source_eta_prime_) {
+            row.Set("eta_prime", tk[index_tp_eta_prime_]);
+          }
+          if (has_source_H_T_Nb_prime_) {
+            row.Set("H_T_Nb_prime", tk[index_tp_H_T_Nb_prime_]);
+          }
+          if (has_source_k2gamma_Nb_) {
+            row.Set("k2gamma_Nb", tk[index_tp_k2gamma_Nb_]);
+          }
         }
         if (ppt->has_velocity_transfers) {
-          PerturbColumnWriter w(dataptr, tk, storeidx);
           for (const auto& [name, sp] : all_species_) {
-            sp->WriteOutputColumns(w,
-                                   *this,
-                                   output_format,
-                                   BaseSpecies::TransferColumnSection::velocity);
+            sp->AddTransferOutput(row,
+                                  tk,
+                                  *this,
+                                  output_format,
+                                  BaseSpecies::TransferColumnSection::velocity);
           }
-          class_store_double(dataptr, tk[index_tp_theta_tot_], has_source_theta_tot_, storeidx);
+          if (has_source_theta_tot_) {
+            row.Set("t_tot", tk[index_tp_theta_tot_]);
+          }
         }
       }
       else if (output_format == file_format::camb_format) {
         /* rescale and reorder the matter transfer functions following the CMBFAST/CAMB convention */
-        {
-          PerturbColumnWriter w(dataptr, tk, storeidx);
-          for (const auto& [name, sp] : all_species_) {
-            sp->WriteOutputColumns(w,
-                                   *this,
-                                   output_format,
-                                   BaseSpecies::TransferColumnSection::density);
-          }
+        for (const auto& [name, sp] : all_species_) {
+          sp->AddTransferOutput(row,
+                                tk,
+                                *this,
+                                output_format,
+                                BaseSpecies::TransferColumnSection::density);
         }
-        class_store_double_or_default(dataptr, -tk[index_tp_delta_tot_] / k2, true, storeidx, 0.0);
+        row.Set("-T_tot/k2", has_source_delta_tot_ ? -tk[index_tp_delta_tot_] / (k * k) : 0.);
       }
+      row.EndRow();
     }
   }
-
-  /* RAII: tkfull cleaned up automatically */
+  return tables;
 }
 
-/**
- * Fill array of strings with the name of the requested 'mTk, vTk' functions
- * (transfer functions as a function of wavenumber for fixed times).
- *
- * @param output_format Input: flag for the format
- * @param titles        Output: name strings
- * @return the error status
- */
+std::vector<OutputTable> PerturbationsModule::GetTransferTables(file_format output_format,
+                                                                double z) const {
+  return TransferTables(output_format, perturb_transfers_at_z(z));
+}
 
-void PerturbationsModule::perturb_output_titles(file_format output_format,
-                                                std::string& titles) const {
-  if (output_format == file_format::class_format) {
-    class_store_columntitle(titles, "k (h/Mpc)", true);
-    if (ppt->has_density_transfers) {
-      PerturbColumnWriter w(titles);
-      for (const auto& [name, sp] : all_species_) {
-        sp->WriteOutputColumns(w,
-                               *this,
-                               output_format,
-                               BaseSpecies::TransferColumnSection::density);
-      }
-      /* d_m, the total *matter* contrast, is the one P(k) is built from, and is
-         what turns a matter spectrum into a Weyl one. Written only when a
-         request that defines it (mPk, non-linear corrections, number counts)
-         set the source; same condition and same column position as
-         class_public. */
-      class_store_columntitle(titles, "d_m", has_source_delta_m_);
-      class_store_columntitle(titles, "d_tot", true);
-      class_store_columntitle(titles, "phi", has_source_phi_);
-      class_store_columntitle(titles, "psi", has_source_psi_);
-      class_store_columntitle(titles, "phi_prime", has_source_phi_prime_);
-      class_store_columntitle(titles, "h", has_source_h_);
-      class_store_columntitle(titles, "h_prime", has_source_h_prime_);
-      class_store_columntitle(titles, "eta", has_source_eta_);
-      class_store_columntitle(titles, "eta_prime", has_source_eta_prime_);
-      class_store_columntitle(titles, "H_T_Nb_prime", has_source_H_T_Nb_prime_);
-      class_store_columntitle(titles, "k2gamma_Nb", has_source_k2gamma_Nb_);
-    }
-    if (ppt->has_velocity_transfers) {
-      PerturbColumnWriter w(titles);
-      for (const auto& [name, sp] : all_species_) {
-        sp->WriteOutputColumns(w,
-                               *this,
-                               output_format,
-                               BaseSpecies::TransferColumnSection::velocity);
-      }
-      class_store_columntitle(titles, "t_tot", true);
-    }
-  }
-
-  else if (output_format == file_format::camb_format) {
-    class_store_columntitle(titles, "k (h/Mpc)", true);
-    {
-      PerturbColumnWriter w(titles);
-      for (const auto& [name, sp] : all_species_) {
-        sp->WriteOutputColumns(w,
-                               *this,
-                               output_format,
-                               BaseSpecies::TransferColumnSection::density);
-      }
-    }
-    class_store_columntitle(titles, "-T_tot/k2", true);
-  }
-
-  // Species title their columns after their instance names (d_<N>, t__<N>); see
-  // background_output_titles for why a repeated title is an error.
-  const std::string duplicate = first_duplicate_title(titles);
-  class_test_severe(!duplicate.empty(),
-                    "two transfer-function columns are titled '%s'. A species instance's name "
-                    "makes its column titles; rename the instance so they do not repeat another "
-                    "column's",
-                    duplicate.c_str());
+std::vector<OutputTable> PerturbationsModule::GetTransferTablesAtIndexTau(file_format output_format,
+                                                                          int index_tau) const {
+  return TransferTables(output_format, perturb_transfers_at_index_tau(index_tau));
 }
 
 /**
@@ -488,50 +420,7 @@ void PerturbationsModule::perturb_output_firstline_and_ic_suffix(int index_ic,
   }
 }
 
-namespace {
-
-/* One table per initial condition from a block laid out as perturb_store_columns
-   writes it: initial conditions, then k, then titles. */
-std::vector<NamedColumns> SplitPerInitialCondition(const std::string& titles,
-                                                   const std::vector<double>& data,
-                                                   int ic_size,
-                                                   int k_size) {
-  const size_t size_ic_data = static_cast<size_t>(get_number_of_titles(titles)) * k_size;
-  std::vector<NamedColumns> tables;
-  tables.reserve(ic_size);
-  for (int index_ic = 0; index_ic < ic_size; index_ic++) {
-    tables.push_back(SplitIntoColumns(titles, data.data() + index_ic * size_ic_data, k_size));
-  }
-  return tables;
-}
-
-}  // namespace
-
-std::vector<NamedColumns> PerturbationsModule::GetTransferColumns(file_format output_format,
-                                                                  double z) const {
-  const int index_md = index_md_scalars_;
-  std::string titles;
-  perturb_output_titles(output_format, titles);
-  const int number_of_titles = get_number_of_titles(titles);
-  std::vector<double> data(static_cast<size_t>(number_of_titles) * k_size_[index_md] *
-                           ic_size_[index_md]);
-  perturb_output_data(output_format, z, number_of_titles, data.data());
-  return SplitPerInitialCondition(titles, data, ic_size_[index_md], k_size_[index_md]);
-}
-
-std::vector<NamedColumns> PerturbationsModule::GetTransferColumnsAtIndexTau(
-    file_format output_format, int index_tau) const {
-  const int index_md = index_md_scalars_;
-  std::string titles;
-  perturb_output_titles(output_format, titles);
-  const int number_of_titles = get_number_of_titles(titles);
-  std::vector<double> data(static_cast<size_t>(number_of_titles) * k_size_[index_md] *
-                           ic_size_[index_md]);
-  perturb_output_data_at_index_tau(output_format, index_tau, number_of_titles, data.data());
-  return SplitPerInitialCondition(titles, data, ic_size_[index_md], k_size_[index_md]);
-}
-
-std::vector<NamedColumns> PerturbationsModule::GetPerturbationColumns(int index_md) const {
+std::vector<OutputTable> PerturbationsModule::GetPerturbationTables(int index_md) const {
   class_test_severe(!ppt->has_perturbations,
                     "the perturbations at k_output_values are stored while the perturbations are "
                     "computed, and this run computes none. Add an output that needs them, such "
@@ -540,26 +429,16 @@ std::vector<NamedColumns> PerturbationsModule::GetPerturbationColumns(int index_
   class_test_severe(index_md < 0 || index_md >= md_size_,
                     "index_md=%d is not a mode of this run",
                     index_md);
-  const std::string* titles       = &scalar_titles_;
-  const std::vector<double>* data = scalar_perturbations_data_;
-  const int* size_data            = size_scalar_perturbation_data_;
-  if (index_md == index_md_vectors_) {
-    titles    = &vector_titles_;
-    data      = vector_perturbations_data_;
-    size_data = size_vector_perturbation_data_;
-  }
-  else if (index_md == index_md_tensors_) {
-    titles    = &tensor_titles_;
-    data      = tensor_perturbations_data_;
-    size_data = size_tensor_perturbation_data_;
-  }
-  const int number_of_titles = get_number_of_titles(*titles);
+  const auto& per_ic = k_output_tables_[index_md];
 
-  std::vector<NamedColumns> tables;
+  std::vector<OutputTable> tables;
   tables.reserve(ppt->k_output_values_num);
   for (int index_ikout = 0; index_ikout < ppt->k_output_values_num; index_ikout++) {
-    const int number_of_rows = number_of_titles > 0 ? size_data[index_ikout] / number_of_titles : 0;
-    tables.push_back(SplitIntoColumns(*titles, data[index_ikout].data(), number_of_rows));
+    OutputTable& table = tables.emplace_back(per_ic[0][index_ikout]);
+    // The rows of the other initial conditions follow, as class_public writes them.
+    for (size_t index_ic = 1; index_ic < per_ic.size(); index_ic++) {
+      table.Append(per_ic[index_ic][index_ikout]);
+    }
   }
   return tables;
 }
@@ -969,12 +848,6 @@ void PerturbationsModule::perturb_indices_of_perturbs() {
   sources_.resize(md_size_);
   late_sources_.resize(md_size_);
   ddlate_sources_.resize(md_size_);
-
-  /** - initialize variables for the output of k values */
-
-  number_of_scalar_titles_ = 0;
-  number_of_vector_titles_ = 0;
-  number_of_tensor_titles_ = 0;
 
   /** - initialization of all flags to false (will eventually be set to true later) */
 
@@ -2751,66 +2624,18 @@ void PerturbationsModule::perturb_solve(int index_md,
  */
 
 void PerturbationsModule::perturb_prepare_k_output() {
-  scalar_titles_.clear();
-  vector_titles_.clear();
-  tensor_titles_.clear();
-
-  if (ppt->k_output_values_num > 0) {
-    /** Write titles for all perturbations that we would like to print/store. */
-    if (ppt->has_scalars) {
-      class_store_columntitle(scalar_titles_, "tau [Mpc]", true);
-      class_store_columntitle(scalar_titles_, "a", true);
-      {
-        PerturbColumnWriter w(scalar_titles_);
-        // Title mode: no perturb_vector exists yet, so there is no layout to pass.
-        for (const auto& [name, sp] : all_species_) {
-          sp->PrintVariables(w, nullptr, 0., nullptr, *this, nullptr);
-        }
-      }
-      class_store_columntitle(scalar_titles_, "psi", true);
-      class_store_columntitle(scalar_titles_, "phi", true);
-      /* Perturbed recombination */
-      class_store_columntitle(scalar_titles_, "delta_Tb", ppt->has_perturbed_recombination);
-      class_store_columntitle(scalar_titles_, "delta_chi", ppt->has_perturbed_recombination);
-
-      number_of_scalar_titles_    = get_number_of_titles(scalar_titles_);
-      const std::string duplicate = first_duplicate_title(scalar_titles_);
-      class_test_severe(!duplicate.empty(),
-                        "two k_output_values columns are titled '%s'. A species instance's name "
-                        "makes its column titles (delta_<N>, ...); rename the instance so they do "
-                        "not repeat another column's",
-                        duplicate.c_str());
-    }
-
-    if (ppt->has_tensors) {
-      class_store_columntitle(tensor_titles_, "tau [Mpc]", true);
-      class_store_columntitle(tensor_titles_, "a", true);
-      class_store_columntitle(tensor_titles_, "delta_g", true);
-      class_store_columntitle(tensor_titles_, "shear_g", true);
-      class_store_columntitle(tensor_titles_, "l4_g", true);
-      class_store_columntitle(tensor_titles_, "pol0_g", true);
-      class_store_columntitle(tensor_titles_, "pol2_g", true);
-      class_store_columntitle(tensor_titles_, "pol4_g", true);
-      class_store_columntitle(tensor_titles_, "H (gw)", true);
-      class_store_columntitle(tensor_titles_, "Hdot (gwdot)", true);
-
-      class_store_columntitle(tensor_titles_, "delta_ur", evolve_tensor_ur_);
-      class_store_columntitle(tensor_titles_, "shear_ur", evolve_tensor_ur_);
-      class_store_columntitle(tensor_titles_, "l4_ur", evolve_tensor_ur_);
-
-      if (evolve_tensor_ncdm_) {
-        for (const auto& sp : all_species_) {
-          sp->WriteTensorOutputColumnTitles(tensor_titles_);
-        }
-      }
-
-      number_of_tensor_titles_    = get_number_of_titles(tensor_titles_);
-      const std::string duplicate = first_duplicate_title(tensor_titles_);
-      class_test_severe(!duplicate.empty(),
-                        "two tensor k_output_values columns are titled '%s'; rename the species "
-                        "instance whose name makes them repeat",
-                        duplicate.c_str());
-    }
+  /* One table per mode, initial condition and k_output_values: the tasks of perturb_init
+     integrate every initial condition of a wavenumber at once, so each needs its own. The
+     rows name their columns as perturb_print_variables fills them; a repeated name fails
+     there, in the first row. */
+  k_output_tables_.assign(md_size_, {});
+  for (int index_md = 0; index_md < md_size_; index_md++) {
+    const char* what = (index_md == index_md_tensors_)   ? "tensor k_output_values"
+                       : (index_md == index_md_vectors_) ? "vector k_output_values"
+                                                         : "scalar k_output_values";
+    k_output_tables_[index_md].assign(ic_size_[index_md],
+                                      std::vector<OutputTable>(ppt->k_output_values_num,
+                                                               OutputTable(what)));
   }
 }
 
@@ -5503,8 +5328,7 @@ void PerturbationsModule::perturb_print_variables(double tau,
 
   perturb_einstein(index_md, k, tau, y, ppw);
 
-  double a  = pvecback[background_module_->index_bg_a_];
-  double a2 = a * a;
+  double a = pvecback[background_module_->index_bg_a_];
 
   /** - calculate perturbed recombination */
 
@@ -5529,7 +5353,8 @@ void PerturbationsModule::perturb_print_variables(double tau,
   double phi      = 0.;
   double psi      = 0.;
   double alpha    = 0.;
-  double* dataptr = nullptr;
+
+  OutputTable& row = k_output_tables_[index_md][pppaw->index_ic][ppw->index_ikout];
 
   /** - for scalar modes */
   if (_scalars_) {
@@ -5551,40 +5376,21 @@ void PerturbationsModule::perturb_print_variables(double tau,
       phi = 0.0;
     }
 
-    //    fprintf(ppw->perturb_output_file," ");
-    /** - --> Handle (re-)allocation */
-    if (scalar_perturbations_data_[ppw->index_ikout].empty()) {
-      scalar_perturbations_data_[ppw->index_ikout].resize(number_of_scalar_titles_);
-      size_scalar_perturbation_data_[ppw->index_ikout] = 0;
+    row.Set("tau [Mpc]", tau);
+    row.Set("a", pvecback[background_module_->index_bg_a_]);
+    // Indexed, not a counter alongside a range-for: species_layouts is parallel to
+    // all_species_, and SpeciesCollection::operator[] exists for exactly this pairing.
+    for (size_t i = 0; i < all_species_.size(); ++i) {
+      all_species_[i]->AddPerturbationOutput(row, *ppw->pv->species_layouts[i], tau, y, *this, ppw);
     }
-    else {
-      scalar_perturbations_data_[ppw->index_ikout].resize(
-          size_scalar_perturbation_data_[ppw->index_ikout] + number_of_scalar_titles_);
-    }
-    int storeidx = 0;
-    dataptr      = scalar_perturbations_data_[ppw->index_ikout].data() +
-                   size_scalar_perturbation_data_[ppw->index_ikout];
-    size_scalar_perturbation_data_[ppw->index_ikout] += number_of_scalar_titles_;
-
-    class_store_double(dataptr, tau, true, storeidx);
-    class_store_double(dataptr, pvecback[background_module_->index_bg_a_], true, storeidx);
-    {
-      PerturbColumnWriter w(dataptr, storeidx);
-      // Indexed, not a counter alongside a range-for: species_layouts is parallel to
-      // all_species_, and SpeciesCollection::operator[] exists for exactly this
-      // pairing. Iterating all of them (not active_species/source_species, which are
-      // filtered) is required — title mode has no pv and emits every species, so the
-      // two loops must produce the same columns in the same order.
-      for (size_t i = 0; i < all_species_.size(); ++i) {
-        all_species_[i]->PrintVariables(w, ppw->pv->species_layouts[i].get(), tau, y, *this, ppw);
-      }
-    }
-    class_store_double(dataptr, psi, true, storeidx);
-    class_store_double(dataptr, phi, true, storeidx);
+    row.Set("psi", psi);
+    row.Set("phi", phi);
     /* perturbed recombination */
-    class_store_double(dataptr, delta_temp, ppt->has_perturbed_recombination, storeidx);
-    class_store_double(dataptr, delta_chi, ppt->has_perturbed_recombination, storeidx);
-    //fprintf(ppw->perturb_output_file,"\n");
+    if (ppt->has_perturbed_recombination) {
+      row.Set("delta_Tb", delta_temp);
+      row.Set("delta_chi", delta_chi);
+    }
+    row.EndRow();
   }
   /** - for tensor modes: */
 
@@ -5637,80 +5443,32 @@ void PerturbationsModule::perturb_print_variables(double tau,
       l4_ur                 = y[ur_pv_lay.idx_delta + 4];
     }
 
-    /** - --> Handle (re-)allocation */
-    if (tensor_perturbations_data_[ppw->index_ikout].empty()) {
-      tensor_perturbations_data_[ppw->index_ikout].resize(number_of_tensor_titles_);
-      size_tensor_perturbation_data_[ppw->index_ikout] = 0;
+    row.Set("tau [Mpc]", tau);
+    row.Set("a", pvecback[background_module_->index_bg_a_]);
+    row.Set("delta_g", delta_g);
+    row.Set("shear_g", shear_g);
+    row.Set("l4_g", l4_g);
+    row.Set("pol0_g", pol0_g);
+    row.Set("pol2_g", pol2_g);
+    row.Set("pol4_g", pol4_g);
+    row.Set("H (gw)", y[ppw->pv->index_pt_gw]);
+    row.Set("Hdot (gwdot)", y[ppw->pv->index_pt_gwdot]);
+
+    if (evolve_tensor_ur_) {
+      row.Set("delta_ur", delta_ur);
+      row.Set("shear_ur", shear_ur);
+      row.Set("l4_ur", l4_ur);
     }
-    else {
-      tensor_perturbations_data_[ppw->index_ikout].resize(
-          size_tensor_perturbation_data_[ppw->index_ikout] + number_of_tensor_titles_);
-    }
-    int storeidx = 0;
-    dataptr      = tensor_perturbations_data_[ppw->index_ikout].data() +
-                   size_tensor_perturbation_data_[ppw->index_ikout];
-    size_tensor_perturbation_data_[ppw->index_ikout] += number_of_tensor_titles_;
 
-    //fprintf(ppw->perturb_output_file," ");
-    class_store_double(dataptr, tau, true, storeidx);
-    class_store_double(dataptr, pvecback[background_module_->index_bg_a_], true, storeidx);
-    class_store_double(dataptr, delta_g, true, storeidx);
-    class_store_double(dataptr, shear_g, true, storeidx);
-    class_store_double(dataptr, l4_g, true, storeidx);
-    class_store_double(dataptr, pol0_g, true, storeidx);
-    class_store_double(dataptr, pol2_g, true, storeidx);
-    class_store_double(dataptr, pol4_g, true, storeidx);
-    class_store_double(dataptr, y[ppw->pv->index_pt_gw], true, storeidx);
-    class_store_double(dataptr, y[ppw->pv->index_pt_gwdot], true, storeidx);
-
-    class_store_double(dataptr, delta_ur, evolve_tensor_ur_, storeidx);
-    class_store_double(dataptr, shear_ur, evolve_tensor_ur_, storeidx);
-    class_store_double(dataptr, l4_ur, evolve_tensor_ur_, storeidx);
-
-    /* Non-cold Dark Matter */
+    /* Non-cold Dark Matter. Decaying NCDM with tensor modes is rejected in perturb_init
+       (the guard where evolve_tensor_ncdm_ is set). */
     if (evolve_tensor_ncdm_) {
-      // Decaying NCDM with tensor modes is rejected in perturb_init (the guard
-      // where evolve_tensor_ncdm_ is set), so only plain NCDMSpecies reach here.
       for (size_t i = 0; i < all_species_.size(); ++i) {
-        const auto* ncdm_sp = dynamic_cast<const NCDMSpecies*>(all_species_[i]);
-        if (!ncdm_sp) {
-          continue;
-        }
-        const auto& ncdm_lay = static_cast<const NCDMBaseSpecies::PerturbLayout&>(
-            *ppw->pv->species_layouts[i]);
-        double rho_delta_ncdm        = 0.0;
-        double rho_plus_p_theta_ncdm = 0.0;
-        double rho_plus_p_shear_ncdm = 0.0;
-        const double factor          = ncdm_sp->factor() * pow(1. / a, 4);
-
-        for (int index_q = 0; index_q < ncdm_lay.q_size; index_q++) {
-          const int idx        = ncdm_lay.index_per_q[index_q];
-          const double q       = ncdm_sp->q()[index_q];
-          const double q2      = q * q;
-          const double epsilon = sqrt(q2 + ncdm_sp->M() * ncdm_sp->M() * a2);
-
-          rho_delta_ncdm        += q2 * epsilon * ncdm_sp->w()[index_q] * y[idx];
-          rho_plus_p_theta_ncdm += q2 * q * ncdm_sp->w()[index_q] * y[idx + 1];
-          rho_plus_p_shear_ncdm += q2 * q2 / epsilon * ncdm_sp->w()[index_q] * y[idx + 2];
-        }
-
-        rho_delta_ncdm        *= factor;
-        rho_plus_p_theta_ncdm *= k * factor;
-        rho_plus_p_shear_ncdm *= 2.0 / 3.0 * factor;
-
-        const double rho        = ncdm_sp->Rho(ppw->pvecback.data());
-        const double rho_plus_p = rho + ncdm_sp->P(ppw->pvecback.data());
-        const double delta_ncdm = rho_delta_ncdm / rho;
-        const double theta_ncdm = rho_plus_p_theta_ncdm / rho_plus_p;
-        const double shear_ncdm = rho_plus_p_shear_ncdm / rho_plus_p;
-
-        class_store_double(dataptr, delta_ncdm, true, storeidx);
-        class_store_double(dataptr, theta_ncdm, true, storeidx);
-        class_store_double(dataptr, shear_ncdm, true, storeidx);
+        all_species_[i]
+            ->AddTensorPerturbationOutput(row, *ppw->pv->species_layouts[i], k, a, y, pvecback);
       }
     }
-
-    //    fprintf(ppw->perturb_output_file,"\n");
+    row.EndRow();
   }
 }
 

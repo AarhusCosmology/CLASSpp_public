@@ -614,28 +614,33 @@ void PhotonsSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRe
   class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
 }
 
-void PhotonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                        const PerturbationsModule& mod,
-                                        file_format fmt,
-                                        BaseSpecies::TransferColumnSection section) const {
+void PhotonsSpecies::AddTransferOutput(OutputTable& row,
+                                       const double* tk,
+                                       const PerturbationsModule& mod,
+                                       file_format fmt,
+                                       BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_g", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_g", tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_g", index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_g", tk[index_tp_theta_]);
+      }
     }
   }
   // file_format::camb_format: photons not written separately
 }
 
-void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
-                                    const BaseSpecies::PerturbLayout* base,
-                                    double /*tau*/,
-                                    const double* y,
-                                    const PerturbationsModule& mod,
-                                    const perturb_workspace* ppw) const {
+void PhotonsSpecies::AddPerturbationOutput(OutputTable& row,
+                                           const BaseSpecies::PerturbLayout& base,
+                                           double /*tau*/,
+                                           const double* y,
+                                           const PerturbationsModule& mod,
+                                           const perturb_workspace* ppw) const {
   double delta_g = 0.;
   double theta_g = 0.;
   double shear_g = 0.;
@@ -643,55 +648,53 @@ void PhotonsSpecies::PrintVariables(PerturbColumnWriter& w,
   double pol1_g  = 0.;
   double pol2_g  = 0.;
 
-  if (!w.IsTitleMode()) {
-    const auto& g_lay = static_cast<const PerturbLayout&>(*base);
-    // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs
-    // before the print callback fires, so it equals pppaw->k at this call site.
-    const double k           = ppw->scalar_ctx.k;
-    const double* pvecthermo = ppw->pvecthermo.data();
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
+  const auto& g_lay = static_cast<const PerturbLayout&>(base);
+  // scalar_ctx.k is always current here: the evolver sets it in perturb_derivs
+  // before the print callback fires, so it equals pppaw->k at this call site.
+  const double k           = ppw->scalar_ctx.k;
+  const double* pvecthermo = ppw->pvecthermo.data();
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
 
-    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
-      delta_g = y[g_lay.idx_delta];
-      theta_g = y[g_lay.idx_theta];
-      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
-        const double dkappa = pvecthermo[mod.GetThermodynamicsModule()->index_th_dkappa_];
-        shear_g             = ppw->tca_shear_g;
-        pol0_g              = 2.5 * ppw->tca_shear_g;
-        pol1_g              = 7. / 12. * 6. / 7. * k / dkappa * ppw->tca_shear_g;
-        pol2_g              = 0.5 * ppw->tca_shear_g;
-      }
-      else {
-        shear_g = y[g_lay.idx_shear];
-        pol0_g  = y[g_lay.idx_pol0];
-        pol1_g  = y[g_lay.idx_pol1];
-        pol2_g  = y[g_lay.idx_pol2];
-      }
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
+    delta_g = y[g_lay.idx_delta];
+    theta_g = y[g_lay.idx_theta];
+    if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on)) {
+      const double dkappa = pvecthermo[mod.GetThermodynamicsModule()->index_th_dkappa_];
+      shear_g             = ppw->tca_shear_g;
+      pol0_g              = 2.5 * ppw->tca_shear_g;
+      pol1_g              = 7. / 12. * 6. / 7. * k / dkappa * ppw->tca_shear_g;
+      pol2_g              = 0.5 * ppw->tca_shear_g;
     }
     else {
-      // RSA on: use approximated values; shear/pol remain 0
-      delta_g = ppw->rsa_delta_g;
-      theta_g = ppw->rsa_theta_g;
-    }
-
-    // Synchronous → Newtonian gauge conversion
-    const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha  = pvecmetric[ppw->index_mt_alpha];
-      const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-      const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      delta_g            -= 4. * H * a * alpha;
-      theta_g            += k * k * alpha;
+      shear_g = y[g_lay.idx_shear];
+      pol0_g  = y[g_lay.idx_pol0];
+      pol1_g  = y[g_lay.idx_pol1];
+      pol2_g  = y[g_lay.idx_pol2];
     }
   }
+  else {
+    // RSA on: use approximated values; shear/pol remain 0
+    delta_g = ppw->rsa_delta_g;
+    theta_g = ppw->rsa_theta_g;
+  }
 
-  w.Add("delta_g", delta_g, true);
-  w.Add("theta_g", theta_g, true);
-  w.Add("shear_g", shear_g, true);
-  w.Add("pol0_g", pol0_g, true);
-  w.Add("pol1_g", pol1_g, true);
-  w.Add("pol2_g", pol2_g, true);
+  // Synchronous → Newtonian gauge conversion
+  const perturbs* ppt = mod.GetPerturbs();
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha  = pvecmetric[ppw->index_mt_alpha];
+    const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    delta_g            -= 4. * H * a * alpha;
+    theta_g            += k * k * alpha;
+  }
+
+  row.Set("delta_g", delta_g);
+  row.Set("theta_g", theta_g);
+  row.Set("shear_g", shear_g);
+  row.Set("pol0_g", pol0_g);
+  row.Set("pol1_g", pol1_g);
+  row.Set("pol2_g", pol2_g);
 }
 
 // ── MarkUsedInSources ─────────────────────────────────────────────────────────

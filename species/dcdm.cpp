@@ -179,50 +179,53 @@ void DCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void DCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                     const PerturbationsModule& mod,
-                                     file_format fmt,
-                                     BaseSpecies::TransferColumnSection section) const {
+void DCDMSpecies::AddTransferOutput(OutputTable& row,
+                                    const double* tk,
+                                    const PerturbationsModule& mod,
+                                    file_format fmt,
+                                    BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_dcdm", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_dcdm", tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_dcdm", index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_dcdm", tk[index_tp_theta_]);
+      }
     }
   }
 }
 
-void DCDMSpecies::PrintVariables(PerturbColumnWriter& w,
-                                 const BaseSpecies::PerturbLayout* base,
-                                 double /*tau*/,
-                                 const double* y,
-                                 const PerturbationsModule& mod,
-                                 const perturb_workspace* ppw) const {
+void DCDMSpecies::AddPerturbationOutput(OutputTable& row,
+                                        const BaseSpecies::PerturbLayout& base,
+                                        double /*tau*/,
+                                        const double* y,
+                                        const PerturbationsModule& mod,
+                                        const perturb_workspace* ppw) const {
   double delta_dcdm = 0.;
   double theta_dcdm = 0.;
 
-  if (!w.IsTitleMode()) {
-    const auto& layout       = static_cast<const PerturbLayout&>(*base);
-    const double k           = ppw->scalar_ctx.k;
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
+  const auto& layout       = static_cast<const PerturbLayout&>(base);
+  const double k           = ppw->scalar_ctx.k;
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
 
-    delta_dcdm = y[layout.idx_delta];
-    theta_dcdm = y[layout.idx_theta];
+  delta_dcdm = y[layout.idx_delta];
+  theta_dcdm = y[layout.idx_theta];
 
-    // Synchronous → Newtonian gauge conversion for DCDM (matter + decay term)
-    const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha  = pvecmetric[ppw->index_mt_alpha];
-      const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-      const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      delta_dcdm         += alpha * (-a * Gamma_dcdm_ - 3. * a * H);
-      theta_dcdm         += k * k * alpha;
-    }
+  // Synchronous → Newtonian gauge conversion for DCDM (matter + decay term)
+  const perturbs* ppt = mod.GetPerturbs();
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha  = pvecmetric[ppw->index_mt_alpha];
+    const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    delta_dcdm         += alpha * (-a * Gamma_dcdm_ - 3. * a * H);
+    theta_dcdm         += k * k * alpha;
   }
 
-  w.Add("delta_dcdm", delta_dcdm, true);
-  w.Add("theta_dcdm", theta_dcdm, true);
+  row.Set("delta_dcdm", delta_dcdm);
+  row.Set("theta_dcdm", theta_dcdm);
 }

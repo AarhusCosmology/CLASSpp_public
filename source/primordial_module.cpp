@@ -2892,31 +2892,20 @@ void PrimordialModule::primordial_external_spectrum_init() {
   }
 }
 
-void PrimordialModule::primordial_output_titles(std::string& titles) const {
-  class_store_columntitle(titles, "k [1/Mpc]", true);
-  class_store_columntitle(titles, "P_scalar(k)", ppt->has_scalars);
-  class_store_columntitle(titles, "P_tensor(k)", ppt->has_tensors);
-}
-
-void PrimordialModule::primordial_output_data(int number_of_titles, double* data) const {
-  int index_k;
-  int storeidx;
-  double* dataptr;
-
-  for (index_k = 0; index_k < lnk_size_; index_k++) {
-    dataptr  = data + index_k * number_of_titles;
-    storeidx = 0;
-
-    class_store_double(dataptr, exp(lnk_[index_k]), true, storeidx);
-    class_store_double(dataptr,
-                       exp(lnpk_[perturbations_module_->index_md_scalars_][index_k]),
-                       ppt->has_scalars,
-                       storeidx);
-    class_store_double(dataptr,
-                       exp(lnpk_[perturbations_module_->index_md_tensors_][index_k]),
-                       ppt->has_tensors,
-                       storeidx);
+OutputTable PrimordialModule::GetOutputTable() const {
+  OutputTable table("primordial spectrum");
+  table.ReserveRows(lnk_size_);
+  for (int index_k = 0; index_k < lnk_size_; index_k++) {
+    table.Set("k [1/Mpc]", exp(lnk_[index_k]));
+    if (ppt->has_scalars) {
+      table.Set("P_scalar(k)", exp(lnpk_[perturbations_module_->index_md_scalars_][index_k]));
+    }
+    if (ppt->has_tensors) {
+      table.Set("P_tensor(k)", exp(lnpk_[perturbations_module_->index_md_tensors_][index_k]));
+    }
+    table.EndRow();
   }
+  return table;
 }
 
 namespace {
@@ -2993,12 +2982,4 @@ const DerivedParameterTable<PrimordialModule>& PrimordialModule::DerivedParamete
       {"phi_max", [](const M& m) { return m.phi_max_; }},
   };
   return table;
-}
-
-NamedColumns PrimordialModule::GetOutputColumns() const {
-  std::string titles;
-  primordial_output_titles(titles);
-  std::vector<double> data(static_cast<size_t>(get_number_of_titles(titles)) * lnk_size_);
-  primordial_output_data(get_number_of_titles(titles), data.data());
-  return SplitIntoColumns(titles, data.data(), lnk_size_);
 }

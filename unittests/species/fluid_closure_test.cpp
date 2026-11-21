@@ -41,19 +41,9 @@ Closure Run(double w0, double wa, const char* use_ppf) {
   Cosmology cosmo(fc);
   auto& bgm = cosmo.GetBackgroundModule();
 
-  std::string titles;
-  bgm->background_output_titles(titles);
-  std::vector<std::string> cols;
-  {
-    std::stringstream ss(titles);
-    std::string t;
-    while (std::getline(ss, t, '\t')) {
-      if (!t.empty()) {
-        cols.push_back(t);
-      }
-    }
-  }
-  auto col = [&](const std::string& nm) {
+  const OutputTable table              = bgm->GetOutputTable();
+  const std::vector<std::string>& cols = table.names();
+  auto col                             = [&](const std::string& nm) {
     for (size_t i = 0; i < cols.size(); ++i) {
       if (cols[i] == nm) {
         return static_cast<int>(i);
@@ -63,11 +53,8 @@ Closure Run(double w0, double wa, const char* use_ppf) {
     assert(false);
     return -1;
   };
-  const int n_titles = static_cast<int>(cols.size());
-  const int n_rows   = bgm->bt_size_;
-  std::vector<double> data(static_cast<size_t>(n_titles) * n_rows);
-  bgm->background_output_data(n_titles, data.data());
-  auto row = [&](int r, int c) { return data[static_cast<size_t>(r) * n_titles + c]; };
+  const int n_rows = static_cast<int>(table.rows());
+  auto row         = [&](int r, int c) { return table.column(c)[r]; };
 
   const int ic_z    = col("z");
   const int ic_H    = col("H [1/Mpc]");

@@ -3,6 +3,7 @@
 // free-streaming radiation redshift, the statistics guard, the #372
 // CopyPerturbationsAcrossSwitch regression, and background-column-name
 // disambiguation between the fermion/boson daughters sharing an instance name.
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -551,28 +552,19 @@ int main() {
     auto sp_l      = MakeDrPsd(fc, Statistics::Fermion);
     auto sp_phi    = MakeDrPsd(fc, Statistics::Boson);
 
-    std::string titles;
-    BackgroundColumnWriter w(titles);
-    sp_l->WriteBackgroundColumnTitles(w);
-    sp_phi->WriteBackgroundColumnTitles(w);
-
-    // No duplicate column name in the combined title string.
-    std::vector<std::string> cols;
-    size_t start = 0;
-    for (size_t i = 0; i < titles.size(); ++i) {
-      if (titles[i] == _DELIMITER_[0]) {
-        cols.push_back(titles.substr(start, i - start));
-        start = i + 1;
-      }
-    }
-    for (size_t i = 0; i < cols.size(); ++i) {
-      for (size_t j = i + 1; j < cols.size(); ++j) {
-        assert(cols[i] != cols[j]);
-      }
-    }
+    // One row of a table with both daughters' columns: the table refuses a name set twice.
+    int index_bg = 0;
+    sp_l->RegisterBackgroundIndices(index_bg);
+    sp_phi->RegisterBackgroundIndices(index_bg);
+    const std::vector<double> pvecback(index_bg, 0.);
+    OutputTable row("background");
+    sp_l->AddBackgroundOutput(row, pvecback.data());
+    sp_phi->AddBackgroundOutput(row, pvecback.data());
+    row.EndRow();
     // Both statistics-specific density columns are present.
-    assert(titles.find("rho_dr_drx_l") != std::string::npos);
-    assert(titles.find("rho_dr_drx_phi") != std::string::npos);
+    const std::vector<std::string>& cols = row.names();
+    assert(std::find(cols.begin(), cols.end(), "(.)rho_dr_drx_l") != cols.end());
+    assert(std::find(cols.begin(), cols.end(), "(.)rho_dr_drx_phi") != cols.end());
   }
 
   // ── Absolute normalization (#385) ────────────────────────────────────────────

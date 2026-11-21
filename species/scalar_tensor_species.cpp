@@ -229,21 +229,12 @@ double ScalarTensorSpecies::SourceSamplingRate(const double* pvecback) const {
   return 2. * a * sqrt(lambda_class_) * A / 7.4163;
 }
 
-void ScalarTensorSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_st", 0.);
-  w.Add("(.)p_st", 0.);
-  w.Add("phi_st", 0.);
-  w.Add("phi'_st", 0.);
-  w.Add("f_st", 0.);
-}
-
-void ScalarTensorSpecies::WriteBackgroundData(const double* pvecback,
-                                              BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_st", pvecback[index_bg_rho_]);
-  w.Add("(.)p_st", pvecback[index_bg_p_]);
-  w.Add("phi_st", pvecback[index_bg_phi_]);
-  w.Add("phi'_st", pvecback[index_bg_phi_prime_]);
-  w.Add("f_st", pvecback[index_bg_f_]);
+void ScalarTensorSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_st", pvecback[index_bg_rho_]);
+  row.Set("(.)p_st", pvecback[index_bg_p_]);
+  row.Set("phi_st", pvecback[index_bg_phi_]);
+  row.Set("phi'_st", pvecback[index_bg_phi_prime_]);
+  row.Set("f_st", pvecback[index_bg_f_]);
 }
 
 void ScalarTensorSpecies::ProcessBackgroundTable(const double* background_table,
@@ -450,21 +441,19 @@ void ScalarTensorSpecies::CopyPerturbationsAcrossSwitch(const BaseSpecies::Pertu
   new_y[new_layout.idx_phi_prime] = old_y[old_layout.idx_phi_prime];
 }
 
-void ScalarTensorSpecies::PrintVariables(PerturbColumnWriter& w,
-                                         const BaseSpecies::PerturbLayout* base,
-                                         double /*tau*/,
-                                         const double* y,
-                                         const PerturbationsModule& /*mod*/,
-                                         const perturb_workspace* /*ppw*/) const {
-  double dphi       = 0.;
-  double dphi_prime = 0.;
-  if (!w.IsTitleMode()) {
-    const auto& layout = static_cast<const PerturbLayout&>(*base);
-    dphi               = y[layout.idx_phi];
-    dphi_prime         = y[layout.idx_phi_prime];
-  }
-  w.Add("delta_phi_st", dphi, true);
-  w.Add("delta_phi_prime_st", dphi_prime, true);
+void ScalarTensorSpecies::AddPerturbationOutput(OutputTable& row,
+                                                const BaseSpecies::PerturbLayout& base,
+                                                double /*tau*/,
+                                                const double* y,
+                                                const PerturbationsModule& /*mod*/,
+                                                const perturb_workspace* /*ppw*/) const {
+  double dphi        = 0.;
+  double dphi_prime  = 0.;
+  const auto& layout = static_cast<const PerturbLayout&>(base);
+  dphi               = y[layout.idx_phi];
+  dphi_prime         = y[layout.idx_phi_prime];
+  row.Set("delta_phi_st", dphi);
+  row.Set("delta_phi_prime_st", dphi_prime);
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

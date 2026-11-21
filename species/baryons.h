@@ -51,11 +51,8 @@ class BaryonsSpecies : public BaseSpecies {
     return 0.;
   }
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override {
-    w.Add("(.)rho_b", 0.);
-  }
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override {
-    w.Add("(.)rho_b", pvecback[index_bg_rho_]);
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override {
+    row.Set("(.)rho_b", pvecback[index_bg_rho_]);
   }
 
   // ── Perturbation index registration ────────────────────────────────────────
@@ -105,17 +102,17 @@ class BaryonsSpecies : public BaseSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
 
   // ── Stress-energy observables ───────────────────────────────────────────────
 

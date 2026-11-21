@@ -26,10 +26,9 @@ class OutputModule : public BaseModule {
   void output_thermodynamics();
   void output_perturbations();
   void output_primordial();
-  void output_print_data(FILE* out,
-                         const std::string& titles,
-                         const double* dataptr,
-                         int size_dataptr);
+  /** A table as the .dat files have it: '#', the numbered column titles, then one line per
+   *  row. */
+  void output_print_table(FILE* out, const OutputTable& table);
   void output_open_cl_file(FILE** clfile,
                            const std::string& filename,
                            const char* first_line,

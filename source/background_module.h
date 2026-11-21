@@ -21,16 +21,11 @@ class BackgroundModule : public BaseModule {
   double GetOmega0Species(const std::string& key) const;
   BackgroundModule(InputModulePtr input_module);
   ~BackgroundModule();
-  /** The background.dat column titles. Rejects a title two columns share. */
-  void background_output_titles(std::string& titles) const;
-  /** The species' notes on their background.dat columns (units), for the file header. */
-  std::vector<std::string> background_output_notes() const;
-  void background_output_data(int number_of_titles, double* data) const;
   void background_at_tau(
       double tau, short return_format, short inter_mode, int* last_index, double* pvecback) const;
   void background_tau_of_z(double z, double* tau) const;
-  /** The background.dat table, column by column. */
-  NamedColumns GetOutputColumns() const;
+  /** The background table (background.dat), with the species' notes on their columns. */
+  OutputTable GetOutputTable() const;
   /** The background vector at redshift z in the long format; index it with index_bg_*. */
   std::vector<double> GetBackgroundAtZ(double z) const;
   /** The redshift at conformal time tau. */

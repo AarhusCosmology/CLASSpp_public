@@ -156,34 +156,21 @@ void ScalarFieldSpecies::FinalizeBackground(double a,
   pvecback[index_bg_p_prime_scf_] = PPrime(a, H, pvecback_B, pvecback);
 }
 
-void ScalarFieldSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Note(
+void ScalarFieldSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.AddNote(
       "The units of phi, tau in the derivatives and the potential V are the following:\n"
       "--> phi is given in units of the reduced Planck mass m_Pl = (8 pi G)^(-1/2)\n"
       "--> tau in the derivative of V(phi) is given in units of Mpc.\n"
       "--> the potential V(phi) is given in units of m_Pl^2/Mpc^2.");
   const std::string& t = column_tag_;
-  w.Add("(.)rho_" + t, 0.);
-  w.Add("(.)p_" + t, 0.);
-  w.Add("(.)p_prime_" + t, 0.);
-  w.Add("phi_" + t, 0.);
-  w.Add("phi'_" + t, 0.);
-  w.Add("V_" + t, 0.);
-  w.Add("V'_" + t, 0.);
-  w.Add("V''_" + t, 0.);
-}
-
-void ScalarFieldSpecies::WriteBackgroundData(const double* pvecback,
-                                             BackgroundColumnWriter& w) const {
-  const std::string& t = column_tag_;
-  w.Add("(.)rho_" + t, Rho(pvecback));
-  w.Add("(.)p_" + t, P(pvecback));
-  w.Add("(.)p_prime_" + t, pvecback[index_bg_p_prime_scf_]);
-  w.Add("phi_" + t, pvecback[index_bg_phi_scf_]);
-  w.Add("phi'_" + t, pvecback[index_bg_phi_prime_scf_]);
-  w.Add("V_" + t, pvecback[index_bg_V_scf_]);
-  w.Add("V'_" + t, pvecback[index_bg_dV_scf_]);
-  w.Add("V''_" + t, pvecback[index_bg_ddV_scf_]);
+  row.Set("(.)rho_" + t, Rho(pvecback));
+  row.Set("(.)p_" + t, P(pvecback));
+  row.Set("(.)p_prime_" + t, pvecback[index_bg_p_prime_scf_]);
+  row.Set("phi_" + t, pvecback[index_bg_phi_scf_]);
+  row.Set("phi'_" + t, pvecback[index_bg_phi_prime_scf_]);
+  row.Set("V_" + t, pvecback[index_bg_V_scf_]);
+  row.Set("V'_" + t, pvecback[index_bg_dV_scf_]);
+  row.Set("V''_" + t, pvecback[index_bg_ddV_scf_]);
 }
 
 void ScalarFieldSpecies::PrintBackgroundDetails(const double* pvecback_today,
@@ -376,83 +363,86 @@ void ScalarFieldSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::Pertur
   }
 }
 
-void ScalarFieldSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                            const PerturbationsModule& mod,
-                                            file_format fmt,
-                                            BaseSpecies::TransferColumnSection section) const {
+void ScalarFieldSpecies::AddTransferOutput(OutputTable& row,
+                                           const double* tk,
+                                           const PerturbationsModule& mod,
+                                           file_format fmt,
+                                           BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_" + column_tag_, index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_" + column_tag_, tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t__" + column_tag_, index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t__" + column_tag_, tk[index_tp_theta_]);
+      }
     }
   }
 }
 
-void ScalarFieldSpecies::PrintVariables(PerturbColumnWriter& w,
-                                        const BaseSpecies::PerturbLayout* base,
-                                        double /*tau*/,
-                                        const double* y,
-                                        const PerturbationsModule& mod,
-                                        const perturb_workspace* ppw) const {
+void ScalarFieldSpecies::AddPerturbationOutput(OutputTable& row,
+                                               const BaseSpecies::PerturbLayout& base,
+                                               double /*tau*/,
+                                               const double* y,
+                                               const PerturbationsModule& mod,
+                                               const perturb_workspace* ppw) const {
   double delta_scf = 0.;
   double theta_scf = 0.;
 
-  if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
-    const double k           = ppw->scalar_ctx.k;
-    const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-    const double a2          = ppw->scalar_ctx.a2;
-    const perturbs* ppt      = mod.GetPerturbs();
+  const perturb_vector* pv = ppw->pv.get();
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
+  const double k           = ppw->scalar_ctx.k;
+  const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+  const double a2          = ppw->scalar_ctx.a2;
+  const perturbs* ppt      = mod.GetPerturbs();
 
-    // beta_ is the Type-3 momentum-transfer coupling and is 0 for a plain scalar
-    // field, so this is the standard expression unless Type3Species built us.
-    const double phi_prime_bg = pvecback[index_bg_phi_prime_scf_];
-    const double dV_bg        = pvecback[index_bg_dV_scf_];
-    const double rho_scf      = Rho(pvecback);
-    const double p_scf        = P(pvecback);
+  // beta_ is the Type-3 momentum-transfer coupling and is 0 for a plain scalar
+  // field, so this is the standard expression unless Type3Species built us.
+  const double phi_prime_bg = pvecback[index_bg_phi_prime_scf_];
+  const double dV_bg        = pvecback[index_bg_dV_scf_];
+  const double rho_scf      = Rho(pvecback);
+  const double p_scf        = P(pvecback);
 
-    const auto& layout = static_cast<const PerturbLayout&>(*base);
+  const auto& layout = static_cast<const PerturbLayout&>(base);
 
-    double delta_phi_prime = y[layout.idx_phi_prime];
-    if (ppt->gauge == possible_gauges::newtonian) {
-      const double phi  = y[pv->index_pt_phi];
-      delta_phi_prime  += phi_prime_bg * (pvecmetric[ppw->index_mt_psi] + 3. * phi);
-    }
-
-    double delta_rho_scf = 0.;
-    if (ppt->gauge == possible_gauges::synchronous) {
-      delta_rho_scf = 1. / 3. *
-                      ((1. - 2. * beta_) / a2 * phi_prime_bg * delta_phi_prime +
-                       dV_bg * y[layout.idx_phi]);
-    }
-    else {
-      delta_rho_scf = 1. / 3. *
-                      ((1. - 2. * beta_) / a2 * phi_prime_bg * delta_phi_prime +
-                       dV_bg * y[layout.idx_phi] -
-                       1. / a2 * phi_prime_bg * phi_prime_bg * pvecmetric[ppw->index_mt_psi]);
-    }
-
-    const double rho_plus_p_theta_scf = 1. / 3. * ppw->scalar_ctx.k2 / a2 * phi_prime_bg *
-                                        y[layout.idx_phi];
-
-    delta_scf = delta_rho_scf / rho_scf;
-    theta_scf = rho_plus_p_theta_scf / (rho_scf + p_scf);
-
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha  = pvecmetric[ppw->index_mt_alpha];
-      const double w_scf  = p_scf / rho_scf;
-      delta_scf          += alpha * (-3. * H * (1. + w_scf));
-      theta_scf          += k * k * alpha;
-    }
+  double delta_phi_prime = y[layout.idx_phi_prime];
+  if (ppt->gauge == possible_gauges::newtonian) {
+    const double phi  = y[pv->index_pt_phi];
+    delta_phi_prime  += phi_prime_bg * (pvecmetric[ppw->index_mt_psi] + 3. * phi);
   }
 
-  w.Add("delta_" + column_tag_, delta_scf, true);
-  w.Add("theta_" + column_tag_, theta_scf, true);
+  double delta_rho_scf = 0.;
+  if (ppt->gauge == possible_gauges::synchronous) {
+    delta_rho_scf = 1. / 3. *
+                    ((1. - 2. * beta_) / a2 * phi_prime_bg * delta_phi_prime +
+                     dV_bg * y[layout.idx_phi]);
+  }
+  else {
+    delta_rho_scf = 1. / 3. *
+                    ((1. - 2. * beta_) / a2 * phi_prime_bg * delta_phi_prime +
+                     dV_bg * y[layout.idx_phi] -
+                     1. / a2 * phi_prime_bg * phi_prime_bg * pvecmetric[ppw->index_mt_psi]);
+  }
+
+  const double rho_plus_p_theta_scf = 1. / 3. * ppw->scalar_ctx.k2 / a2 * phi_prime_bg *
+                                      y[layout.idx_phi];
+
+  delta_scf = delta_rho_scf / rho_scf;
+  theta_scf = rho_plus_p_theta_scf / (rho_scf + p_scf);
+
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha  = pvecmetric[ppw->index_mt_alpha];
+    const double w_scf  = p_scf / rho_scf;
+    delta_scf          += alpha * (-3. * H * (1. + w_scf));
+    theta_scf          += k * k * alpha;
+  }
+
+  row.Set("delta_" + column_tag_, delta_scf);
+  row.Set("theta_" + column_tag_, theta_scf);
 }
 
 BaseSpecies::StressEnergyContribution ScalarFieldSpecies::StressEnergy(

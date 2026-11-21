@@ -182,52 +182,55 @@ void BaryonsSpecies::RegisterTransferSourceIndices(int& index_tp, const SourceRe
   class_define_index(index_tp_theta_, ctx.wants_velocity, index_tp, 1);
 }
 
-void BaryonsSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                        const PerturbationsModule& mod,
-                                        file_format fmt,
-                                        BaseSpecies::TransferColumnSection section) const {
+void BaryonsSpecies::AddTransferOutput(OutputTable& row,
+                                       const double* tk,
+                                       const PerturbationsModule& mod,
+                                       file_format fmt,
+                                       BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_b", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_b", tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_b", index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_b", tk[index_tp_theta_]);
+      }
     }
   }
 }
 
-void BaryonsSpecies::PrintVariables(PerturbColumnWriter& w,
-                                    const BaseSpecies::PerturbLayout* base,
-                                    double /*tau*/,
-                                    const double* y,
-                                    const PerturbationsModule& mod,
-                                    const perturb_workspace* ppw) const {
+void BaryonsSpecies::AddPerturbationOutput(OutputTable& row,
+                                           const BaseSpecies::PerturbLayout& base,
+                                           double /*tau*/,
+                                           const double* y,
+                                           const PerturbationsModule& mod,
+                                           const perturb_workspace* ppw) const {
   double delta_b = 0.;
   double theta_b = 0.;
 
-  if (!w.IsTitleMode()) {
-    const auto& layout       = static_cast<const PerturbLayout&>(*base);
-    const double k           = ppw->scalar_ctx.k;
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
+  const auto& layout       = static_cast<const PerturbLayout&>(base);
+  const double k           = ppw->scalar_ctx.k;
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
 
-    delta_b = y[layout.idx_delta];
-    theta_b = y[layout.idx_theta];
+  delta_b = y[layout.idx_delta];
+  theta_b = y[layout.idx_theta];
 
-    // Converting synchronous variables to Newtonian
-    const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha  = pvecmetric[ppw->index_mt_alpha];
-      const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-      const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      delta_b            -= 3. * H * a * alpha;
-      theta_b            += k * k * alpha;
-    }
+  // Converting synchronous variables to Newtonian
+  const perturbs* ppt = mod.GetPerturbs();
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha  = pvecmetric[ppw->index_mt_alpha];
+    const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    delta_b            -= 3. * H * a * alpha;
+    theta_b            += k * k * alpha;
   }
 
-  w.Add("delta_b", delta_b, true);
-  w.Add("theta_b", theta_b, true);
+  row.Set("delta_b", delta_b);
+  row.Set("theta_b", theta_b);
 }
 
 // ── Newtonian-gauge transform ─────────────────────────────────────────────────

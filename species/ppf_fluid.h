@@ -42,12 +42,12 @@ class PpfFluid : public FluidSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
   void CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
                                      const BaseSpecies::PerturbLayout& new_base,
                                      const double* old_y,

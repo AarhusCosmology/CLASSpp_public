@@ -7,17 +7,11 @@
 #include "perturbations.h"
 #include "perturbations_module.h"
 
-void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_idr_drmd", 0.);
-  w.Add("(.)rho_idm_drmd", 0.);
-  w.Add("G_over_aH_drmd", 0.);
-}
-
-void IDM_DRMD_IDR_DRMD_Species::WriteBackgroundData(const double* pvecback,
-                                                    BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_idr_drmd", idr_drmd().Rho(pvecback));
-  w.Add("(.)rho_idm_drmd", idm_drmd().Rho(pvecback));
-  w.Add("G_over_aH_drmd", pvecback[index_bg_G_over_aH_drmd_]);
+void IDM_DRMD_IDR_DRMD_Species::AddBackgroundOutput(OutputTable& row,
+                                                    const double* pvecback) const {
+  row.Set("(.)rho_idr_drmd", idr_drmd().Rho(pvecback));
+  row.Set("(.)rho_idm_drmd", idm_drmd().Rho(pvecback));
+  row.Set("G_over_aH_drmd", pvecback[index_bg_G_over_aH_drmd_]);
 }
 
 void IDM_DRMD_IDR_DRMD_Species::RegisterBackgroundIndices(int& index_bg) {
@@ -181,78 +175,89 @@ void IDM_DRMD_IDR_DRMD_Species::FillSources(const BaseSpecies::PerturbLayout& ba
   }
 }
 
-void IDM_DRMD_IDR_DRMD_Species::WriteOutputColumns(
-    PerturbColumnWriter& w,
+void IDM_DRMD_IDR_DRMD_Species::AddTransferOutput(
+    OutputTable& row,
+    const double* tk,
     const PerturbationsModule& mod,
     file_format fmt,
     BaseSpecies::TransferColumnSection section) const {
   // This composite owns its transfer slots directly, but chain anyway so a
   // child that later registers its own is named without editing this.
-  CompositeSpecies::WriteOutputColumns(w, mod, fmt, section);
+  CompositeSpecies::AddTransferOutput(row, tk, mod, fmt, section);
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_idm_drmd", index_tp_delta_idm_drmd_, index_tp_delta_idm_drmd_ >= 0);
-      w.Add("d_idr_drmd", index_tp_delta_idr_drmd_, index_tp_delta_idr_drmd_ >= 0);
+      if (index_tp_delta_idm_drmd_ >= 0) {
+        row.Set("d_idm_drmd", tk[index_tp_delta_idm_drmd_]);
+      }
+      if (index_tp_delta_idr_drmd_ >= 0) {
+        row.Set("d_idr_drmd", tk[index_tp_delta_idr_drmd_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_idm_drmd", index_tp_theta_idm_drmd_, index_tp_theta_idm_drmd_ >= 0);
-      w.Add("t_idr_drmd", index_tp_theta_idr_drmd_, index_tp_theta_idr_drmd_ >= 0);
+      if (index_tp_theta_idm_drmd_ >= 0) {
+        row.Set("t_idm_drmd", tk[index_tp_theta_idm_drmd_]);
+      }
+      if (index_tp_theta_idr_drmd_ >= 0) {
+        row.Set("t_idr_drmd", tk[index_tp_theta_idr_drmd_]);
+      }
     }
   }
 }
 
-void IDM_DRMD_IDR_DRMD_Species::PrintVariables(PerturbColumnWriter& w,
-                                               const BaseSpecies::PerturbLayout* base,
-                                               double tau,
-                                               const double* y,
-                                               const PerturbationsModule& mod,
-                                               const perturb_workspace* ppw) const {
+void IDM_DRMD_IDR_DRMD_Species::AddPerturbationOutput(OutputTable& row,
+                                                      const BaseSpecies::PerturbLayout& base,
+                                                      double tau,
+                                                      const double* y,
+                                                      const PerturbationsModule& mod,
+                                                      const perturb_workspace* ppw) const {
   // Chain first (children currently publish nothing) so a child that later gains
-  // PrintVariables is picked up without editing this.
-  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
+  // AddPerturbationOutput is picked up without editing this.
+  CompositeSpecies::AddPerturbationOutput(row, base, tau, y, mod, ppw);
   double delta_idm_drmd = 0.;
   double theta_idm_drmd = 0.;
   double delta_idr_drmd = 0.;
   double theta_idr_drmd = 0.;
 
-  if (!w.IsTitleMode()) {
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
-    const double k           = ppw->scalar_ctx.k;
-    const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-    const perturbs* ppt      = mod.GetPerturbs();
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
+  const double k           = ppw->scalar_ctx.k;
+  const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+  const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+  const perturbs* ppt      = mod.GetPerturbs();
 
-    const auto& idm_drm_pr_lay = idm_drmd_layout(*base);
-    const auto& idr_drm_pr_lay = idr_drmd_layout(*base);
+  const auto& idm_drm_pr_lay = idm_drmd_layout(base);
+  const auto& idr_drm_pr_lay = idr_drmd_layout(base);
 
+  if (has_idm_drmd()) {
+    delta_idm_drmd = y[idm_drm_pr_lay.idx_delta];
+    theta_idm_drmd = y[idm_drm_pr_lay.idx_theta];
+  }
+  if (has_idr_drmd()) {
+    delta_idr_drmd = y[idr_drm_pr_lay.idx_delta];
+    theta_idr_drmd = y[idr_drm_pr_lay.idx_theta];
+  }
+
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha = pvecmetric[ppw->index_mt_alpha];
     if (has_idm_drmd()) {
-      delta_idm_drmd = y[idm_drm_pr_lay.idx_delta];
-      theta_idm_drmd = y[idm_drm_pr_lay.idx_theta];
+      delta_idm_drmd -= 3. * H * a * alpha;
+      theta_idm_drmd += k * k * alpha;
     }
     if (has_idr_drmd()) {
-      delta_idr_drmd = y[idr_drm_pr_lay.idx_delta];
-      theta_idr_drmd = y[idr_drm_pr_lay.idx_theta];
-    }
-
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha = pvecmetric[ppw->index_mt_alpha];
-      if (has_idm_drmd()) {
-        delta_idm_drmd -= 3. * H * a * alpha;
-        theta_idm_drmd += k * k * alpha;
-      }
-      if (has_idr_drmd()) {
-        delta_idr_drmd -= 4. * H * a * alpha;
-        theta_idr_drmd += k * k * alpha;
-      }
+      delta_idr_drmd -= 4. * H * a * alpha;
+      theta_idr_drmd += k * k * alpha;
     }
   }
 
-  w.Add("delta_idr_drmd", delta_idr_drmd, has_idr_drmd());
-  w.Add("theta_idr_drmd", theta_idr_drmd, has_idr_drmd());
-  w.Add("delta_idm_drmd", delta_idm_drmd, has_idm_drmd());
-  w.Add("theta_idm_drmd", theta_idm_drmd, has_idm_drmd());
+  if (has_idr_drmd()) {
+    row.Set("delta_idr_drmd", delta_idr_drmd);
+    row.Set("theta_idr_drmd", theta_idr_drmd);
+  }
+  if (has_idm_drmd()) {
+    row.Set("delta_idm_drmd", delta_idm_drmd);
+    row.Set("theta_idm_drmd", theta_idm_drmd);
+  }
 }
 
 IDM_DRMD_IDR_DRMD_Species::IDM_DRMD_IDR_DRMD_Species(const background& pba,

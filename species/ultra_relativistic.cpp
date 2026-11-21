@@ -48,13 +48,8 @@ double UltraRelativisticSpecies::PPrime(double a,
   return a * H * (-4. / 3. * pvecback[index_bg_rho_]);
 }
 
-void UltraRelativisticSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_" + label_, 0.);
-}
-
-void UltraRelativisticSpecies::WriteBackgroundData(const double* pvecback,
-                                                   BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_" + label_, Rho(pvecback));
+void UltraRelativisticSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_" + label_, Rho(pvecback));
 }
 
 // ── Perturbations ─────────────────────────────────────────────────────────────
@@ -338,68 +333,72 @@ void UltraRelativisticSpecies::CopyPerturbationsAcrossSwitch(
   }
 }
 
-void UltraRelativisticSpecies::WriteOutputColumns(
-    PerturbColumnWriter& w,
-    const PerturbationsModule& mod,
-    file_format fmt,
-    BaseSpecies::TransferColumnSection section) const {
+void UltraRelativisticSpecies::AddTransferOutput(OutputTable& row,
+                                                 const double* tk,
+                                                 const PerturbationsModule& mod,
+                                                 file_format fmt,
+                                                 BaseSpecies::TransferColumnSection section) const {
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_" + label_, index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_" + label_, tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_" + label_, index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_" + label_, tk[index_tp_theta_]);
+      }
     }
   }
   else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity) {
-      w.Add("-T_" + label_ + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("-T_" + label_ + "/k2", tk[index_tp_delta_]);
+      }
     }
   }
 }
 
-void UltraRelativisticSpecies::PrintVariables(PerturbColumnWriter& w,
-                                              const BaseSpecies::PerturbLayout* base,
-                                              double /*tau*/,
-                                              const double* y,
-                                              const PerturbationsModule& mod,
-                                              const perturb_workspace* ppw) const {
+void UltraRelativisticSpecies::AddPerturbationOutput(OutputTable& row,
+                                                     const BaseSpecies::PerturbLayout& base,
+                                                     double /*tau*/,
+                                                     const double* y,
+                                                     const PerturbationsModule& mod,
+                                                     const perturb_workspace* ppw) const {
   double delta_ur = 0.;
   double theta_ur = 0.;
   double shear_ur = 0.;
 
-  if (!w.IsTitleMode()) {
-    const double k           = ppw->scalar_ctx.k;
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
+  const double k           = ppw->scalar_ctx.k;
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
 
-    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
-      const auto& lay = static_cast<const PerturbLayout&>(*base);
-      delta_ur        = y[lay.idx_delta];
-      theta_ur        = y[lay.idx_theta];
-      shear_ur        = y[lay.idx_shear];
-    }
-    else {
-      delta_ur = ppw->rsa_delta_ur;
-      theta_ur = ppw->rsa_theta_ur;
-      shear_ur = 0.;
-    }
-
-    // Synchronous → Newtonian gauge conversion (relativistic: factor 4)
-    const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha  = pvecmetric[ppw->index_mt_alpha];
-      const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-      const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      delta_ur           -= 4. * H * a * alpha;
-      theta_ur           += k * k * alpha;
-    }
+  if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
+    const auto& lay = static_cast<const PerturbLayout&>(base);
+    delta_ur        = y[lay.idx_delta];
+    theta_ur        = y[lay.idx_theta];
+    shear_ur        = y[lay.idx_shear];
+  }
+  else {
+    delta_ur = ppw->rsa_delta_ur;
+    theta_ur = ppw->rsa_theta_ur;
+    shear_ur = 0.;
   }
 
-  w.Add("delta_" + label_, delta_ur, true);
-  w.Add("theta_" + label_, theta_ur, true);
-  w.Add("shear_" + label_, shear_ur, true);
+  // Synchronous → Newtonian gauge conversion (relativistic: factor 4)
+  const perturbs* ppt = mod.GetPerturbs();
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha  = pvecmetric[ppw->index_mt_alpha];
+    const double H      = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double a      = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+    delta_ur           -= 4. * H * a * alpha;
+    theta_ur           += k * k * alpha;
+  }
+
+  row.Set("delta_" + label_, delta_ur);
+  row.Set("theta_" + label_, theta_ur);
+  row.Set("shear_" + label_, shear_ur);
 }
 
 // ── MarkUsedInSources ─────────────────────────────────────────────────────────

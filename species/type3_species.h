@@ -74,8 +74,7 @@ class Type3Species : public CompositeSpecies {
     return scf_->beta();
   }
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   std::vector<ShootingTarget> GetShootingTargets() const override {
     return scf_->GetShootingTargets();

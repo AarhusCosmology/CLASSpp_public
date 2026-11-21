@@ -532,22 +532,12 @@ double WdmDecayProductSpecies::RhoPrimeOverRho(const double* pvecback,
 
 // ── Background output columns ────────────────────────────────────────────────
 
-void WdmDecayProductSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
+void WdmDecayProductSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
   const std::string& nm = name();
-  w.Add("(.)rho_wdm_" + nm, 0.);
-  w.Add("(.)p_wdm_" + nm, 0.);
+  row.Set("(.)rho_wdm_" + nm, Rho(pvecback));
+  row.Set("(.)p_wdm_" + nm, P(pvecback));
   for (int i = 0; i < n_bins_; ++i) {
-    w.Add("f_" + nm + "[" + std::to_string(i) + "]", 0.);
-  }
-}
-
-void WdmDecayProductSpecies::WriteBackgroundData(const double* pvecback,
-                                                 BackgroundColumnWriter& w) const {
-  const std::string& nm = name();
-  w.Add("(.)rho_wdm_" + nm, Rho(pvecback));
-  w.Add("(.)p_wdm_" + nm, P(pvecback));
-  for (int i = 0; i < n_bins_; ++i) {
-    w.Add("f_" + nm + "[" + std::to_string(i) + "]", pvecback[index_bg_f_ + i]);
+    row.Set("f_" + nm + "[" + std::to_string(i) + "]", pvecback[index_bg_f_ + i]);
   }
 }
 
@@ -763,18 +753,23 @@ void WdmDecayProductSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void WdmDecayProductSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                                const PerturbationsModule& mod,
-                                                file_format fmt,
-                                                BaseSpecies::TransferColumnSection section) const {
+void WdmDecayProductSpecies::AddTransferOutput(OutputTable& row,
+                                               const double* tk,
+                                               const PerturbationsModule& mod,
+                                               file_format fmt,
+                                               BaseSpecies::TransferColumnSection section) const {
   if (fmt != file_format::class_format) {
     return;
   }
   const perturbs* ppt = mod.GetPerturbs();
   if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-    w.Add("d_wdm_" + name(), index_tp_delta_, index_tp_delta_ >= 0);
+    if (index_tp_delta_ >= 0) {
+      row.Set("d_wdm_" + name(), tk[index_tp_delta_]);
+    }
   }
   if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-    w.Add("t_wdm_" + name(), index_tp_theta_, index_tp_theta_ >= 0);
+    if (index_tp_theta_ >= 0) {
+      row.Set("t_wdm_" + name(), tk[index_tp_theta_]);
+    }
   }
 }

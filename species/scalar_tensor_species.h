@@ -95,8 +95,7 @@ class ScalarTensorSpecies : public BaseSpecies, public ModifiedGravity {
                 double H,
                 const double* pvecback_B,
                 const double* pvecback) const override;
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
   void ProcessBackgroundTable(const double* background_table,
                               int n_rows,
                               int row_stride,
@@ -163,12 +162,12 @@ class ScalarTensorSpecies : public BaseSpecies, public ModifiedGravity {
                                      const double* old_y,
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
 
  private:
   double dV(double phi) const;

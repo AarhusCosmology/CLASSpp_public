@@ -44,15 +44,9 @@ void IDM_DR_IDR_Species::WarnIfNonlinearUnreliable(double m_ev_threshold) const 
   }
 }
 
-void IDM_DR_IDR_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_idr", 0.);
-  w.Add("(.)rho_idm_dr", 0.);
-}
-
-void IDM_DR_IDR_Species::WriteBackgroundData(const double* pvecback,
-                                             BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_idr", idr().Rho(pvecback));
-  w.Add("(.)rho_idm_dr", idm_dr().Rho(pvecback));
+void IDM_DR_IDR_Species::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_idr", idr().Rho(pvecback));
+  row.Set("(.)rho_idm_dr", idm_dr().Rho(pvecback));
 }
 
 void IDM_DR_IDR_Species::ApplyInitialConditions(const BaseSpecies::PerturbLayout& base,
@@ -151,103 +145,116 @@ void IDM_DR_IDR_Species::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void IDM_DR_IDR_Species::WriteOutputColumns(PerturbColumnWriter& w,
-                                            const PerturbationsModule& mod,
-                                            file_format fmt,
-                                            BaseSpecies::TransferColumnSection section) const {
+void IDM_DR_IDR_Species::AddTransferOutput(OutputTable& row,
+                                           const double* tk,
+                                           const PerturbationsModule& mod,
+                                           file_format fmt,
+                                           BaseSpecies::TransferColumnSection section) const {
   // This composite owns its transfer slots directly, but chain anyway so a
   // child that later registers its own is named without editing this.
-  CompositeSpecies::WriteOutputColumns(w, mod, fmt, section);
+  CompositeSpecies::AddTransferOutput(row, tk, mod, fmt, section);
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_idm_dr", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
-      w.Add("d_idr", index_tp_delta_idr_, index_tp_delta_idr_ >= 0);
+      if (index_tp_delta_idm_dr_ >= 0) {
+        row.Set("d_idm_dr", tk[index_tp_delta_idm_dr_]);
+      }
+      if (index_tp_delta_idr_ >= 0) {
+        row.Set("d_idr", tk[index_tp_delta_idr_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_idm_dr", index_tp_theta_idm_dr_, index_tp_theta_idm_dr_ >= 0);
-      w.Add("t_idr", index_tp_theta_idr_, index_tp_theta_idr_ >= 0);
+      if (index_tp_theta_idm_dr_ >= 0) {
+        row.Set("t_idm_dr", tk[index_tp_theta_idm_dr_]);
+      }
+      if (index_tp_theta_idr_ >= 0) {
+        row.Set("t_idr", tk[index_tp_theta_idr_]);
+      }
     }
   }
   else if (fmt == file_format::camb_format) {
     if (section != TransferColumnSection::velocity) {
-      w.Add("-T_idm_dr/k2", index_tp_delta_idm_dr_, index_tp_delta_idm_dr_ >= 0);
+      if (index_tp_delta_idm_dr_ >= 0) {
+        row.Set("-T_idm_dr/k2", tk[index_tp_delta_idm_dr_]);
+      }
     }
   }
 }
 
-void IDM_DR_IDR_Species::PrintVariables(PerturbColumnWriter& w,
-                                        const BaseSpecies::PerturbLayout* base,
-                                        double tau,
-                                        const double* y,
-                                        const PerturbationsModule& mod,
-                                        const perturb_workspace* ppw) const {
+void IDM_DR_IDR_Species::AddPerturbationOutput(OutputTable& row,
+                                               const BaseSpecies::PerturbLayout& base,
+                                               double tau,
+                                               const double* y,
+                                               const PerturbationsModule& mod,
+                                               const perturb_workspace* ppw) const {
   // Chain first (children currently publish nothing) so a child that later gains
-  // PrintVariables is picked up without editing this.
-  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
+  // AddPerturbationOutput is picked up without editing this.
+  CompositeSpecies::AddPerturbationOutput(row, base, tau, y, mod, ppw);
   double delta_idm_dr = 0.;
   double theta_idm_dr = 0.;
   double delta_idr    = 0.;
   double theta_idr    = 0.;
   double shear_idr    = 0.;
 
-  if (!w.IsTitleMode()) {
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
-    const double k           = ppw->scalar_ctx.k;
-    const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-    const perturbs* ppt      = mod.GetPerturbs();
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
+  const double k           = ppw->scalar_ctx.k;
+  const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+  const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+  const perturbs* ppt      = mod.GetPerturbs();
 
-    const auto& idm_dr_lay = idm_dr_layout(*base);
-    const auto& idr_lay    = idr_layout(*base);
+  const auto& idm_dr_lay = idm_dr_layout(base);
+  const auto& idr_lay    = idr_layout(base);
 
-    if (has_idm_dr()) {
-      delta_idm_dr = y[idm_dr_lay.idx_delta];
-      theta_idm_dr = y[idm_dr_lay.idx_theta];
-    }
+  if (has_idm_dr()) {
+    delta_idm_dr = y[idm_dr_lay.idx_delta];
+    theta_idm_dr = y[idm_dr_lay.idx_theta];
+  }
 
-    if (has_idr()) {
-      if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) {
-        delta_idr = y[idr_lay.idx_delta];
-        theta_idr = y[idr_lay.idx_theta];
-        if (idr_->idr_nature() == idr_free_streaming) {
-          if (has_idm_dr() &&
-              (ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_on))) {
-            shear_idr = idr_->TcaShearIdr(idr_lay, y, ppw);
-          }
-          else {
-            shear_idr = y[idr_lay.idx_shear];
-          }
+  if (has_idr()) {
+    if (ppw->approx[ppw->index_ap_rsa_idr] == static_cast<int>(rsa_idr_off)) {
+      delta_idr = y[idr_lay.idx_delta];
+      theta_idr = y[idr_lay.idx_theta];
+      if (idr_->idr_nature() == idr_free_streaming) {
+        if (has_idm_dr() &&
+            (ppw->approx[ppw->index_ap_tca_idm_dr] == static_cast<int>(tca_idm_dr_on))) {
+          shear_idr = idr_->TcaShearIdr(idr_lay, y, ppw);
+        }
+        else {
+          shear_idr = y[idr_lay.idx_shear];
         }
       }
-      else {
-        delta_idr = ppw->rsa_delta_idr;
-        theta_idr = ppw->rsa_theta_idr;
-        shear_idr = 0.;
-      }
     }
-
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha = pvecmetric[ppw->index_mt_alpha];
-      if (has_idm_dr()) {
-        delta_idm_dr -= 3. * H * a * alpha;
-        theta_idm_dr += k * k * alpha;
-      }
-      if (has_idr()) {
-        delta_idr -= 4. * H * a * alpha;
-        theta_idr += k * k * alpha;
-      }
+    else {
+      delta_idr = ppw->rsa_delta_idr;
+      theta_idr = ppw->rsa_theta_idr;
+      shear_idr = 0.;
     }
   }
 
-  w.Add("delta_idr", delta_idr, has_idr());
-  w.Add("theta_idr", theta_idr, has_idr());
-  if (has_idr() && idr_->idr_nature() == idr_free_streaming) {
-    w.Add("shear_idr", shear_idr, true);
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha = pvecmetric[ppw->index_mt_alpha];
+    if (has_idm_dr()) {
+      delta_idm_dr -= 3. * H * a * alpha;
+      theta_idm_dr += k * k * alpha;
+    }
+    if (has_idr()) {
+      delta_idr -= 4. * H * a * alpha;
+      theta_idr += k * k * alpha;
+    }
   }
-  w.Add("delta_idm_dr", delta_idm_dr, has_idm_dr());
-  w.Add("theta_idm_dr", theta_idm_dr, has_idm_dr());
+
+  if (has_idr()) {
+    row.Set("delta_idr", delta_idr);
+    row.Set("theta_idr", theta_idr);
+    if (idr_->idr_nature() == idr_free_streaming) {
+      row.Set("shear_idr", shear_idr);
+    }
+  }
+  if (has_idm_dr()) {
+    row.Set("delta_idm_dr", delta_idm_dr);
+    row.Set("theta_idm_dr", theta_idm_dr);
+  }
 }
 
 IDM_DR_IDR_Species::IDM_DR_IDR_Species(const background& pba,

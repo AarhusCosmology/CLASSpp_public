@@ -73,8 +73,6 @@ using LensingModulePtr        = std::shared_ptr<const LensingModule>;
 #define _COLUMNWIDTH_ \
   24 /**< Must be at least _OUTPUTPRECISION_+8 for guaranteed fixed width columns */
 
-#define _DELIMITER_ "\t" /**< character used for delimiting titles in the title strings */
-
 #ifndef __CLASSDIR__
 #define __CLASSDIR__ \
   "." /**< The directory of CLASS. This is set to the absolute path to the CLASS directory so this is just a failsafe. */
@@ -128,48 +126,5 @@ inline int index_symmetric_matrix(int i1, int i2, int N) {
               _OUTPUTPRECISION_ + 6,                                         \
               title);                                                        \
   }
-
-#define class_store_columntitle(titlestring, title, condition) \
-  {                                                            \
-    if (condition) {                                           \
-      (titlestring) += (title);                                \
-      (titlestring) += _DELIMITER_;                            \
-    }                                                          \
-  }
-
-#define class_store_double(storage, value, condition, dataindex) \
-  {                                                              \
-    if (condition)                                               \
-      (storage)[(dataindex)++] = value;                          \
-  }
-
-#define class_store_double_or_default(storage, value, condition, dataindex, defaultvalue) \
-  {                                                                                       \
-    if (condition)                                                                        \
-      (storage)[(dataindex)++] = value;                                                   \
-    else                                                                                  \
-      (storage)[(dataindex)++] = defaultvalue;                                            \
-  }
-
-#ifdef __cplusplus
-/* Not in the extern "C" block: takes a std::string& (a C++ type), so it cannot
- * have C language linkage; guarded by __cplusplus so C translation units never
- * see this declaration. */
-int get_number_of_titles(const std::string& titlestring);
-/* The first title that occurs twice in a title string, or "" if every title is
- * unique. A column's title is its key in classy's dicts and in readers of the
- * .dat files, so a repeated title silently hides one of the two columns. */
-std::string first_duplicate_title(const std::string& titlestring);
-/* An output table as (title, column) pairs, in the order of the titles: what classy
- * turns into a dict of arrays. A vector rather than a map keeps the .dat file's column
- * order, which is the order of the keys classy has always returned; SplitIntoColumns
- * refuses repeated titles. */
-using NamedColumns = std::vector<std::pair<std::string, std::vector<double>>>;
-/* The columns of a table written as the .dat files are: one title per column in a
- * title string (class_store_columntitle), and the rows one after the other. */
-NamedColumns SplitIntoColumns(const std::string& titlestring,
-                              const double* rows,
-                              int number_of_rows);
-#endif
 
 #endif

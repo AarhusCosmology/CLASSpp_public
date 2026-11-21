@@ -80,12 +80,21 @@ cdef object _ndarray(const vector[double]& values):
         memcpy(&view[0], values.data(), values.size()*sizeof(double))
     return array
 
-cdef dict _columns_dict(const NamedColumns& columns):
-    """A table of named columns from the C++ modules as a dict of arrays, in column order."""
+cdef dict _table_dict(const OutputTable& table):
+    """An output table of the C++ modules as a dict of arrays, in column order."""
     cdef dict out = {}
     cdef size_t index
-    for index in range(columns.size()):
-        out[(<bytes> columns[index].first).decode()] = _ndarray(columns[index].second)
+    cdef string name
+    cdef OutputColumn column
+    cdef double[::1] view
+    for index in range(table.names().size()):
+        name = table.names()[index]
+        column = table.column(index)
+        array = np.empty(column.size(), np.double)
+        if column.size() > 0:
+            view = array
+            memcpy(&view[0], column.data(), column.size()*sizeof(double))
+        out[(<bytes> name).decode()] = array
     return out
 
 cdef extern from "bessel_table_cache.h":
@@ -737,7 +746,7 @@ cdef class PyCosmology:
         -------
         background : dictionary containing background.
         """
-        return _columns_dict(self._background().GetOutputColumns())
+        return _table_dict(self._background().GetOutputTable())
 
     cpdef get_thermodynamics(self):
         """
@@ -747,7 +756,7 @@ cdef class PyCosmology:
         -------
         thermodynamics : dictionary containing thermodynamics.
         """
-        return _columns_dict(self._thermo().GetOutputColumns())
+        return _table_dict(self._thermo().GetOutputTable())
 
     cpdef get_primordial(self):
         """
@@ -758,7 +767,7 @@ cdef class PyCosmology:
         -------
         primordial : dictionary containing k-vector and primordial scalar and tensor P(k).
         """
-        return _columns_dict(self._primordial().GetOutputColumns())
+        return _table_dict(self._primordial().GetOutputTable())
 
 
     cpdef get_perturbations(self):
@@ -781,7 +790,7 @@ cdef class PyCosmology:
 
         cdef:
             const PerturbationsModule* perturbations_module
-            vector[NamedColumns] tables
+            vector[OutputTable] tables
             size_t index_k
 
         perturbations = {}
@@ -796,8 +805,8 @@ cdef class PyCosmology:
                 ('tensor', self.pt().has_tensors, perturbations_module.index_md_tensors_)):
             if not has_mode:
                 continue
-            tables = perturbations_module.GetPerturbationColumns(index_md)
-            perturbations[mode] = [_columns_dict(tables[index_k]) for index_k in range(tables.size())]
+            tables = perturbations_module.GetPerturbationTables(index_md)
+            perturbations[mode] = [_table_dict(tables[index_k]) for index_k in range(tables.size())]
 
         return perturbations
 
@@ -829,7 +838,7 @@ cdef class PyCosmology:
             string ic_suffix
             file_format outf
             const PerturbationsModule* perturbations_module
-            vector[NamedColumns] tables
+            vector[OutputTable] tables
             int index_ic
 
         if (not self.pt().has_density_transfers) and (not self.pt().has_velocity_transfers):
@@ -842,17 +851,17 @@ cdef class PyCosmology:
 
         perturbations_module = self._perturbations()
         if index_tau < 0:
-            tables = perturbations_module.GetTransferColumns(outf, z)
+            tables = perturbations_module.GetTransferTables(outf, z)
         else:
-            tables = perturbations_module.GetTransferColumnsAtIndexTau(outf, index_tau)
+            tables = perturbations_module.GetTransferTablesAtIndexTau(outf, index_tau)
 
         if tables.size() == 1:
-            return _columns_dict(tables[0])
+            return _table_dict(tables[0])
 
         transfers = {}
         for index_ic in range(tables.size()):
             perturbations_module.perturb_output_firstline_and_ic_suffix(index_ic, ic_info, ic_suffix)
-            transfers[(<bytes> ic_suffix).decode()] = _columns_dict(tables[index_ic])
+            transfers[(<bytes> ic_suffix).decode()] = _table_dict(tables[index_ic])
         return transfers
 
     def _derived_parameter(self, name):

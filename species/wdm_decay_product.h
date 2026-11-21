@@ -133,8 +133,7 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
                 const double* pvecback) const override;
   double RhoPrimeOverRho(const double* pvecback, double a_prime_over_a) const override;
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   // ── Decay-product neutrality overrides ─────────────────────────────────────
   // The daughter starts empty: it contributes nothing to the early-time
@@ -202,11 +201,11 @@ class WdmDecayProductSpecies : public NCDMBaseSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
 
   /** Tensor modes: no slots registered — the daughter's tensor anisotropic
    *  stress is neglected (documented scope limit; it is empty until late times). */

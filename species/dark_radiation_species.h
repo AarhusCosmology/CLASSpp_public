@@ -133,11 +133,11 @@ class DarkRadiationSpecies : public BaseSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
 
  private:
   const background* pba_;

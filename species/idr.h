@@ -149,7 +149,7 @@ class IDRSpecies : public BaseSpecies {
    * IDR shear under TCA with IDM_DR. Returns the TCA shear prediction if all
    * TCA guards are satisfied; otherwise returns 0. Called by StressEnergy
    * (when shear_idr is not in the y-vector) and by external code
-   * that needs the TCA shear (perturb_vector_init, IDM_DR_IDR_Species::PrintVariables).
+   * that needs the TCA shear (perturb_vector_init, IDM_DR_IDR_Species::AddPerturbationOutput).
    *
    * `layout` must be the IDR child's PerturbLayout (nested inside the
    * IDM_DR_IDR composite layout). We read layout.idx_shear / layout.idx_theta

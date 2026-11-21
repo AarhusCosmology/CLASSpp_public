@@ -62,15 +62,9 @@ void DCDM_WDM_Species::BackgroundDerivs(double tau,
   }
 }
 
-void DCDM_WDM_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_dcdm_" + name(), 0.);
-  wdm_->WriteBackgroundColumnTitles(w);
-}
-
-void DCDM_WDM_Species::WriteBackgroundData(const double* pvecback,
-                                           BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_dcdm_" + name(), dcdm_->Rho(pvecback));
-  wdm_->WriteBackgroundData(pvecback, w);
+void DCDM_WDM_Species::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_dcdm_" + name(), dcdm_->Rho(pvecback));
+  wdm_->AddBackgroundOutput(row, pvecback);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

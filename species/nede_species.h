@@ -61,8 +61,7 @@ class NEDESpecies : public BaseSpecies {
                 double H,
                 const double* pvecback_B,
                 const double* pvecback) const override;
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   enum Regime { kBeforeTransition = 0, kAfterTransition = 1 };

@@ -631,8 +631,6 @@ void OutputModule::output_tk() {
   /** Summary: */
 
   /** - define local variables */
-  std::string titles;
-
   std::string first_line;
   std::string ic_suffix;
 
@@ -658,12 +656,6 @@ void OutputModule::output_tk() {
                "format, or ask only for density transfer function");
   }
 
-  perturbations_module_->perturb_output_titles(pop->output_format, titles);
-  int number_of_titles = get_number_of_titles(titles);
-  int size_data        = number_of_titles * perturbations_module_->k_size_[index_md];
-
-  std::vector<double> data(perturbations_module_->ic_size_[index_md] * size_data);
-
   for (int index_z = 0; index_z < pop->z_pk_num; index_z++) {
     double z = pop->z_pk[index_z];
 
@@ -682,10 +674,8 @@ void OutputModule::output_tk() {
 
     /** - second, open only the relevant files, and write a heading in each of them */
 
-    perturbations_module_->perturb_output_data(pop->output_format,
-                                               pop->z_pk[index_z],
-                                               number_of_titles,
-                                               data.data());
+    const std::vector<OutputTable> tables =
+        perturbations_module_->GetTransferTables(pop->output_format, pop->z_pk[index_z]);
 
     for (int index_ic = 0; index_ic < perturbations_module_->ic_size_[index_md]; index_ic++) {
       perturbations_module_->perturb_output_firstline_and_ic_suffix(index_ic,
@@ -763,7 +753,7 @@ void OutputModule::output_tk() {
         }
       }
 
-      output_print_data(tkfile, titles, data.data() + index_ic * size_data, size_data);
+      output_print_table(tkfile, tables[index_ic]);
 
       /** - free memory and close files */
       fclose(tkfile);
@@ -773,14 +763,7 @@ void OutputModule::output_tk() {
 
 void OutputModule::output_background() {
   std::string file_name;
-
-  std::string titles;
-
-  background_module_->background_output_titles(titles);
-  int number_of_titles = get_number_of_titles(titles);
-  int size_data        = number_of_titles * background_module_->bt_size_;
-  std::vector<double> data(size_data);
-  background_module_->background_output_data(number_of_titles, data.data());
+  const OutputTable table = background_module_->GetOutputTable();
 
   file_name = pop->root + "background.dat";
   FILE* backfile;
@@ -793,7 +776,7 @@ void OutputModule::output_background() {
             "factor) \n");
     fprintf(backfile, "# Densities are in units [Mpc^-2] while all distances are in [Mpc]. \n");
     // The species' own notes on their columns (the scalar field's units of phi and V).
-    for (const auto& note : background_module_->background_output_notes()) {
+    for (const auto& note : table.notes()) {
       std::istringstream lines(note);
       std::string line;
       while (std::getline(lines, line)) {
@@ -802,20 +785,14 @@ void OutputModule::output_background() {
     }
   }
 
-  output_print_data(backfile, titles, data.data(), size_data);
+  output_print_table(backfile, table);
 
   fclose(backfile);
 }
 
 void OutputModule::output_thermodynamics() {
   std::string file_name;
-  std::string titles;
-
-  thermodynamics_module_->thermodynamics_output_titles(titles);
-  int number_of_titles = get_number_of_titles(titles);
-  int size_data        = number_of_titles * thermodynamics_module_->tt_size_;
-  std::vector<double> data(size_data);
-  thermodynamics_module_->thermodynamics_output_data(number_of_titles, data.data());
+  const OutputTable table = thermodynamics_module_->GetOutputTable();
 
   file_name = pop->root + "thermodynamics.dat";
   FILE* thermofile;
@@ -852,7 +829,7 @@ void OutputModule::output_thermodynamics() {
     }
   }
 
-  output_print_data(thermofile, titles, data.data(), size_data);
+  output_print_table(thermofile, table);
 
   fclose(thermofile);
 }
@@ -864,6 +841,22 @@ void OutputModule::output_perturbations() {
   int index_md;
   double k;
 
+  std::vector<OutputTable> scalar_tables;
+  std::vector<OutputTable> vector_tables;
+  std::vector<OutputTable> tensor_tables;
+  if (ppt->has_scalars) {
+    scalar_tables = perturbations_module_->GetPerturbationTables(
+        perturbations_module_->index_md_scalars_);
+  }
+  if (ppt->has_vectors) {
+    vector_tables = perturbations_module_->GetPerturbationTables(
+        perturbations_module_->index_md_vectors_);
+  }
+  if (ppt->has_tensors) {
+    tensor_tables = perturbations_module_->GetPerturbationTables(
+        perturbations_module_->index_md_tensors_);
+  }
+
   for (index_ikout = 0; index_ikout < ppt->k_output_values_num; index_ikout++) {
     if (ppt->has_scalars) {
       index_md = perturbations_module_->index_md_scalars_;
@@ -874,11 +867,7 @@ void OutputModule::output_perturbations() {
       file_name = pop->root + "perturbations_k" + std::to_string(index_ikout) + "_s.dat";
       class_open(out, file_name.c_str(), "w");
       fprintf(out, "#scalar perturbations for mode k = %.*e Mpc^(-1)\n", _OUTPUTPRECISION_, k);
-      output_print_data(out,
-                        perturbations_module_->scalar_titles_,
-
-                        perturbations_module_->scalar_perturbations_data_[index_ikout].data(),
-                        perturbations_module_->size_scalar_perturbation_data_[index_ikout]);
+      output_print_table(out, scalar_tables[index_ikout]);
 
       fclose(out);
     }
@@ -891,11 +880,7 @@ void OutputModule::output_perturbations() {
       file_name = pop->root + "perturbations_k" + std::to_string(index_ikout) + "_v.dat";
       class_open(out, file_name.c_str(), "w");
       fprintf(out, "#vector perturbations for mode k = %.*e Mpc^(-1)\n", _OUTPUTPRECISION_, k);
-      output_print_data(out,
-                        perturbations_module_->vector_titles_,
-
-                        perturbations_module_->vector_perturbations_data_[index_ikout].data(),
-                        perturbations_module_->size_vector_perturbation_data_[index_ikout]);
+      output_print_table(out, vector_tables[index_ikout]);
 
       fclose(out);
     }
@@ -908,11 +893,7 @@ void OutputModule::output_perturbations() {
       file_name = pop->root + "perturbations_k" + std::to_string(index_ikout) + "_t.dat";
       class_open(out, file_name.c_str(), "w");
       fprintf(out, "#tensor perturbations for mode k = %.*e Mpc^(-1)\n", _OUTPUTPRECISION_, k);
-      output_print_data(out,
-                        perturbations_module_->tensor_titles_,
-
-                        perturbations_module_->tensor_perturbations_data_[index_ikout].data(),
-                        perturbations_module_->size_tensor_perturbation_data_[index_ikout]);
+      output_print_table(out, tensor_tables[index_ikout]);
 
       fclose(out);
     }
@@ -921,15 +902,10 @@ void OutputModule::output_perturbations() {
 
 void OutputModule::output_primordial() {
   std::string file_name;
-  std::string titles;
 
   file_name = pop->root + "primordial_Pk.dat";
 
-  primordial_module_->primordial_output_titles(titles);
-  int number_of_titles = get_number_of_titles(titles);
-  int size_data        = number_of_titles * primordial_module_->lnk_size_;
-  std::vector<double> data(size_data);
-  primordial_module_->primordial_output_data(number_of_titles, data.data());
+  const OutputTable table = primordial_module_->GetOutputTable();
 
   FILE* out;
   class_open(out, file_name.c_str(), "w");
@@ -937,40 +913,28 @@ void OutputModule::output_primordial() {
     fprintf(out, "# Dimensionless primordial spectrum, equal to [k^3/2pi^2] P(k) \n");
   }
 
-  output_print_data(out, titles, data.data(), size_data);
+  output_print_table(out, table);
 
   fclose(out);
 }
 
-void OutputModule::output_print_data(FILE* out,
-                                     const std::string& titles,
-                                     const double* dataptr,
-                                     int size_dataptr) {
+void OutputModule::output_print_table(FILE* out, const OutputTable& table) {
   int colnum = 1;
-
-  /** Summary*/
-
-  /** - First we print the titles */
   fprintf(out, "#");
-
-  std::string titles_copy = titles;
-  char* pch               = strtok(titles_copy.data(), _DELIMITER_);
-  while (pch != nullptr) {
-    class_fprintf_columntitle(out, pch, true, colnum);
-    pch = strtok(nullptr, _DELIMITER_);
+  for (const std::string& name : table.names()) {
+    class_fprintf_columntitle(out, name.c_str(), true, colnum);
   }
   fprintf(out, "\n");
-
-  /** - Then we print the data */
-  int number_of_titles = colnum - 1;
-  if (number_of_titles > 0) {
-    for (int index_tau = 0; index_tau < size_dataptr / number_of_titles; index_tau++) {
-      fprintf(out, " ");
-      for (int index_title = 0; index_title < number_of_titles; index_title++) {
-        class_fprintf_double(out, dataptr[index_tau * number_of_titles + index_title], true);
-      }
-      fprintf(out, "\n");
+  std::vector<OutputColumn> columns;
+  for (size_t index = 0; index < table.names().size(); ++index) {
+    columns.push_back(table.column(index));
+  }
+  for (size_t row = 0; row < table.rows(); ++row) {
+    fprintf(out, " ");
+    for (const OutputColumn& column : columns) {
+      class_fprintf_double(out, column[row], true);
     }
+    fprintf(out, "\n");
   }
 }
 

@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "common.h"  // for file_format, true, false, class_store_* macros
+#include "common.h"  // for file_format
 
 // Forward declarations
 struct perturb_workspace;
@@ -49,50 +49,6 @@ struct SourceRequestContext {
   bool wants_density;   // ppt->has_density_transfers
   bool wants_velocity;  // ppt->has_velocity_transfers
   int gauge;            // possible_gauges; CDM registers theta only when != synchronous
-};
-
-// ── PerturbColumnWriter ──────────────────────────────────────────────────────
-/**
- * Thin helper that handles both title-writing and data-writing in one pass.
- * Construct in title mode or one of two data modes; call Add() once per column.
- *
- * The two Add overloads let species use the same writer for:
- *   - WriteOutputColumns: Add(title, tp_index, active)  — value = tk[tp_index]
- *   - PrintVariables    : Add(title, value,    active)  — value passed directly
- */
-class PerturbColumnWriter {
- public:
-  // Title mode (used from perturb_output_titles and perturb_prepare_k_output)
-  explicit PerturbColumnWriter(std::string& titles) : titles_(&titles) {}
-
-  // Data mode for WriteOutputColumns: value = tk[tp_index]
-  PerturbColumnWriter(double* dataptr, const double* tk, int& storeidx)
-      : dataptr_(dataptr), tk_(tk), storeidx_(&storeidx) {}
-
-  // Data mode for PrintVariables: value passed directly
-  PerturbColumnWriter(double* dataptr, int& storeidx) : dataptr_(dataptr), storeidx_(&storeidx) {}
-
-  bool IsTitleMode() const {
-    return titles_ != nullptr;
-  }
-
-  // For WriteOutputColumns: species pass a tp_index; writer looks up tk[tp_index]
-  void Add(const char* title, int tp_index, bool active);
-  void Add(const std::string& title, int tp_index, bool active) {
-    Add(title.c_str(), tp_index, active);
-  }
-
-  // For PrintVariables: species pass the value directly
-  void Add(const char* title, double value, bool active);
-  void Add(const std::string& title, double value, bool active) {
-    Add(title.c_str(), value, active);
-  }
-
- private:
-  std::string* titles_ = nullptr;
-  double* dataptr_     = nullptr;
-  const double* tk_    = nullptr;
-  int* storeidx_       = nullptr;
 };
 
 // ── PerturbSourceContext ─────────────────────────────────────────────────────

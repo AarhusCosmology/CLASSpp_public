@@ -214,25 +214,25 @@ void CompositeSpecies::FillSources(const BaseSpecies::PerturbLayout& base,
   }
 }
 
-void CompositeSpecies::WriteOutputColumns(PerturbColumnWriter& writer,
-                                          const PerturbationsModule& mod,
-                                          file_format fmt,
-                                          BaseSpecies::TransferColumnSection section) const {
+void CompositeSpecies::AddTransferOutput(OutputTable& row,
+                                         const double* tk,
+                                         const PerturbationsModule& mod,
+                                         file_format fmt,
+                                         BaseSpecies::TransferColumnSection section) const {
   for (const auto& child : children_) {
-    child->WriteOutputColumns(writer, mod, fmt, section);
+    child->AddTransferOutput(row, tk, mod, fmt, section);
   }
 }
 
-void CompositeSpecies::PrintVariables(PerturbColumnWriter& writer,
-                                      const BaseSpecies::PerturbLayout* base,
-                                      double tau,
-                                      const double* y,
-                                      const PerturbationsModule& mod,
-                                      const perturb_workspace* ppw) const {
-  const auto* my = static_cast<const PerturbLayout*>(base);
+void CompositeSpecies::AddPerturbationOutput(OutputTable& row,
+                                             const BaseSpecies::PerturbLayout& base,
+                                             double tau,
+                                             const double* y,
+                                             const PerturbationsModule& mod,
+                                             const perturb_workspace* ppw) const {
+  const auto& my = static_cast<const PerturbLayout&>(base);
   for (size_t i = 0; i < children_.size(); ++i) {
-    children_[i]
-        ->PrintVariables(writer, my ? my->child_layouts[i].get() : nullptr, tau, y, mod, ppw);
+    children_[i]->AddPerturbationOutput(row, *my.child_layouts[i], tau, y, mod, ppw);
   }
 }
 

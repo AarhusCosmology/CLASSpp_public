@@ -94,12 +94,8 @@ double NEDESpecies::PPrime(double a,
   return -3. * a * H * (1. + w) * w * pvecback[index_bg_rho_];
 }
 
-void NEDESpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_NEDE", 0.);
-}
-
-void NEDESpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_NEDE", pvecback[index_bg_rho_]);
+void NEDESpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_NEDE", pvecback[index_bg_rho_]);
 }
 
 // ── Perturbations ──────────────────────────────────────────────────────────────

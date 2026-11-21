@@ -258,16 +258,10 @@ void NCDMSpecies::BackgroundDerivs(double /*tau*/,
   // Stable NCDM has no background derivatives
 }
 
-void NCDMSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)number_" + name(), 0.);
-  w.Add("(.)rho_" + name(), 0.);
-  w.Add("(.)p_" + name(), 0.);
-}
-
-void NCDMSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  w.Add("(.)number_" + name(), pvecback[bg_number_index()]);
-  w.Add("(.)rho_" + name(), Rho(pvecback));
-  w.Add("(.)p_" + name(), P(pvecback));
+void NCDMSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)number_" + name(), pvecback[bg_number_index()]);
+  row.Set("(.)rho_" + name(), Rho(pvecback));
+  row.Set("(.)p_" + name(), P(pvecback));
 }
 
 void NCDMSpecies::FillSources(const BaseSpecies::PerturbLayout& layout,
@@ -517,112 +511,142 @@ void NCDMSpecies::PerturbSynchronousToNewtonian(const BaseSpecies::PerturbLayout
 
 // ── Output columns ─────────────────────────────────────────────────────────
 
-void NCDMSpecies::WriteOutputColumns(PerturbColumnWriter& w,
-                                     const PerturbationsModule& mod,
-                                     file_format fmt,
-                                     BaseSpecies::TransferColumnSection section) const {
+void NCDMSpecies::AddTransferOutput(OutputTable& row,
+                                    const double* tk,
+                                    const PerturbationsModule& mod,
+                                    file_format fmt,
+                                    BaseSpecies::TransferColumnSection section) const {
   const std::string& nm = name();
 
   if (fmt == file_format::class_format) {
     const perturbs* ppt = mod.GetPerturbs();
     if (section != TransferColumnSection::velocity && ppt->has_density_transfers) {
-      w.Add("d_" + nm, index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("d_" + nm, tk[index_tp_delta_]);
+      }
     }
     if (section != TransferColumnSection::density && ppt->has_velocity_transfers) {
-      w.Add("t_" + nm, index_tp_theta_, index_tp_theta_ >= 0);
+      if (index_tp_theta_ >= 0) {
+        row.Set("t_" + nm, tk[index_tp_theta_]);
+      }
     }
   }
   else if (fmt == file_format::camb_format) {
     // file_format::camb_format: per-flavor column (intentional change from aggregate, #309)
     if (section != TransferColumnSection::velocity) {
-      w.Add("-T_" + nm + "/k2", index_tp_delta_, index_tp_delta_ >= 0);
+      if (index_tp_delta_ >= 0) {
+        row.Set("-T_" + nm + "/k2", tk[index_tp_delta_]);
+      }
     }
   }
 }
 
-void NCDMSpecies::PrintVariables(PerturbColumnWriter& w,
-                                 const BaseSpecies::PerturbLayout* base,
-                                 double /*tau*/,
-                                 const double* y,
-                                 const PerturbationsModule& mod,
-                                 const perturb_workspace* ppw) const {
+void NCDMSpecies::AddPerturbationOutput(OutputTable& row,
+                                        const BaseSpecies::PerturbLayout& base,
+                                        double /*tau*/,
+                                        const double* y,
+                                        const PerturbationsModule& mod,
+                                        const perturb_workspace* ppw) const {
   double delta_ncdm = 0.;
   double theta_ncdm = 0.;
   double shear_ncdm = 0.;
   double cs2_ncdm   = 0.;
   double a4Pi_ncdm  = 0.;
 
-  if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback.data();
-    const double* pvecmetric = ppw->pvecmetric.data();
-    const double k           = ppw->scalar_ctx.k;
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-    const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+  const perturb_vector* pv = ppw->pv.get();
+  const double* pvecback   = ppw->pvecback.data();
+  const double* pvecmetric = ppw->pvecmetric.data();
+  const double k           = ppw->scalar_ctx.k;
+  const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+  const double H           = pvecback[mod.GetBackgroundModule()->index_bg_H_];
 
-    const double rho_ncdm_bg = Rho(pvecback);
-    const double p_ncdm_bg   = P(pvecback);
-    const double rho_plus_p  = rho_ncdm_bg + p_ncdm_bg;
-    const double w_ncdm      = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
+  const double rho_ncdm_bg = Rho(pvecback);
+  const double p_ncdm_bg   = P(pvecback);
+  const double rho_plus_p  = rho_ncdm_bg + p_ncdm_bg;
+  const double w_ncdm      = (rho_ncdm_bg > 0.) ? p_ncdm_bg / rho_ncdm_bg : 0.;
 
-    const auto& layout = *base;
-    const auto se      = StressEnergy(layout, pv, y, pvecback, ppw);
-    delta_ncdm         = (rho_ncdm_bg > 0.) ? se.delta_rho / rho_ncdm_bg : 0.;
-    theta_ncdm         = (rho_plus_p > 0.) ? se.rho_plus_p_theta / rho_plus_p : 0.;
-    shear_ncdm         = (rho_plus_p > 0.) ? se.rho_plus_p_shear / rho_plus_p : 0.;
-    // a⁴Π ≡ a⁴(ρ̄+p̄)σ — the anisotropic stress that sources k²(φ−ψ) = 12πGa²Π.
-    // Deliberately built from the SAME `se.rho_plus_p_shear` that DNCDMInvSpecies
-    // uses for its own a4Pi_* columns, rather than reconstructed from the
-    // normalized `shear_ncdm` above: the two columns are then definitionally
-    // identical, which is what makes a decaying sector and a self-interacting one
-    // comparable in magnitude and not merely in shape. a⁴ removes the free
-    // radiation redshift, so a free-streaming species oscillates at constant
-    // amplitude and collisional isotropisation shows up as a decaying envelope.
-    a4Pi_ncdm                   = a * a * a * a * se.rho_plus_p_shear;
-    const double delta_p_ncdm   = se.delta_p;
-    const double delta_rho_ncdm = rho_ncdm_bg * delta_ncdm;
-    constexpr double eps        = 1e-300;
-    cs2_ncdm = (std::abs(delta_rho_ncdm) > eps) ? delta_p_ncdm / delta_rho_ncdm : 0.;
+  const auto se = StressEnergy(base, pv, y, pvecback, ppw);
+  delta_ncdm    = (rho_ncdm_bg > 0.) ? se.delta_rho / rho_ncdm_bg : 0.;
+  theta_ncdm    = (rho_plus_p > 0.) ? se.rho_plus_p_theta / rho_plus_p : 0.;
+  shear_ncdm    = (rho_plus_p > 0.) ? se.rho_plus_p_shear / rho_plus_p : 0.;
+  // a⁴Π ≡ a⁴(ρ̄+p̄)σ — the anisotropic stress that sources k²(φ−ψ) = 12πGa²Π.
+  // Deliberately built from the SAME `se.rho_plus_p_shear` that DNCDMInvSpecies
+  // uses for its own a4Pi_* columns, rather than reconstructed from the
+  // normalized `shear_ncdm` above: the two columns are then definitionally
+  // identical, which is what makes a decaying sector and a self-interacting one
+  // comparable in magnitude and not merely in shape. a⁴ removes the free
+  // radiation redshift, so a free-streaming species oscillates at constant
+  // amplitude and collisional isotropisation shows up as a decaying envelope.
+  a4Pi_ncdm                   = a * a * a * a * se.rho_plus_p_shear;
+  const double delta_p_ncdm   = se.delta_p;
+  const double delta_rho_ncdm = rho_ncdm_bg * delta_ncdm;
+  constexpr double eps        = 1e-300;
+  cs2_ncdm = (std::abs(delta_rho_ncdm) > eps) ? delta_p_ncdm / delta_rho_ncdm : 0.;
 
-    const perturbs* ppt = mod.GetPerturbs();
-    if (ppt->gauge == possible_gauges::synchronous) {
-      const double alpha_corr = pvecmetric[ppw->index_mt_alpha];
-      // Store pre-correction delta for cs2 update
-      const double delta_ncdm_syn  = delta_ncdm;
-      delta_ncdm                  -= 3. * a * H * (1. + w_ncdm) * alpha_corr;
-      theta_ncdm                  += k * k * alpha_corr;
-      // Update cs2_ncdm with gauge correction
-      if (p_ncdm_bg > eps) {
-        const double pseudo_p_ncdm         = pvecback[index_bg_pseudo_p_];
-        const double p_prime_over_rho_ncdm = -a * H * w_ncdm * (5. - pseudo_p_ncdm / p_ncdm_bg);
-        const double delta_ncdm_corrected  = delta_ncdm_syn -
-                                             3. * (1. + w_ncdm) * a * H * alpha_corr;
-        if (std::abs(delta_ncdm_corrected) > eps) {
-          cs2_ncdm = (cs2_ncdm * delta_ncdm_syn + p_prime_over_rho_ncdm * alpha_corr) /
-                     delta_ncdm_corrected;
-        }
+  const perturbs* ppt = mod.GetPerturbs();
+  if (ppt->gauge == possible_gauges::synchronous) {
+    const double alpha_corr = pvecmetric[ppw->index_mt_alpha];
+    // Store pre-correction delta for cs2 update
+    const double delta_ncdm_syn  = delta_ncdm;
+    delta_ncdm                  -= 3. * a * H * (1. + w_ncdm) * alpha_corr;
+    theta_ncdm                  += k * k * alpha_corr;
+    // Update cs2_ncdm with gauge correction
+    if (p_ncdm_bg > eps) {
+      const double pseudo_p_ncdm         = pvecback[index_bg_pseudo_p_];
+      const double p_prime_over_rho_ncdm = -a * H * w_ncdm * (5. - pseudo_p_ncdm / p_ncdm_bg);
+      const double delta_ncdm_corrected  = delta_ncdm_syn - 3. * (1. + w_ncdm) * a * H * alpha_corr;
+      if (std::abs(delta_ncdm_corrected) > eps) {
+        cs2_ncdm = (cs2_ncdm * delta_ncdm_syn + p_prime_over_rho_ncdm * alpha_corr) /
+                   delta_ncdm_corrected;
       }
     }
   }
 
   const std::string& nm = name();
-  w.Add("delta_" + nm, delta_ncdm, true);
-  w.Add("theta_" + nm, theta_ncdm, true);
-  w.Add("shear_" + nm, shear_ncdm, true);
-  w.Add("cs2_" + nm, cs2_ncdm, true);
-  w.Add("a4Pi_" + nm, a4Pi_ncdm, true);
+  row.Set("delta_" + nm, delta_ncdm);
+  row.Set("theta_" + nm, theta_ncdm);
+  row.Set("shear_" + nm, shear_ncdm);
+  row.Set("cs2_" + nm, cs2_ncdm);
+  row.Set("a4Pi_" + nm, a4Pi_ncdm);
 }
 
 // ── Tensor output column titles ────────────────────────────────────────────
 
-void NCDMSpecies::WriteTensorOutputColumnTitles(std::string& tensor_titles) const {
+void NCDMSpecies::AddTensorPerturbationOutput(OutputTable& row,
+                                              const BaseSpecies::PerturbLayout& base,
+                                              double k,
+                                              double a,
+                                              const double* y,
+                                              const double* pvecback) const {
+  const auto& layout           = static_cast<const NCDMBaseSpecies::PerturbLayout&>(base);
+  const double a2              = a * a;
+  double rho_delta_ncdm        = 0.0;
+  double rho_plus_p_theta_ncdm = 0.0;
+  double rho_plus_p_shear_ncdm = 0.0;
+  const double factor          = this->factor() * pow(1. / a, 4);
+
+  for (int index_q = 0; index_q < layout.q_size; index_q++) {
+    const int idx        = layout.index_per_q[index_q];
+    const double q       = this->q()[index_q];
+    const double q2      = q * q;
+    const double epsilon = sqrt(q2 + M() * M() * a2);
+
+    rho_delta_ncdm        += q2 * epsilon * w()[index_q] * y[idx];
+    rho_plus_p_theta_ncdm += q2 * q * w()[index_q] * y[idx + 1];
+    rho_plus_p_shear_ncdm += q2 * q2 / epsilon * w()[index_q] * y[idx + 2];
+  }
+
+  rho_delta_ncdm        *= factor;
+  rho_plus_p_theta_ncdm *= k * factor;
+  rho_plus_p_shear_ncdm *= 2.0 / 3.0 * factor;
+
+  const double rho        = Rho(pvecback);
+  const double rho_plus_p = rho + P(pvecback);
+
   const std::string& nm = name();
-  std::string title     = "delta_" + nm;
-  class_store_columntitle(tensor_titles, title, true);
-  title = "theta_" + nm;
-  class_store_columntitle(tensor_titles, title, true);
-  title = "shear_" + nm;
-  class_store_columntitle(tensor_titles, title, true);
+  row.Set("delta_" + nm, rho_delta_ncdm / rho);
+  row.Set("theta_" + nm, rho_plus_p_theta_ncdm / rho_plus_p);
+  row.Set("shear_" + nm, rho_plus_p_shear_ncdm / rho_plus_p);
 }
 
 // Fused stress-energy: eliminates four virtual dispatches with one override.

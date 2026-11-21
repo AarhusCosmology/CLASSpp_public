@@ -18,14 +18,9 @@ Type3Species::Type3Species(const background& pba,
   children_.push_back(std::move(scf));
 }
 
-void Type3Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  cdm_->WriteBackgroundColumnTitles(w);
-  scf_->WriteBackgroundColumnTitles(w);
-}
-
-void Type3Species::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  cdm_->WriteBackgroundData(pvecback, w);
-  scf_->WriteBackgroundData(pvecback, w);
+void Type3Species::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  cdm_->AddBackgroundOutput(row, pvecback);
+  scf_->AddBackgroundOutput(row, pvecback);
 }
 
 // ── Coupling free functions (arXiv:1604.04222, synchronous gauge) ────────────

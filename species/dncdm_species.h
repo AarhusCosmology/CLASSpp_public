@@ -141,17 +141,16 @@ class DNCDMSpecies : public NCDMBaseSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
 
   bool IsFreestreaming() const override {
     return true;
   }
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   // ── Accessors for DNCDM_DR_Species coupling ───────────────────────────────
   int bg_number_index() const {

@@ -1534,17 +1534,10 @@ void DNCDMInvSpecies::PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& /*
 // Background column output (parent + both daughters)
 // ─────────────────────────────────────────────────────────────────────────────
 
-void DNCDMInvSpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  parent_->WriteBackgroundColumnTitles(w);
-  fermion_->WriteBackgroundColumnTitles(w);
-  boson_->WriteBackgroundColumnTitles(w);
-  w.Add("bose_occupancy_" + name(), 0.);
-}
-
-void DNCDMInvSpecies::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  parent_->WriteBackgroundData(pvecback, w);
-  fermion_->WriteBackgroundData(pvecback, w);
-  boson_->WriteBackgroundData(pvecback, w);
+void DNCDMInvSpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  parent_->AddBackgroundOutput(row, pvecback);
+  fermion_->AddBackgroundOutput(row, pvecback);
+  boson_->AddBackgroundOutput(row, pvecback);
   // max_q f̄_φ, the neutrino-lasing order parameter (thesis §6.4): the Bose runaway
   // is driven by 1+f̄_φ ≈ f̄_φ, so f̄_φ ≳ 1 is the condition for the (1±f) terms to
   // dominate. The per-bin f_dr_*_phi[i] columns already carry the full PSD; this is
@@ -1556,7 +1549,7 @@ void DNCDMInvSpecies::WriteBackgroundData(const double* pvecback, BackgroundColu
   for (int i = 1; i < N; ++i) {
     f_max = std::max(f_max, f_phi[i]);
   }
-  w.Add("bose_occupancy_" + name(), f_max);
+  row.Set("bose_occupancy_" + name(), f_max);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1567,16 +1560,16 @@ double DNCDMInvSpecies::DaughtersInitialRadiationOmega0(double H0) const {
   return fermion_->InitialRadiationOmega0(H0) + boson_->InitialRadiationOmega0(H0);
 }
 
-void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
-                                     const BaseSpecies::PerturbLayout* base,
-                                     double tau,
-                                     const double* y,
-                                     const PerturbationsModule& mod,
-                                     const perturb_workspace* ppw) const {
+void DNCDMInvSpecies::AddPerturbationOutput(OutputTable& row,
+                                            const BaseSpecies::PerturbLayout& base,
+                                            double tau,
+                                            const double* y,
+                                            const PerturbationsModule& mod,
+                                            const perturb_workspace* ppw) const {
   // Chain first (children currently publish nothing) so a child that later gains
-  // PrintVariables is picked up without editing this; then the sector aggregates
+  // AddPerturbationOutput is picked up without editing this; then the sector aggregates
   // below, which no child can form on its own.
-  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
+  CompositeSpecies::AddPerturbationOutput(row, base, tau, y, mod, ppw);
   // a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i — the total anisotropic stress of the
   // decaying sector, eq. (6.19) of the thesis / the Ma&Bertschinger source of
   // k²(φ−ψ) = 12πGa²Π. Each child already forms (ρ+p)σ in its own StressEnergy
@@ -1588,7 +1581,7 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // free-streaming oscillation against which interaction-induced isotropisation
   // shows up as a decaying envelope.
   //
-  // Composite-owned (mirrors Type3Species::PrintVariables): the children are not
+  // Composite-owned (mirrors Type3Species::AddPerturbationOutput): the children are not
   // separately registered in the collection, so their layouts are reached through
   // this composite's nested layout, never through their own collection_index_.
   double pi_H   = 0.;
@@ -1602,82 +1595,80 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   // Γ=1e5) and any weighting applied to the published ratio inherits that noise,
   // while Σδρ / Σρ never forms it. The per-component columns are published too, so
   // the decomposition stays checkable — they are the ones to distrust late.
-  double d_sec = 0.;
-  double t_sec = 0.;
-  double s_sec = 0.;
-  double d_H   = 0.;
-  double d_l   = 0.;
-  double d_phi = 0.;
-  double t_H   = 0.;
-  double t_l   = 0.;
-  double t_phi = 0.;
-  if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback.data();
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-    const double a4          = a * a * a * a;
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
-    const auto se_H   = parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw);
-    const auto se_l   = fermion_->StressEnergy(*my.child_layouts[kFermion], pv, y, pvecback, ppw);
-    const auto se_phi = boson_->StressEnergy(*my.child_layouts[kBoson], pv, y, pvecback, ppw);
-    pi_H              = a4 * se_H.rho_plus_p_shear;
-    pi_l              = a4 * se_l.rho_plus_p_shear;
-    pi_phi            = a4 * se_phi.rho_plus_p_shear;
+  double d_sec             = 0.;
+  double t_sec             = 0.;
+  double s_sec             = 0.;
+  double d_H               = 0.;
+  double d_l               = 0.;
+  double d_phi             = 0.;
+  double t_H               = 0.;
+  double t_l               = 0.;
+  double t_phi             = 0.;
+  const perturb_vector* pv = ppw->pv.get();
+  const double* pvecback   = ppw->pvecback.data();
+  const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+  const double a4          = a * a * a * a;
+  const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(base);
+  const auto se_H   = parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw);
+  const auto se_l   = fermion_->StressEnergy(*my.child_layouts[kFermion], pv, y, pvecback, ppw);
+  const auto se_phi = boson_->StressEnergy(*my.child_layouts[kBoson], pv, y, pvecback, ppw);
+  pi_H              = a4 * se_H.rho_plus_p_shear;
+  pi_l              = a4 * se_l.rho_plus_p_shear;
+  pi_phi            = a4 * se_phi.rho_plus_p_shear;
 
-    StressEnergyContribution tot  = se_H;
-    tot                          += se_l;
-    tot                          += se_phi;
-    auto ratio       = [](double num, double den) { return (den > 0.) ? num / den : 0.; };
-    const double rpp = tot.rho + tot.p;
-    d_sec            = ratio(tot.delta_rho, tot.rho);
-    t_sec            = ratio(tot.rho_plus_p_theta, rpp);
-    s_sec            = ratio(tot.rho_plus_p_shear, rpp);
-    d_H              = ratio(se_H.delta_rho, se_H.rho);
-    d_l              = ratio(se_l.delta_rho, se_l.rho);
-    d_phi            = ratio(se_phi.delta_rho, se_phi.rho);
-    t_H              = ratio(se_H.rho_plus_p_theta, se_H.rho + se_H.p);
-    t_l              = ratio(se_l.rho_plus_p_theta, se_l.rho + se_l.p);
-    t_phi            = ratio(se_phi.rho_plus_p_theta, se_phi.rho + se_phi.p);
+  StressEnergyContribution tot  = se_H;
+  tot                          += se_l;
+  tot                          += se_phi;
+  auto ratio       = [](double num, double den) { return (den > 0.) ? num / den : 0.; };
+  const double rpp = tot.rho + tot.p;
+  d_sec            = ratio(tot.delta_rho, tot.rho);
+  t_sec            = ratio(tot.rho_plus_p_theta, rpp);
+  s_sec            = ratio(tot.rho_plus_p_shear, rpp);
+  d_H              = ratio(se_H.delta_rho, se_H.rho);
+  d_l              = ratio(se_l.delta_rho, se_l.rho);
+  d_phi            = ratio(se_phi.delta_rho, se_phi.rho);
+  t_H              = ratio(se_H.rho_plus_p_theta, se_H.rho + se_H.p);
+  t_l              = ratio(se_l.rho_plus_p_theta, se_l.rho + se_l.p);
+  t_phi            = ratio(se_phi.rho_plus_p_theta, se_phi.rho + se_phi.p);
 
-    // Synchronous → Newtonian, exactly as NCDMSpecies::PrintVariables does it for a
-    // stand-alone ncdm. Without this the decaying sector's δ and θ would not be
-    // comparable with the `delta_<name>` / `theta_<name>` columns of the
-    // self-interacting comparison runs, which are gauge-corrected. σ is
-    // gauge-invariant and is left alone. The correction is linear in each species'
-    // (1+w_i), so applying it to the ρ-weighted sum with the sector's own w is the
-    // same as correcting each component first and then summing.
-    if (mod.GetPerturbs()->gauge == possible_gauges::synchronous) {
-      const double H     = pvecback[mod.GetBackgroundModule()->index_bg_H_];
-      const double k     = ppw->scalar_ctx.k;
-      const double alpha = ppw->pvecmetric[ppw->index_mt_alpha];
-      auto to_newt       = [&](double& d, double& t, double rho, double p) {
-        d -= 3. * a * H * (1. + ((rho > 0.) ? p / rho : 0.)) * alpha;
-        t += k * k * alpha;
-      };
-      to_newt(d_sec, t_sec, tot.rho, tot.p);
-      to_newt(d_H, t_H, se_H.rho, se_H.p);
-      to_newt(d_l, t_l, se_l.rho, se_l.p);
-      to_newt(d_phi, t_phi, se_phi.rho, se_phi.p);
-    }
+  // Synchronous → Newtonian, exactly as NCDMSpecies::AddPerturbationOutput does it for a
+  // stand-alone ncdm. Without this the decaying sector's δ and θ would not be
+  // comparable with the `delta_<name>` / `theta_<name>` columns of the
+  // self-interacting comparison runs, which are gauge-corrected. σ is
+  // gauge-invariant and is left alone. The correction is linear in each species'
+  // (1+w_i), so applying it to the ρ-weighted sum with the sector's own w is the
+  // same as correcting each component first and then summing.
+  if (mod.GetPerturbs()->gauge == possible_gauges::synchronous) {
+    const double H     = pvecback[mod.GetBackgroundModule()->index_bg_H_];
+    const double k     = ppw->scalar_ctx.k;
+    const double alpha = ppw->pvecmetric[ppw->index_mt_alpha];
+    auto to_newt       = [&](double& d, double& t, double rho, double p) {
+      d -= 3. * a * H * (1. + ((rho > 0.) ? p / rho : 0.)) * alpha;
+      t += k * k * alpha;
+    };
+    to_newt(d_sec, t_sec, tot.rho, tot.p);
+    to_newt(d_H, t_H, se_H.rho, se_H.p);
+    to_newt(d_l, t_l, se_l.rho, se_l.p);
+    to_newt(d_phi, t_phi, se_phi.rho, se_phi.p);
   }
   // Total first (the measured quantity), then the decomposition: the thesis' own
   // footnote flags that the a⁴Π_νφ notation hides a parent contribution which is
   // "often negligible" — with the three columns side by side that is checkable
   // rather than assumed.
-  w.Add("a4Pi_" + name(), pi_H + pi_l + pi_phi, true);
-  w.Add("a4Pi_" + name() + "_H", pi_H, true);
-  w.Add("a4Pi_" + name() + "_l", pi_l, true);
-  w.Add("a4Pi_" + name() + "_phi", pi_phi, true);
+  row.Set("a4Pi_" + name(), pi_H + pi_l + pi_phi);
+  row.Set("a4Pi_" + name() + "_H", pi_H);
+  row.Set("a4Pi_" + name() + "_l", pi_l);
+  row.Set("a4Pi_" + name() + "_phi", pi_phi);
 
-  w.Add("delta_" + name(), d_sec, true);
-  w.Add("theta_" + name(), t_sec, true);
-  w.Add("shear_" + name(), s_sec, true);
-  w.Add("delta_" + name() + "_H", d_H, true);
-  w.Add("delta_" + name() + "_l", d_l, true);
-  w.Add("delta_" + name() + "_phi", d_phi, true);
-  w.Add("theta_" + name() + "_H", t_H, true);
-  w.Add("theta_" + name() + "_l", t_l, true);
-  w.Add("theta_" + name() + "_phi", t_phi, true);
+  row.Set("delta_" + name(), d_sec);
+  row.Set("theta_" + name(), t_sec);
+  row.Set("shear_" + name(), s_sec);
+  row.Set("delta_" + name() + "_H", d_H);
+  row.Set("delta_" + name() + "_l", d_l);
+  row.Set("delta_" + name() + "_phi", d_phi);
+  row.Set("theta_" + name() + "_H", t_H);
+  row.Set("theta_" + name() + "_l", t_l);
+  row.Set("theta_" + name() + "_phi", t_phi);
 
   // ── Transport rate: the COLLISIONAL part of d(a⁴Π)/dτ, and the parent's γ ─────
   //
@@ -1700,80 +1691,73 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   double pidot_l   = 0.;
   double pidot_phi = 0.;
   double gamma_H   = 0.;
-  if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback.data();
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-    const double a4          = a * a * a * a;
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
-    auto* scratch            = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
-    if (scratch != nullptr && scratch->kernel_pt != nullptr) {
-      const auto& p_lay = parent_layout(my);
-      int l_max_col     = mod.GetPrecision()->l_max_dncdm_col;
-      l_max_col         = std::min(l_max_col, p_lay.l_max);
-      // Zeroed every call: ApplyKernelPerturbDerivs ACCUMULATES into dy (it is
-      // written to be one contributor among several on the real RHS), so a stale
-      // buffer would silently sum sampling points together.
-      scratch->dy_coll.assign(pv->pt_size, 0.);
-      ApplyKernelPerturbDerivs(a,
-                               l_max_col,
-                               pvecback,
-                               p_lay,
-                               fermion_layout(my),
-                               boson_layout(my),
-                               y,
-                               scratch->dy_coll.data(),
-                               *scratch);
-      const double* dyc = scratch->dy_coll.data();
-      // The DAUGHTERS' StressEnergy contracts the y it is HANDED, so evaluating it on
-      // the collision vector gives their Π-rate directly.
-      pidot_l = a4 * fermion_->StressEnergy(*my.child_layouts[kFermion], pv, dyc, pvecback, ppw)
-                         .rho_plus_p_shear;
-      pidot_phi =
-          a4 *
-          boson_->StressEnergy(*my.child_layouts[kBoson], pv, dyc, pvecback, ppw).rho_plus_p_shear;
-      // The parent's is not evaluated on dy_coll: its StressEnergy normalises by
-      // rho+p and the exp(lnN) rescaling, which are not the collision vector's.
-      //
-      // Rescale instead. Π_H = norm · Σ_q dq q⁴/ε · y₂ with a y-INDEPENDENT norm (the
-      // 2/3, (ρ+p), the exp(lnN) rescaling and the ρ+p normalisation all factor out),
-      // so the same norm carries the collision vector and the ratio of the two raw
-      // ℓ=2 contractions converts one into the other. The rescaling factor cancels
-      // between numerator and denominator, so it need not be recomputed here, and
-      // there is no second copy of the normalisation to drift out of sync.
-      // Weights are the collision-owned ones; the composite always sets that mode on
-      // its parent (SetCollisionOwned(true) in this constructor).
-      double num = 0.;
-      double den = 0.;
-      for (int i = 0; i < parent_->q_size(); ++i) {
-        const double q    = parent_->GetQ()[i];
-        const double eps  = std::sqrt(q * q + a * a * parent_->GetMass() * parent_->GetMass());
-        const double wq   = parent_->dq()[i] * q * q * q * q / eps;
-        const int i2      = p_lay.index_per_q[i] + 2;
-        num              += wq * dyc[i2];
-        den              += wq * y[i2];  // the vector pi_H was contracted from
-      }
-      // pi_H/den is the y-independent norm and stays well conditioned even at a zero
-      // crossing of den, because pi_H carries the same vanishing factor.
-      pidot_H = (den != 0.) ? (pi_H / den) * num : 0.;
+  auto* scratch    = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
+  if (scratch != nullptr && scratch->kernel_pt != nullptr) {
+    const auto& p_lay = parent_layout(my);
+    int l_max_col     = mod.GetPrecision()->l_max_dncdm_col;
+    l_max_col         = std::min(l_max_col, p_lay.l_max);
+    // Zeroed every call: ApplyKernelPerturbDerivs ACCUMULATES into dy (it is
+    // written to be one contributor among several on the real RHS), so a stale
+    // buffer would silently sum sampling points together.
+    scratch->dy_coll.assign(pv->pt_size, 0.);
+    ApplyKernelPerturbDerivs(a,
+                             l_max_col,
+                             pvecback,
+                             p_lay,
+                             fermion_layout(my),
+                             boson_layout(my),
+                             y,
+                             scratch->dy_coll.data(),
+                             *scratch);
+    const double* dyc = scratch->dy_coll.data();
+    // The DAUGHTERS' StressEnergy contracts the y it is HANDED, so evaluating it on
+    // the collision vector gives their Π-rate directly.
+    pidot_l = a4 * fermion_->StressEnergy(*my.child_layouts[kFermion], pv, dyc, pvecback, ppw)
+                       .rho_plus_p_shear;
+    pidot_phi =
+        a4 *
+        boson_->StressEnergy(*my.child_layouts[kBoson], pv, dyc, pvecback, ppw).rho_plus_p_shear;
+    // The parent's is not evaluated on dy_coll: its StressEnergy normalises by
+    // rho+p and the exp(lnN) rescaling, which are not the collision vector's.
+    //
+    // Rescale instead. Π_H = norm · Σ_q dq q⁴/ε · y₂ with a y-INDEPENDENT norm (the
+    // 2/3, (ρ+p), the exp(lnN) rescaling and the ρ+p normalisation all factor out),
+    // so the same norm carries the collision vector and the ratio of the two raw
+    // ℓ=2 contractions converts one into the other. The rescaling factor cancels
+    // between numerator and denominator, so it need not be recomputed here, and
+    // there is no second copy of the normalisation to drift out of sync.
+    // Weights are the collision-owned ones; the composite always sets that mode on
+    // its parent (SetCollisionOwned(true) in this constructor).
+    double num = 0.;
+    double den = 0.;
+    for (int i = 0; i < parent_->q_size(); ++i) {
+      const double q    = parent_->GetQ()[i];
+      const double eps  = std::sqrt(q * q + a * a * parent_->GetMass() * parent_->GetMass());
+      const double wq   = parent_->dq()[i] * q * q * q * q / eps;
+      const int i2      = p_lay.index_per_q[i] + 2;
+      num              += wq * dyc[i2];
+      den              += wq * y[i2];  // the vector pi_H was contracted from
     }
-    // Parent's number-weighted mean Lorentz factor <eps>/(a·M). Emitted rather than
-    // reconstructed downstream, which would mean re-deriving the parent's q grid and
-    // its stored-vs-bare f convention outside the code that owns them.
-    const double M = parent_->GetMass();
-    if (M > 0. && a > 0.) {
-      const auto& q  = parent_->GetQ();
-      const auto& dq = parent_->dq();
-      double num     = 0.;
-      double den     = 0.;
-      for (int i = 0; i < parent_->q_size(); ++i) {
-        const double f   = std::exp(pvecback[parent_->bg_lnf_index() + i]);
-        const double w0  = dq[i] * q[i] * q[i] * f;
-        num             += w0 * std::sqrt(q[i] * q[i] + a * a * M * M);
-        den             += w0;
-      }
-      gamma_H = (den > 0.) ? num / (den * a * M) : 0.;
+    // pi_H/den is the y-independent norm and stays well conditioned even at a zero
+    // crossing of den, because pi_H carries the same vanishing factor.
+    pidot_H = (den != 0.) ? (pi_H / den) * num : 0.;
+  }
+  // Parent's number-weighted mean Lorentz factor <eps>/(a·M). Emitted rather than
+  // reconstructed downstream, which would mean re-deriving the parent's q grid and
+  // its stored-vs-bare f convention outside the code that owns them.
+  const double M = parent_->GetMass();
+  if (M > 0. && a > 0.) {
+    const auto& q  = parent_->GetQ();
+    const auto& dq = parent_->dq();
+    double num     = 0.;
+    double den     = 0.;
+    for (int i = 0; i < parent_->q_size(); ++i) {
+      const double f   = std::exp(pvecback[parent_->bg_lnf_index() + i]);
+      const double w0  = dq[i] * q[i] * q[i] * f;
+      num             += w0 * std::sqrt(q[i] * q[i] + a * a * M * M);
+      den             += w0;
     }
+    gamma_H = (den > 0.) ? num / (den * a * M) : 0.;
   }
   // ── Per-multipole sector moments: what alpha_l can actually be measured from ──
   //
@@ -1807,83 +1791,77 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
     double m_num[kLMomentMax + 1] = {0.};
     double m_den[kLMomentMax + 1] = {0.};
     double m_can[kLMomentMax + 1] = {0.};
-    if (!w.IsTitleMode()) {
-      const double* pvecback = ppw->pvecback.data();
-      const double a         = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-      const auto& my         = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
-      auto* scratch          = static_cast<Scratch*>(ppw->species_scratch[collection_index_].get());
-      if (scratch != nullptr && !scratch->dy_coll.empty()) {
-        const double* dyc = scratch->dy_coll.data();
-        const double aM2  = a * a * parent_->GetMass() * parent_->GetMass();
-        // (layout, q, dq, n, mass^2 a^2, norm) for each of the three legs. The norms
-        // are filled from l = 2 below, so they must be computed before the l loop.
-        struct Leg {
-          const NCDMBaseSpecies::PerturbLayout* lay;
-          const std::vector<double>* q;
-          const std::vector<double>* dq;
-          const double* state;  // the vector this leg's pi was contracted from
-          double a2m2;
-          double pi;    // that species' a4Pi contribution
-          double norm;  // pi / raw l=2 moment
-        };
-        // Each norm N_i must be calibrated on the vector its own pi_i was contracted
-        // from. All three StressEnergy calls now contract the `y` they are handed
-        // (DNCDMSpecies::RescaledPerturbations used to read ppw->pv->y instead, which
-        // differs from `y` here by ~0.7%, and is stale on the RHS -- #136), so all
-        // three legs use `y`.
-        Leg legs[3] = {{&parent_layout(my), &parent_->q(), &parent_->dq(), y, aM2, pi_H, 0.},
-                       {&fermion_layout(my), &fermion_->q(), &fermion_->dq(), y, 0., pi_l, 0.},
-                       {&boson_layout(my), &boson_->q(), &boson_->dq(), y, 0., pi_phi, 0.}};
-        auto raw    = [&](const Leg& L, const double* vec, int l) {
-          if (l > L.lay->l_max || L.lay->q_size <= 0) {
-            return 0.;
-          }
-          double sum = 0.;
-          for (int i = 0; i < L.lay->q_size && i < static_cast<int>(L.q->size()); ++i) {
-            const double q    = (*L.q)[i];
-            const double eps  = std::sqrt(q * q + L.a2m2);
-            sum              += (*L.dq)[i] * q * q * q * q / eps * vec[L.lay->index_per_q[i] + l];
-          }
-          return sum;
-        };
-        for (Leg& L : legs) {
-          const double r2 = raw(L, L.state, 2);
-          L.norm          = (r2 != 0.) ? L.pi / r2 : 0.;
+    if (scratch != nullptr && !scratch->dy_coll.empty()) {
+      const double* dyc = scratch->dy_coll.data();
+      const double aM2  = a * a * parent_->GetMass() * parent_->GetMass();
+      // (layout, q, dq, n, mass^2 a^2, norm) for each of the three legs. The norms
+      // are filled from l = 2 below, so they must be computed before the l loop.
+      struct Leg {
+        const NCDMBaseSpecies::PerturbLayout* lay;
+        const std::vector<double>* q;
+        const std::vector<double>* dq;
+        const double* state;  // the vector this leg's pi was contracted from
+        double a2m2;
+        double pi;    // that species' a4Pi contribution
+        double norm;  // pi / raw l=2 moment
+      };
+      // Each norm N_i must be calibrated on the vector its own pi_i was contracted
+      // from. All three StressEnergy calls now contract the `y` they are handed
+      // (DNCDMSpecies::RescaledPerturbations used to read ppw->pv->y instead, which
+      // differs from `y` here by ~0.7%, and is stale on the RHS -- #136), so all
+      // three legs use `y`.
+      Leg legs[3] = {{&parent_layout(my), &parent_->q(), &parent_->dq(), y, aM2, pi_H, 0.},
+                     {&fermion_layout(my), &fermion_->q(), &fermion_->dq(), y, 0., pi_l, 0.},
+                     {&boson_layout(my), &boson_->q(), &boson_->dq(), y, 0., pi_phi, 0.}};
+      auto raw    = [&](const Leg& L, const double* vec, int l) {
+        if (l > L.lay->l_max || L.lay->q_size <= 0) {
+          return 0.;
         }
-        int l_top = mod.GetPrecision()->l_max_dncdm_col;
+        double sum = 0.;
+        for (int i = 0; i < L.lay->q_size && i < static_cast<int>(L.q->size()); ++i) {
+          const double q    = (*L.q)[i];
+          const double eps  = std::sqrt(q * q + L.a2m2);
+          sum              += (*L.dq)[i] * q * q * q * q / eps * vec[L.lay->index_per_q[i] + l];
+        }
+        return sum;
+      };
+      for (Leg& L : legs) {
+        const double r2 = raw(L, L.state, 2);
+        L.norm          = (r2 != 0.) ? L.pi / r2 : 0.;
+      }
+      int l_top = mod.GetPrecision()->l_max_dncdm_col;
+      for (const Leg& L : legs) {
+        l_top = std::min(l_top, L.lay->l_max);
+      }
+      l_top = std::min(l_top, kLMomentMax);
+      for (int l = 2; l <= l_top; ++l) {
+        double sn = 0.;
+        double sd = 0.;
+        double an = 0.;
         for (const Leg& L : legs) {
-          l_top = std::min(l_top, L.lay->l_max);
+          const double n  = L.norm * raw(L, dyc, l);
+          sn             += n;
+          an             += std::fabs(n);
+          sd             += L.norm * raw(L, L.state, l);
         }
-        l_top = std::min(l_top, kLMomentMax);
-        for (int l = 2; l <= l_top; ++l) {
-          double sn = 0.;
-          double sd = 0.;
-          double an = 0.;
-          for (const Leg& L : legs) {
-            const double n  = L.norm * raw(L, dyc, l);
-            sn             += n;
-            an             += std::fabs(n);
-            sd             += L.norm * raw(L, L.state, l);
-          }
-          m_num[l] = sn;
-          m_den[l] = sd;
-          m_can[l] = (an > 0.) ? std::fabs(sn) / an : 0.;
-        }
+        m_num[l] = sn;
+        m_den[l] = sd;
+        m_can[l] = (an > 0.) ? std::fabs(sn) / an : 0.;
       }
     }
     for (int l = 2; l <= kLMomentMax; ++l) {
       const std::string sl = "_l" + std::to_string(l) + "_" + name();
-      w.Add("Ml" + sl, m_den[l], true);
-      w.Add("MlDot" + sl, m_num[l], true);
-      w.Add("Mlcancel" + sl, m_can[l], true);
+      row.Set("Ml" + sl, m_den[l]);
+      row.Set("MlDot" + sl, m_num[l]);
+      row.Set("Mlcancel" + sl, m_can[l]);
     }
   }
 
-  w.Add("a4PiDot_coll_" + name(), pidot_H + pidot_l + pidot_phi, true);
-  w.Add("a4PiDot_coll_" + name() + "_H", pidot_H, true);
-  w.Add("a4PiDot_coll_" + name() + "_l", pidot_l, true);
-  w.Add("a4PiDot_coll_" + name() + "_phi", pidot_phi, true);
-  w.Add("gamma_" + name(), gamma_H, true);
+  row.Set("a4PiDot_coll_" + name(), pidot_H + pidot_l + pidot_phi);
+  row.Set("a4PiDot_coll_" + name() + "_H", pidot_H);
+  row.Set("a4PiDot_coll_" + name() + "_l", pidot_l);
+  row.Set("a4PiDot_coll_" + name() + "_phi", pidot_phi);
+  row.Set("gamma_" + name(), gamma_H);
 
   // The parent's own background density and the UNNORMALIZED moments of its
   // perturbation. rho_H is what makes the sector's contribution to the metric
@@ -1895,16 +1873,11 @@ void DNCDMInvSpecies::PrintVariables(PerturbColumnWriter& w,
   double rho_H       = 0.;
   double drho_H      = 0.;
   double rpp_shear_H = 0.;
-  if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback.data();
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
-    const auto se = parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw);
-    rho_H         = se.rho;
-    drho_H        = se.delta_rho;
-    rpp_shear_H   = se.rho_plus_p_shear;
-  }
-  w.Add("rho_" + name() + "_H", rho_H, true);
-  w.Add("drho_" + name() + "_H", drho_H, true);
-  w.Add("rppshear_" + name() + "_H", rpp_shear_H, true);
+  const auto se      = parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw);
+  rho_H              = se.rho;
+  drho_H             = se.delta_rho;
+  rpp_shear_H        = se.rho_plus_p_shear;
+  row.Set("rho_" + name() + "_H", rho_H);
+  row.Set("drho_" + name() + "_H", drho_H);
+  row.Set("rppshear_" + name() + "_H", rpp_shear_H);
 }

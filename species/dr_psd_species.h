@@ -182,8 +182,7 @@ class DrPsdSpecies : public NCDMBaseSpecies {
     return a * H * (pvecback[index_bg_pseudo_p_] - 5. * pvecback[index_bg_p_]);
   }
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   // ── Decay-product neutrality overrides (mirror wdm_decay_product.h:148-167) ──
   // The daughter's sector density is owned by the composite; standalone it is a
@@ -289,11 +288,11 @@ class DrPsdSpecies : public NCDMBaseSpecies {
                    const double* y,
                    const double* dy,
                    PerturbSourceContext& ctx) const override;
-  void WriteOutputColumns(
-      PerturbColumnWriter& writer,
-      const PerturbationsModule& mod,
-      file_format fmt,
-      TransferColumnSection section = TransferColumnSection::all) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section = TransferColumnSection::all) const override;
 
   /** Tensor modes: no slots (daughter tensor anisotropic stress neglected;
    *  documented scope limit, empty until late times — mirrors dcdm_wdm). */

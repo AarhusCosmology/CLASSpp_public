@@ -99,19 +99,25 @@ class NCDMSpecies : public NCDMBaseSpecies {
                                      double* new_y,
                                      const PerturbSwitchContext& ctx) const override;
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
-  void WriteOutputColumns(PerturbColumnWriter& w,
-                          const PerturbationsModule& mod,
-                          file_format fmt,
-                          TransferColumnSection section) const override;
-  void PrintVariables(PerturbColumnWriter& w,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
-  void WriteTensorOutputColumnTitles(std::string& tensor_titles) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
+  void AddTransferOutput(OutputTable& row,
+                         const double* tk,
+                         const PerturbationsModule& mod,
+                         file_format fmt,
+                         TransferColumnSection section) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
+  /** delta_, theta_ and shear_<name> of the tensor ncdm hierarchy, integrated over q. */
+  void AddTensorPerturbationOutput(OutputTable& row,
+                                   const BaseSpecies::PerturbLayout& base,
+                                   double k,
+                                   double a,
+                                   const double* y,
+                                   const double* pvecback) const override;
 
   int bg_number_index() const {
     return index_bg_number_;

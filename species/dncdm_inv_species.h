@@ -125,8 +125,7 @@ class DNCDMInvSpecies : public DNCDMSector {
                                    double* dy,
                                    double a_prime_over_a = 0.);
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   // ── Perturbations: the per-ℓ collision coupling (design §4.3) ───────────────
   /** Runs after each child's free-streaming PerturbDerivs (CompositeSpecies two-
@@ -158,7 +157,7 @@ class DNCDMInvSpecies : public DNCDMSector {
     std::vector<double> fH_gather;
     std::vector<double> F_H, F_l, F_phi;
     std::vector<double> dF_H, dF_l, dF_phi;
-    /** Collision-only dy, for the transport-rate diagnostic in PrintVariables.
+    /** Collision-only dy, for the transport-rate diagnostic in AddPerturbationOutput.
      *  Sized lazily to pv->pt_size (the layout is not known at CreatePerturbScratch
      *  time) and used ONLY at k_output_values sampling points, never on the RHS. */
     std::vector<double> dy_coll;
@@ -337,15 +336,15 @@ class DNCDMInvSpecies : public DNCDMSector {
 
   /** k_output_values time series: the sector's total anisotropic stress
    *  a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i (paper/thesis eq. 6.19), plus its
-   *  per-child decomposition. Composite-owned like Type3Species::PrintVariables:
+   *  per-child decomposition. Composite-owned like Type3Species::AddPerturbationOutput:
    *  the children carry no valid collection_index_, so their layouts are reached
    *  through THIS composite's nested layout. */
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
 
   // ── Test introspection (not on the hot path) ───────────────────────────────
   /** The parent's cached PERTURBATION-kernel background PSD rate f̄̇_H from the last

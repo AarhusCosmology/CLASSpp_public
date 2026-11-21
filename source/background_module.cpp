@@ -1064,89 +1064,36 @@ void BackgroundModule::background_find_equality() {
  *
  */
 
-void BackgroundModule::background_output_titles(std::string& titles) const {
-  // ── Module header (always present) ──────────────────────────────────────
-  class_store_columntitle(titles, "z", true);
-  class_store_columntitle(titles, "proper time [Gyr]", true);
-  class_store_columntitle(titles, "conf. time [Mpc]", true);
-  class_store_columntitle(titles, "H [1/Mpc]", true);
-  class_store_columntitle(titles, "comov. dist.", true);
-  class_store_columntitle(titles, "ang.diam.dist.", true);
-  class_store_columntitle(titles, "lum. dist.", true);
-  class_store_columntitle(titles, "comov.snd.hrz.", true);
-
-  // ── Species output — per-species dispatch ───────────────────────────────
-  BackgroundColumnWriter writer(titles);
-  for (const auto& [name, sp] : all_species_) {
-    sp->WriteBackgroundColumnTitles(writer);
-  }
-
-  // ── Module aggregate columns ────────────────────────────────────────────
-  class_store_columntitle(titles, "(.)rho_crit", true);
-  class_store_columntitle(titles, "(.)rho_tot", true);
-  class_store_columntitle(titles, "(.)p_tot", true);
-  class_store_columntitle(titles, "(.)p_tot_prime", true);
-  class_store_columntitle(titles, "gr.fac. D", true);
-  class_store_columntitle(titles, "gr.fac. f", true);
-
-  // A species names its columns after its instance name (phi_<N>, (.)rho_<N>), so an
-  // instance called b or tot would repeat (.)rho_b or (.)rho_tot, and classy's dict, keyed
-  // by title, would silently return one column for the other.
-  const std::string duplicate = first_duplicate_title(titles);
-  class_test_severe(!duplicate.empty(),
-                    "two background columns are titled '%s'. A species instance's name makes its "
-                    "column titles; rename the instance so they do not repeat another column's",
-                    duplicate.c_str());
-}
-
-std::vector<std::string> BackgroundModule::background_output_notes() const {
-  std::string titles;
-  std::vector<std::string> notes;
-  BackgroundColumnWriter writer(titles, &notes);
-  for (const auto& [name, sp] : all_species_) {
-    sp->WriteBackgroundColumnTitles(writer);
-  }
-  return notes;
-}
-
-void BackgroundModule::background_output_data(int number_of_titles, double* data) const {
+OutputTable BackgroundModule::GetOutputTable() const {
+  OutputTable table("background");
+  table.ReserveRows(bt_size_);
   for (int index_tau = 0; index_tau < bt_size_; index_tau++) {
-    double* dataptr        = data + index_tau * number_of_titles;
     const double* pvecback = background_table_.data() + index_tau * bg_size_;
-    int storeidx           = 0;
 
-    // ── Module header ──────────────────────────────────────────────────────
-    class_store_double(dataptr, 1. / pvecback[index_bg_a_] - 1., true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_time_] / _Gyr_over_Mpc_, true, storeidx);
-    class_store_double(dataptr, conformal_age_ - pvecback[index_bg_conf_distance_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_H_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_conf_distance_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_ang_distance_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_lum_distance_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rs_], true, storeidx);
+    table.Set("z", 1. / pvecback[index_bg_a_] - 1.);
+    table.Set("proper time [Gyr]", pvecback[index_bg_time_] / _Gyr_over_Mpc_);
+    table.Set("conf. time [Mpc]", conformal_age_ - pvecback[index_bg_conf_distance_]);
+    table.Set("H [1/Mpc]", pvecback[index_bg_H_]);
+    table.Set("comov. dist.", pvecback[index_bg_conf_distance_]);
+    table.Set("ang.diam.dist.", pvecback[index_bg_ang_distance_]);
+    table.Set("lum. dist.", pvecback[index_bg_lum_distance_]);
+    table.Set("comov.snd.hrz.", pvecback[index_bg_rs_]);
 
-    // ── Species data — per-species dispatch ───────────────────────────────
-    BackgroundColumnWriter writer(dataptr, storeidx);
+    // A species titles its columns after its instance name (phi_<N>, (.)rho_<N>), so an
+    // instance called b or tot would repeat (.)rho_b or (.)rho_tot: the table refuses it.
     for (const auto& [name, sp] : all_species_) {
-      sp->WriteBackgroundData(pvecback, writer);
+      sp->AddBackgroundOutput(table, pvecback);
     }
 
-    // ── Module aggregate columns ──────────────────────────────────────────
-    class_store_double(dataptr, pvecback[index_bg_rho_crit_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_rho_tot_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_tot_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_p_tot_prime_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_D_], true, storeidx);
-    class_store_double(dataptr, pvecback[index_bg_f_], true, storeidx);
+    table.Set("(.)rho_crit", pvecback[index_bg_rho_crit_]);
+    table.Set("(.)rho_tot", pvecback[index_bg_rho_tot_]);
+    table.Set("(.)p_tot", pvecback[index_bg_p_tot_]);
+    table.Set("(.)p_tot_prime", pvecback[index_bg_p_tot_prime_]);
+    table.Set("gr.fac. D", pvecback[index_bg_D_]);
+    table.Set("gr.fac. f", pvecback[index_bg_f_]);
+    table.EndRow();
   }
-}
-
-NamedColumns BackgroundModule::GetOutputColumns() const {
-  std::string titles;
-  background_output_titles(titles);
-  std::vector<double> data(static_cast<size_t>(get_number_of_titles(titles)) * bt_size_);
-  background_output_data(get_number_of_titles(titles), data.data());
-  return SplitIntoColumns(titles, data.data(), bt_size_);
+  return table;
 }
 
 std::vector<double> BackgroundModule::GetBackgroundAtZ(double z) const {

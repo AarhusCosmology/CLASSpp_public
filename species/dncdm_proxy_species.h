@@ -119,8 +119,7 @@ class DNCDMProxySpecies : public DNCDMSector {
                                 double* diag,
                                 const double* pvecback) override;
 
-  void WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const override;
-  void WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const override;
+  void AddBackgroundOutput(OutputTable& row, const double* pvecback) const override;
 
   // ── Perturbations ──────────────────────────────────────────────────────────
   void AddCouplingDerivs(double tau,
@@ -140,18 +139,18 @@ class DNCDMProxySpecies : public DNCDMSector {
   /** k_output_values time series: the sector's total anisotropic stress
    *  a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i, plus its per-child decomposition.
    *
-   *  Same column names and same construction as DNCDMInvSpecies::PrintVariables,
+   *  Same column names and same construction as DNCDMInvSpecies::AddPerturbationOutput,
    *  so a proxy run and an exact run are readable by one analysis script — which
    *  is the only way the closure can be checked on the quantity it approximates.
    *  Composite-owned for the same reason: the children carry no valid
    *  collection_index_, so their layouts are reached through THIS composite's
    *  nested layout. */
-  void PrintVariables(PerturbColumnWriter& writer,
-                      const BaseSpecies::PerturbLayout* base,
-                      double tau,
-                      const double* y,
-                      const PerturbationsModule& mod,
-                      const perturb_workspace* ppw) const override;
+  void AddPerturbationOutput(OutputTable& row,
+                             const BaseSpecies::PerturbLayout& base,
+                             double tau,
+                             const double* y,
+                             const PerturbationsModule& mod,
+                             const perturb_workspace* ppw) const override;
 
   /** `dr_rta_form`: which transport rate the ℓ ≥ 2 damping uses.
    *

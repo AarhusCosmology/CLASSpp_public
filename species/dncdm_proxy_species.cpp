@@ -966,7 +966,7 @@ void DNCDMProxySpecies::ComputeDerivedBackground(double a,
   const double N_H   = pvecback[parent_->bg_number_index()] / BareFactorNumber(a);
   const double N_l   = DaughterNumber(&pvecback_B[index_bi_f_l_], false);
   const double N_phi = DaughterNumber(&pvecback_B[index_bi_f_phi_], true);
-  // Published as physical number densities: WriteBackgroundData needs them and only
+  // Published as physical number densities: AddBackgroundOutput needs them and only
   // ever sees pvecback, and the per-bin PSD columns it used to sum are optional.
   // The number COLUMNS are physical, so the fermion daughter takes its species
   // weight here (N_l itself stays bare -- it is a per-dof rate denominator below).
@@ -1179,43 +1179,25 @@ void DNCDMProxySpecies::PerturbDerivsDiagonal(const BaseSpecies::PerturbLayout& 
   }
 }
 
-void DNCDMProxySpecies::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  // Column layout deliberately mirrors DNCDMInvSpecies: parent, then the two
-  // daughters' number/rho/p. A proxy run and an exact run are then readable by the
-  // same analysis script.
-  parent_->WriteBackgroundColumnTitles(w);
-  const std::string& nm = name();
-  for (int leg = 0; leg < 2; ++leg) {
-    const std::string dn = "dr_" + nm + (leg == 0 ? "_l" : "_phi");
-    w.Add("(.)number_" + dn, 0.);
-    w.Add("(.)rho_" + dn, 0.);
-    w.Add("(.)p_" + dn, 0.);
-  }
-  w.Add("proxy_rate_" + nm, 0.);
-  w.Add("proxy_eps_ne_" + nm, 0.);
-  w.Add("proxy_gamma_" + nm, 0.);
-}
-
-void DNCDMProxySpecies::WriteBackgroundData(const double* pvecback,
-                                            BackgroundColumnWriter& w) const {
-  parent_->WriteBackgroundData(pvecback, w);
+void DNCDMProxySpecies::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  parent_->AddBackgroundOutput(row, pvecback);
   const std::string& nm = name();
   for (int leg = 0; leg < 2; ++leg) {
     const bool boson     = (leg == 1);
     const std::string dn = "dr_" + nm + (boson ? "_phi" : "_l");
     const double rho     = boson ? boson_->Rho(pvecback) : fermion_->Rho(pvecback);
-    w.Add("(.)number_" + dn, pvecback[boson ? index_bg_n_phi_ : index_bg_n_l_]);
-    w.Add("(.)rho_" + dn, rho);
-    w.Add("(.)p_" + dn, rho / 3.);  // massless
+    row.Set("(.)number_" + dn, pvecback[boson ? index_bg_n_phi_ : index_bg_n_l_]);
+    row.Set("(.)rho_" + dn, rho);
+    row.Set("(.)p_" + dn, rho / 3.);  // massless
   }
   const double a     = pvecback[bgm_->index_bg_a_];
   const double X     = a * parent_->GetMass();
   const double n     = pvecback[parent_->bg_number_index()];
   const double rho   = parent_->Rho(pvecback);
   const double gamma = (n > 0. && X > 0.) ? (a * rho / n) / X : 0.;
-  w.Add("proxy_rate_" + nm, pvecback[index_bg_rate_]);
-  w.Add("proxy_eps_ne_" + nm, pvecback[index_bg_eps_ne_]);
-  w.Add("proxy_gamma_" + nm, gamma);
+  row.Set("proxy_rate_" + nm, pvecback[index_bg_rate_]);
+  row.Set("proxy_eps_ne_" + nm, pvecback[index_bg_eps_ne_]);
+  row.Set("proxy_gamma_" + nm, gamma);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1367,41 +1349,38 @@ void DNCDMProxySpecies::AddCouplingDerivs(double /*tau*/,
 // k_output time series
 // ─────────────────────────────────────────────────────────────────────────────
 
-void DNCDMProxySpecies::PrintVariables(PerturbColumnWriter& w,
-                                       const BaseSpecies::PerturbLayout* base,
-                                       double tau,
-                                       const double* y,
-                                       const PerturbationsModule& mod,
-                                       const perturb_workspace* ppw) const {
+void DNCDMProxySpecies::AddPerturbationOutput(OutputTable& row,
+                                              const BaseSpecies::PerturbLayout& base,
+                                              double tau,
+                                              const double* y,
+                                              const PerturbationsModule& mod,
+                                              const perturb_workspace* ppw) const {
   // Chain first (children currently publish nothing) so a child that later gains
-  // PrintVariables is picked up without editing this; then the sector aggregates
+  // AddPerturbationOutput is picked up without editing this; then the sector aggregates
   // below, which no child can form on its own.
-  CompositeSpecies::PrintVariables(w, base, tau, y, mod, ppw);
+  CompositeSpecies::AddPerturbationOutput(row, base, tau, y, mod, ppw);
   // a⁴Π_νφ ≡ a⁴·Σ_{i∈{H,l,φ}} (ρ̄_i+p̄_i)σ_i, the sector's total anisotropic
   // stress and the quantity the ℓ ≥ 2 closure approximates. Each child already
   // forms (ρ+p)σ in its own StressEnergy — the parent from its per-q moments,
   // the daughters from their integrated F_2 — so this only sums the three and
   // multiplies by a⁴. Column names match DNCDMInvSpecies exactly, which is the
   // point: it lets one script read a proxy run against an exact one.
-  double pi_H   = 0.;
-  double pi_l   = 0.;
-  double pi_phi = 0.;
-  if (!w.IsTitleMode()) {
-    const perturb_vector* pv = ppw->pv.get();
-    const double* pvecback   = ppw->pvecback.data();
-    const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
-    const double a4          = a * a * a * a;
-    const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(*base);
-    pi_H = a4 *
-           parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw).rho_plus_p_shear;
-    pi_l =
-        a4 *
-        fermion_->StressEnergy(*my.child_layouts[kFermion], pv, y, pvecback, ppw).rho_plus_p_shear;
-    pi_phi = a4 *
-             boson_->StressEnergy(*my.child_layouts[kBoson], pv, y, pvecback, ppw).rho_plus_p_shear;
-  }
-  w.Add("a4Pi_" + name(), pi_H + pi_l + pi_phi, true);
-  w.Add("a4Pi_" + name() + "_H", pi_H, true);
-  w.Add("a4Pi_" + name() + "_l", pi_l, true);
-  w.Add("a4Pi_" + name() + "_phi", pi_phi, true);
+  double pi_H              = 0.;
+  double pi_l              = 0.;
+  double pi_phi            = 0.;
+  const perturb_vector* pv = ppw->pv.get();
+  const double* pvecback   = ppw->pvecback.data();
+  const double a           = pvecback[mod.GetBackgroundModule()->index_bg_a_];
+  const double a4          = a * a * a * a;
+  const auto& my           = static_cast<const CompositeSpecies::PerturbLayout&>(base);
+  pi_H = a4 *
+         parent_->StressEnergy(*my.child_layouts[kParent], pv, y, pvecback, ppw).rho_plus_p_shear;
+  pi_l = a4 *
+         fermion_->StressEnergy(*my.child_layouts[kFermion], pv, y, pvecback, ppw).rho_plus_p_shear;
+  pi_phi = a4 *
+           boson_->StressEnergy(*my.child_layouts[kBoson], pv, y, pvecback, ppw).rho_plus_p_shear;
+  row.Set("a4Pi_" + name(), pi_H + pi_l + pi_phi);
+  row.Set("a4Pi_" + name() + "_H", pi_H);
+  row.Set("a4Pi_" + name() + "_l", pi_l);
+  row.Set("a4Pi_" + name() + "_phi", pi_phi);
 }

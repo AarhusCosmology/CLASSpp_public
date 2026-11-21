@@ -14,6 +14,7 @@
 #include "lensing.h"
 #include "nonlinear.h"
 #include "output.h"
+#include "output_table.h"
 #include "perturbations.h"
 #include "primordial.h"
 #include "spectra.h"

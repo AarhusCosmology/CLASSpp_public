@@ -30,10 +30,8 @@ class ThermodynamicsModule : public BaseModule {
  public:
   ThermodynamicsModule(InputModulePtr input_module, BackgroundModulePtr background_module);
   ~ThermodynamicsModule();
-  void thermodynamics_output_titles(std::string& titles) const;
-  void thermodynamics_output_data(int number_of_titles, double* data) const;
-  /** The thermodynamics.dat table, column by column. */
-  NamedColumns GetOutputColumns() const;
+  /** The thermodynamics table (thermodynamics.dat). */
+  OutputTable GetOutputTable() const;
   /** The thermodynamics vector at redshift z; index it with index_th_*. */
   std::vector<double> GetThermodynamicsAtZ(double z) const;
   /** The named derived parameters this module answers (see DerivedParameterTable). */

@@ -25,14 +25,9 @@ void DCDM_DR_Species::SetBackgroundModule(const BackgroundModule* bgm) {
   CompositeSpecies::SetBackgroundModule(bgm);
 }
 
-void DCDM_DR_Species::WriteBackgroundColumnTitles(BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_dcdm", 0.);
-  w.Add("(.)rho_dr", 0.);
-}
-
-void DCDM_DR_Species::WriteBackgroundData(const double* pvecback, BackgroundColumnWriter& w) const {
-  w.Add("(.)rho_dcdm", dcdm().Rho(pvecback));
-  w.Add("(.)rho_dr", dr().Rho(pvecback));
+void DCDM_DR_Species::AddBackgroundOutput(OutputTable& row, const double* pvecback) const {
+  row.Set("(.)rho_dcdm", dcdm().Rho(pvecback));
+  row.Set("(.)rho_dr", dr().Rho(pvecback));
 }
 
 void DCDM_DR_Species::SetBackgroundInitialConditions(const BackgroundICContext& ctx) {

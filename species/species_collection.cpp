@@ -25,7 +25,7 @@ void SpeciesCollection::freeze() {
   std::sort(species_.begin(), species_.end(), [](const Entry& a, const Entry& b) {
     return a.key < b.key;
   });
-  /* Stamp each species with its sorted index so PrintVariables can look up
+  /* Stamp each species with its sorted index so AddPerturbationOutput can look up
      its own layout in ppw->pv->species_layouts[collection_index_]. */
   for (std::size_t i = 0; i < species_.size(); ++i) {
     species_[i].species->collection_index_ = i;

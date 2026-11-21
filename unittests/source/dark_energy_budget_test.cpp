@@ -66,20 +66,17 @@ Check Run(const std::map<std::string, std::string>& extra) {
   auto& bgm = cosmo.GetBackgroundModule();
 
   Table t;
-  std::string titles;
-  bgm->background_output_titles(titles);
-  {
-    std::stringstream ss(titles);
-    std::string s;
-    while (std::getline(ss, s, '\t')) {
-      if (!s.empty()) {
-        t.col[s] = t.n_titles++;
-      }
+  const OutputTable table = bgm->GetOutputTable();
+  for (const std::string& name : table.names()) {
+    t.col[name] = t.n_titles++;
+  }
+  t.n_rows = static_cast<int>(table.rows());
+  t.data.resize(static_cast<size_t>(t.n_titles) * t.n_rows);
+  for (int r = 0; r < t.n_rows; ++r) {
+    for (int c = 0; c < t.n_titles; ++c) {
+      t.data[static_cast<size_t>(r) * t.n_titles + c] = table.column(c)[r];
     }
   }
-  t.n_rows = bgm->bt_size_;
-  t.data.resize(static_cast<size_t>(t.n_titles) * t.n_rows);
-  bgm->background_output_data(t.n_titles, t.data.data());
 
   Check out;
   for (int r = 0; r < t.n_rows; ++r) {

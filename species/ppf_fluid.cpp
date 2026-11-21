@@ -67,23 +67,21 @@ void PpfFluid::FillSources(const BaseSpecies::PerturbLayout& /*base*/,
   }
 }
 
-void PpfFluid::PrintVariables(PerturbColumnWriter& w,
-                              const BaseSpecies::PerturbLayout* base,
-                              double /*tau*/,
-                              const double* /*y*/,
-                              const PerturbationsModule& /*mod*/,
-                              const perturb_workspace* ppw) const {
+void PpfFluid::AddPerturbationOutput(OutputTable& row,
+                                     const BaseSpecies::PerturbLayout& base,
+                                     double /*tau*/,
+                                     const double* /*y*/,
+                                     const PerturbationsModule& /*mod*/,
+                                     const perturb_workspace* ppw) const {
   double delta_rho_fld        = 0.;
   double rho_plus_p_theta_fld = 0.;
   double delta_p_fld          = 0.;
-  if (!w.IsTitleMode()) {
-    delta_rho_fld        = ppw->delta_rho_fld;
-    rho_plus_p_theta_fld = ppw->rho_plus_p_theta_fld;
-    delta_p_fld          = ppw->delta_p_fld;
-  }
-  w.Add("delta_rho_fld", delta_rho_fld, true);
-  w.Add("rho_plus_p_theta_fld", rho_plus_p_theta_fld, true);
-  w.Add("delta_p_fld", delta_p_fld, true);
+  delta_rho_fld               = ppw->delta_rho_fld;
+  rho_plus_p_theta_fld        = ppw->rho_plus_p_theta_fld;
+  delta_p_fld                 = ppw->delta_p_fld;
+  row.Set("delta_rho_fld", delta_rho_fld);
+  row.Set("rho_plus_p_theta_fld", rho_plus_p_theta_fld);
+  row.Set("delta_p_fld", delta_p_fld);
 }
 
 void PpfFluid::CopyPerturbationsAcrossSwitch(const BaseSpecies::PerturbLayout& old_base,
