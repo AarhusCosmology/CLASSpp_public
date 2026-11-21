@@ -161,9 +161,7 @@ class FileContent {
 
  public:
   /** Invoke @p fn for every parameter in insertion order.
-   *  Arguments: parameter name, value string, whether it was read.
-   *  Declared in the second public section so the Cython wrapper generator
-   *  (which stops at the first private:) does not attempt to parse it. */
+   *  Arguments: parameter name, value string, whether it was read. */
   void for_each(
       const std::function<void(const std::string& name, const std::string& value, bool read)>& fn)
       const;

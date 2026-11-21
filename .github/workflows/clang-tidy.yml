@@ -34,7 +34,7 @@ jobs:
       - name: No POSIX math constants
         run: |
           hits=$(git grep -nwE 'M_(E|LOG2E|LOG10E|LN2|LN10|PI|PI_2|PI_4|1_PI|2_PI|2_SQRTPI|SQRT2|SQRT1_2)' \
-                   -- '*.c' '*.cpp' '*.h' '*.hpp' '*.pyx' '*.pxd' '*.pxi' \
+                   -- '*.c' '*.cpp' '*.h' '*.hpp' \
                  | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' || true)
           if [ -n "$hits" ]; then
             echo "$hits"

@@ -19,9 +19,7 @@ class IDM_DR_IDR_Species;
    O(1) access to the relevant species' data, replacing per-step/per-sample/per-k
    O(n) string-keyed scans of all_species_ (frozen after construction) and the
    per-step downcasts that accompanied them. Resolved by ResolveSpecies() in the
-   ctor. Defined at file scope (not nested in the class) so the cclassy.pxi
-   generator (generate_wrapper.py) does not mistake its closing brace for the end
-   of the PerturbationsModule class and truncate the harvested member list. */
+   ctor. */
 struct ResolvedSpecies {
   const IDM_DR_IDR_Species* idm_dr_idr = nullptr;                 // TCA-idm_dr, RSA-idr
   std::size_t idm_dr_idr_index   = static_cast<std::size_t>(-1);  // its species_layouts[] index

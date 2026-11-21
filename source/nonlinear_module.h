@@ -42,9 +42,9 @@ class NonlinearModule : public BaseModule {
                                 double* out_pk_cb,
                                 double* out_pk_cb_ic) const;
   void nonlinear_pks_at_kvec_and_zvec(enum pk_outputs pk_output,
-                                      double* kvec,
+                                      const double* kvec,
                                       int kvec_size,
-                                      double* zvec,
+                                      const double* zvec,
                                       int zvec_size,
                                       double* out_pk,
                                       double* out_pk_cb) const;

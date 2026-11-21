@@ -139,7 +139,6 @@ set(CLASS_TOOLS_FILES
   tools/evolver_ndf15.cpp
   tools/evolver_options.cpp
   tools/nonfinite.cpp
-  tools/exceptions.cpp
   tools/hyperspherical.cpp
   tools/parser.cpp
   tools/quadrature.cpp
@@ -267,48 +266,33 @@ endif()
 
 # ------------------------------------------------------------------- python --
 if(CLASS_BUILD_PYTHON)
-  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module NumPy)
+  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
-  # 1) cclassy.pxi, generated from the C++ headers into the build dir.
-  file(GLOB _class_wrapper_headers CONFIGURE_DEPENDS
-    ${PROJECT_SOURCE_DIR}/include/*.h
-    ${PROJECT_SOURCE_DIR}/main/*.h
-    ${PROJECT_SOURCE_DIR}/source/*.h
-    ${PROJECT_SOURCE_DIR}/species/*.h
-    ${PROJECT_SOURCE_DIR}/tools/*.h
-  )
-  add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxi
-    COMMAND Python::Interpreter ${PROJECT_SOURCE_DIR}/generate_wrapper.py
-            --output-dir ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${PROJECT_SOURCE_DIR}/generate_wrapper.py ${_class_wrapper_headers}
-    COMMENT "Generating cclassy.pxi"
-    VERBATIM
-  )
-
-  # 2) Cython transpile of the core. The module is always classy._core (PyInit__core); a
-  #    renamed build (CLASS_PYTHON_MODULE_NAME) installs the package under another name, and
-  #    --module-name makes its classes and tracebacks say so (classyref._core.PyCosmology).
-  #    (cclassy.pxi is found via -I <build dir>.)
+  # 1) The compiled core, src/classy/_core.cpp, in nanobind
+  #    (docs/superpowers/specs/2026-11-21-classy-nanobind-results.md). The module is always
+  #    _core (PyInit__core); a renamed build (CLASS_PYTHON_MODULE_NAME) only installs the
+  #    package under another name, and the module takes its full name from the import.
+  #    nanobind's CMake package lives inside its Python package.
   set(_class_pkg_src ${PROJECT_SOURCE_DIR}/src/classy)
-  add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_core.cpp
-    COMMAND Python::Interpreter -m cython -3 --cplus
-            --module-name ${CLASS_PYTHON_MODULE_NAME}._core
-            -I ${CMAKE_CURRENT_BINARY_DIR}
-            -o ${CMAKE_CURRENT_BINARY_DIR}/_core.cpp
-            ${_class_pkg_src}/_core.pyx
-    DEPENDS ${_class_pkg_src}/_core.pyx ${CMAKE_CURRENT_BINARY_DIR}/cclassy.pxi
-    COMMENT "Cythonizing _core.pyx"
-    VERBATIM
-  )
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT
+    RESULT_VARIABLE _class_nanobind_found)
+  if(NOT _class_nanobind_found EQUAL 0)
+    message(FATAL_ERROR "classy needs nanobind in ${Python_EXECUTABLE} (pip install nanobind)")
+  endif()
+  find_package(nanobind CONFIG REQUIRED)
 
-  # 3) The extension module, built straight into a package directory in the build tree, so
-  #    that PYTHONPATH=<build dir> imports a runnable package (see 4).
+  # 2) The extension module, built straight into a package directory in the build tree, so
+  #    that PYTHONPATH=<build dir> imports a runnable package (see 3). NB_STATIC: the nanobind
+  #    runtime goes into the module. NB_DOMAIN: each package (classy, classyref, ...) has its own
+  #    nanobind internals. Without it, two of them in one process share one type registry, so the
+  #    second cannot register its PyCosmology, and classy's exception translator would apply to
+  #    every other nanobind module in the process.
   set(_class_pkg_dir ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME})
-  python_add_library(classy_core MODULE ${CMAKE_CURRENT_BINARY_DIR}/_core.cpp WITH_SOABI)
-  target_link_libraries(classy_core PRIVATE classpp Python::NumPy)
-  target_compile_definitions(classy_core PRIVATE NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION)
+  nanobind_add_module(classy_core NB_STATIC NB_DOMAIN ${CLASS_PYTHON_MODULE_NAME}
+                      ${_class_pkg_src}/_core.cpp)
+  target_link_libraries(classy_core PRIVATE classpp)
   set_target_properties(classy_core PROPERTIES
     OUTPUT_NAME _core
     # $<1:...>: multi-config generators (Xcode, Visual Studio) would add a per-config
@@ -318,7 +302,7 @@ if(CLASS_BUILD_PYTHON)
     VISIBILITY_INLINES_HIDDEN ON
   )
 
-  # 4) The rest of the package next to it in the build tree: the plain-Python modules, copied
+  # 3) The rest of the package next to it in the build tree: the plain-Python modules, copied
   #    on every build so that edits are picked up, and the data, linked (copied where links
   #    are not possible).
   file(GLOB _class_pkg_py CONFIGURE_DEPENDS ${_class_pkg_src}/*.py)
@@ -349,7 +333,7 @@ if(CLASS_BUILD_PYTHON)
     file(CREATE_LINK ${_dat} ${_class_pkg_dir}/data/hyrec/${_dat_name} SYMBOLIC COPY_ON_ERROR)
   endforeach()
 
-  # 5) Wheel layout: the package <name>/ with __init__.py and the other modules, _core.<soabi>.so
+  # 4) Wheel layout: the package <name>/ with __init__.py and the other modules, _core.<soabi>.so
   #    and data/{bbn,hyrec}. Each renamed build (classyref) carries its own data, so two of
   #    them never share a file.
   if(SKBUILD)

@@ -13,8 +13,6 @@
  *  changes. */
 class OutputColumn {
  public:
-  /** For Cython, which declares a temporary before assigning a returned column to it. */
-  OutputColumn() = default;
   OutputColumn(const double* data, std::size_t size) : data_(data), size_(size) {}
 
   const double* data() const {
@@ -69,8 +67,6 @@ class OutputTable {
  public:
   /** `what` names the table in error messages: "background", "transfer functions", ... */
   explicit OutputTable(std::string what);
-  /** For Cython, which declares a temporary before assigning a returned table to it. */
-  OutputTable() = default;
 
   /** A value of the current row, in the column called `name`. */
   void Set(std::string_view name, double value) {

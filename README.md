@@ -16,7 +16,7 @@ For download and information, see [class-code.net](http://class-code.net),
 In March 2020 a branch of the development version of CLASS v2.9 was started in order to start converting CLASS into C++. The reasons for doing this were many and are summarised below:
 
 - C++ is as fast as C, but it has many features that enables one to do more with fewer lines of code.
-- CLASS is often used through `classy`, a Python wrapper written in Cython. C++ allows a more seamless wrapping where e.g. exceptions can be thrown in C++ code and automatically handled in Cython/Python.
+- CLASS is often used through `classy`, a Python wrapper: a plain-Python package over a thin compiled core written with nanobind. C++ allows a more seamless wrapping where e.g. exceptions can be thrown in C++ code and automatically handled in Python.
 - C++ allows automatic (and safe) allocation and deallocation of resources (memory) using constructors and destructors which can eliminate the possibility of memory leaks.
 - With C, there was always the possibility that a function was called while the corresponding module is in an incomplete state, often leading to segmentation fault. In CLASS++, if construction of a module fails, it is not possible to call its member methods.
 
@@ -65,7 +65,7 @@ or directly:
     pip install .       # Python wrapper (scikit-build-core)
 
 For faster repeated Python installs with build dependencies preinstalled
-(cython, numpy, scikit-build-core): `pip install --no-build-isolation .`
+(nanobind, scikit-build-core): `pip install --no-build-isolation .`
 
 IDE projects are generated, not committed:
 

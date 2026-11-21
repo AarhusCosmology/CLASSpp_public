@@ -32,7 +32,7 @@ Checks:
   - '-bugprone-reserved-identifier'                               # _PI_ and the other constant macros
   - '-readability-function-cognitive-complexity'                  # long physics routines; it has no fix
   - '-performance-enum-size'                                      # no measurable gain
-  - '-modernize-use-nodiscard'                                    # lands on every getter; generate_wrapper.py can't parse it
+  - '-modernize-use-nodiscard'                                    # lands on every getter
   - '-readability-convert-member-functions-to-static'             # the interface would follow the implementation
   - '-readability-simplify-boolean-expr'                          # its De Morgan rewrite lets a NaN through
   - '-readability-identifier-naming'                              # can't tell class from struct members; physics names

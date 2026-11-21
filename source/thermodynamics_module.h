@@ -55,8 +55,7 @@ class ThermodynamicsModule : public BaseModule {
    *  He3 includes tritium and Li7 includes Be7, both of which decay to them long
    *  after BBN. Left at zero when YHe comes from the interpolation table or is
    *  fixed by hand, since neither can produce them -- `bbn_network_ran_` says
-   *  which. These are public because generate_wrapper.py lifts public members
-   *  into cclassy.pxi, which is how classy exposes them as derived parameters. */
+   *  which. They are the derived parameters D_H, He3_H, Li7_H and Li6_H. */
   double DoverH_        = 0.;
   double He3overH_      = 0.;
   double Li7overH_      = 0.;

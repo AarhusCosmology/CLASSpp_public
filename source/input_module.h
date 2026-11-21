@@ -27,8 +27,7 @@ class Cosmology;
 
 /** InputModule::DoShooting's answer. `converged` is the Cosmology the solver's last residual
  *  evaluation built, when that evaluation was at exactly the resolved unknowns: it is then the
- *  production cosmology, modules included. Otherwise `input` is a freshly built module.
- *  (At namespace scope: generate_wrapper.py ends a class at its first `};`.) */
+ *  production cosmology, modules included. Otherwise `input` is a freshly built module. */
 struct ShootingResult {
   InputModulePtr input;
   std::shared_ptr<Cosmology> converged;

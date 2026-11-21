@@ -29,10 +29,7 @@ enum equation_of_state { CLP, EDE, PhenoAxion, PEDE };
  *  species — inferred during input parsing from which corresponding Omega
  *  parameter was left unspecified (Omega_Lambda or Omega_fld) or set to the
  *  negative-sentinel value (Omega_scf < 0), and consumed by
- *  InputModule::ConstructSpecies after all non-closure species are built.
- *  Defined at file scope (not nested in `background`) so that
- *  generate_wrapper.py's struct parser doesn't see the enum's `};` and
- *  prematurely terminate the background struct. */
+ *  InputModule::ConstructSpecies after all non-closure species are built. */
 enum class ClosureSpecies { None, Lambda, Fluid, ScalarField };
 
 struct background {

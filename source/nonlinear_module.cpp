@@ -643,9 +643,9 @@ void NonlinearModule::nonlinear_pks_at_k_and_z(
 
 void NonlinearModule::nonlinear_pks_at_kvec_and_zvec(
     enum pk_outputs pk_output,
-    double* kvec,  // kvec[index_kvec]
+    const double* kvec,  // kvec[index_kvec]
     int kvec_size,
-    double* zvec,  // zvec[index_zvec]
+    const double* zvec,  // zvec[index_zvec]
     int zvec_size,
     double* out_pk,    // output_pk[index_zvec*kvec_size+index_kvec] already allocated or nullptr
     double* out_pk_cb  // output_pk[index_zvec*kvec_size+index_kvec] already allocated or nullptr

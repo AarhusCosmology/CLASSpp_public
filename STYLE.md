@@ -218,7 +218,7 @@ if (cond) {
 
 Errors are C++ exceptions thrown at the error origin via the macros in
 `include/errors.h`. The exception type encodes severity; the Python wrapper
-maps it to sampler behaviour (`src/classy/_core.pyx: raise_my_py_error`):
+maps it to sampler behaviour (`src/classy/_core.cpp: TranslateException`):
 
 * `class_test_severe` / `class_stop_severe` → `std::invalid_argument` →
   `CosmoSevereError`: the sampler **aborts**. Use ONLY for checks that depend

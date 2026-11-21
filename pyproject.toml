@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "cython>=3.0", "numpy"]
+requires = ["scikit-build-core>=0.11", "nanobind>=3.1"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -13,9 +13,9 @@ authors = [
 description = "Python interface to the C++ community-edition of the cosmological Boltzmann code CLASS"
 readme = "README.md"
 requires-python = ">=3.10"
-# classy's compiled core cimports numpy, so import fails without it. Each wheel refuses a NumPy
-# older than the C-API it was compiled for; 1.25 is the highest such target among
-# the wheels (cp312+; the cp310/cp311 ones accept older), so it is safe for all.
+# classy returns numpy arrays, so import fails without numpy. The floor dates from the Cython core,
+# whose wheels needed NumPy's 1.25 C-API; the nanobind core needs no NumPy to build, and nothing
+# older than 1.25 is tested.
 dependencies = ["numpy>=1.25"]
 license-files = ["COPYING.txt", "LICENSE.txt", "AUTHORS.txt"]
 classifiers = [
@@ -39,7 +39,7 @@ cmake.version = ">=3.21"
 wheel.packages = []
 # sdist: scikit-build-core includes the source tree minus .gitignore matches.
 # Exclude local clutter that is not gitignored; everything the build needs
-# (sources, headers, generate_wrapper.py, src/classy/, bbn/hyrec data,
+# (sources, headers, src/classy/, bbn/hyrec data,
 # CMakeLists.txt) is included by default. /scripts stays in: the sdist ships
 # the Makefile, whose classy target calls scripts/montepython_layout.py.
 sdist.exclude = [

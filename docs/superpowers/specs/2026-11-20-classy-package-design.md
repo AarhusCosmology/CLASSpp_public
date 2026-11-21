@@ -1,7 +1,10 @@
 # Design: classy as a package, with a thin compiled core and a plain-Python `Class`; then a nanobind prototype of the core
 
 **Status (2026-11-20): approved by Thomas; phase 1 implemented on branch `classy-package`
-(PR #504, after #503, which merged as 67e51a6b). Phase 2 not started.** Where the
+(PR #504, after #503, which merged as 67e51a6b). Phase 2: nanobind replaced Cython, decided by
+Thomas on 2026-11-21 (PR #506), with the numbers in `2026-11-21-classy-nanobind-results.md`.
+Everything below about Cython, `cclassy.pxi` and `generate_wrapper.py` is superseded by it.**
+Where the
 implementation differs from the text below:
 - A module's derived-parameter name keeps the module's meaning when a species answers it too
   (section 3, found while building: NEDE's `z_star`).

@@ -18,8 +18,6 @@
 #include <utility>
 #include <vector>
 
-#include "exceptions.h"
-
 class InputModule;
 class BackgroundModule;
 class ThermodynamicsModule;
