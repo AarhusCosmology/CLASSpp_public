@@ -266,7 +266,10 @@ endif()
 
 # ------------------------------------------------------------------- python --
 if(CLASS_BUILD_PYTHON)
-  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+  # SKBUILD_SABI_COMPONENT is Development.SABIModule when scikit-build-core builds a stable-ABI
+  # wheel (wheel.py-api in pyproject.toml, on CPython 3.12 and later), and empty or undefined
+  # otherwise; see STABLE_ABI below.
+  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module ${SKBUILD_SABI_COMPONENT})
 
   # 1) The compiled core, src/classy/_core.cpp, in nanobind
   #    (docs/superpowers/specs/2026-11-21-classy-nanobind-results.md). The module is always
@@ -291,9 +294,13 @@ if(CLASS_BUILD_PYTHON)
   #    runtime goes into the module. NB_DOMAIN: each package (classy, classyref, ...) has its own
   #    nanobind internals. Without it, two of them in one process share one type registry, so the
   #    second cannot register its PyCosmology, and classy's exception translator would apply to
-  #    every other nanobind module in the process.
+  #    every other nanobind module in the process. STABLE_ABI: one abi3 wheel serves Python 3.12
+  #    and every later version. nanobind ignores it without Python::SABIModule, so it applies to
+  #    pip builds on CPython 3.12 and later only: not to direct CMake builds (make class,
+  #    make xcode), and not below 3.12 or on free-threaded Pythons, which have no stable ABI in
+  #    this mode.
   set(_class_pkg_dir ${CMAKE_CURRENT_BINARY_DIR}/${CLASS_PYTHON_MODULE_NAME})
-  nanobind_add_module(classy_core NB_STATIC NB_DOMAIN ${CLASS_PYTHON_MODULE_NAME}
+  nanobind_add_module(classy_core NB_STATIC STABLE_ABI NB_DOMAIN ${CLASS_PYTHON_MODULE_NAME}
                       ${_class_pkg_src}/_core.cpp)
   target_link_libraries(classy_core PRIVATE classpp)
   set_target_properties(classy_core PROPERTIES

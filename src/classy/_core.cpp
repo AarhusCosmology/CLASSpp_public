@@ -119,6 +119,8 @@ bool Equal(nb::handle a, nb::handle b) {
 
 // An integer argument as classy has always taken one: an int, or anything with __int__, a
 // float truncated (raw_cl(2.5e3) is raw_cl(2500)). Out of the type's range is an OverflowError.
+// The type's __int__ slot through PyType_GetSlot, not tp_as_number: the stable-ABI wheels compile
+// against the limited API, where PyTypeObject is opaque.
 template <class Int>
 Int IntArg(nb::handle value) {
   nb::object number;
@@ -126,14 +128,15 @@ Int IntArg(nb::handle value) {
     number = nb::borrow(value);
   }
   else {
-    PyNumberMethods* methods = Py_TYPE(value.ptr())->tp_as_number;
-    if (methods == nullptr || methods->nb_int == nullptr) {
+    auto* const nb_int = reinterpret_cast<unaryfunc>(
+        PyType_GetSlot(reinterpret_cast<PyTypeObject*>(value.type().ptr()), Py_nb_int));
+    if (nb_int == nullptr) {
       PyErr_Format(PyExc_TypeError,
-                   "an integer is required, not '%s'",
-                   Py_TYPE(value.ptr())->tp_name);
+                   "an integer is required, not '%U'",
+                   nb::type_name(value.type()).ptr());
       throw nb::python_error();
     }
-    number = nb::steal(methods->nb_int(value.ptr()));
+    number = nb::steal(nb_int(value.ptr()));
     if (!number.is_valid()) {
       throw nb::python_error();
     }

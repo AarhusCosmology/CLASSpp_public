@@ -1,6 +1,18 @@
 name: Build sdist and wheels
 env:
-  CIBW_BUILD: cp3{10,11,12,13,14}-*
+  # CPython 3.10 and 3.11 get a wheel each. From 3.12 on there is one stable-ABI (abi3) wheel per
+  # platform (wheel.py-api in pyproject.toml): cibuildwheel builds it on 3.12 and only tests it on
+  # the later versions. cp3* is every CPython the pinned cibuildwheel knows, so a new Python needs
+  # no edit here; requires-python in pyproject.toml sets the floor.
+  CIBW_BUILD: "cp3*-*"
+  # Free-threaded CPython has no stable ABI in nanobind's linked mode, so it would need a wheel per
+  # version, and classy would have to be made safe without the GIL first.
+  CIBW_SKIP: "cp3??t-*"
+  # On Windows, auto adds 32-bit x86 wheels.
+  CIBW_ARCHS_WINDOWS: auto64
+  # Each wheel, installed in a fresh environment on every selected Python, computes the background
+  # and thermodynamics, which reads the bbn and hyrec data packaged with it.
+  CIBW_TEST_COMMAND: python -c "import classy; c = classy.Class(); c.compute(); print(classy.__file__, c.h())"
 
 # Wheels run on GitHub-hosted runners, which cost minutes (Windows counts double,
 # macOS ten times). They are built when a push to master changes the version in

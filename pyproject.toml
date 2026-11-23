@@ -35,7 +35,11 @@ classifiers = [
 test = ["pytest", "parameterized", "numpy", "scipy", "matplotlib"]
 
 [tool.scikit-build]
-cmake.version = ">=3.21"
+# 3.26: FindPython's Development.SABIModule, for the stable-ABI build below.
+cmake.version = ">=3.26"
+# On CPython 3.12 and later, one stable-ABI (abi3) wheel serves every later version; on 3.10 and
+# 3.11 the wheel is built for that version alone. No measurable cost per call (2026-11-23).
+wheel.py-api = "cp312"
 wheel.packages = []
 # sdist: scikit-build-core includes the source tree minus .gitignore matches.
 # Exclude local clutter that is not gitignored; everything the build needs
