@@ -281,6 +281,9 @@ if(CLASS_BUILD_PYTHON)
   if(NOT _class_nanobind_found EQUAL 0)
     message(FATAL_ERROR "classy needs nanobind in ${Python_EXECUTABLE} (pip install nanobind)")
   endif()
+  # Each configure takes nanobind from the current Python: a cached nanobind_DIR would keep the
+  # first Python's nanobind after -DPython_EXECUTABLE=<another> on an existing build tree.
+  set(nanobind_DIR "${nanobind_ROOT}" CACHE PATH "nanobind's CMake package, from Python_EXECUTABLE" FORCE)
   find_package(nanobind CONFIG REQUIRED)
 
   # 2) The extension module, built straight into a package directory in the build tree, so

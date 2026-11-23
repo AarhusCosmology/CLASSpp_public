@@ -1,7 +1,10 @@
 # Thin convenience shim. The build system is CMakeLists.txt; see README.md.
 BUILD_DIR ?= build/cmake
+XCODE_DIR ?= build/xcode
+# The Python the classy targets build and install for, e.g. `PYTHON=python3.12 make xcode`.
+PYTHON ?= python
 
-.PHONY: all class class_profiled classy classy-pip-dev test clean
+.PHONY: all class class_profiled classy classy-pip-dev xcode test clean
 
 # The real parallelism happens inside `cmake --build --parallel`; serialize
 # the shim targets so `make -j class class_profiled` cannot run two CMake
@@ -31,8 +34,8 @@ test: $(BUILD_DIR)/CMakeCache.txt
 # the python/build/lib.* layout MontePython expects.
 classy:
 	rm -rf python/build && mkdir -p python/build
-	pip install .
-	python scripts/montepython_layout.py
+	$(PYTHON) -m pip install .
+	$(PYTHON) scripts/montepython_layout.py
 
 # Faster local wrapper rebuild: reuse scikit-build-core's CMake tree and build
 # with 12 parallel jobs. This assumes build dependencies are already installed.
@@ -43,8 +46,19 @@ classy:
 # but neither installs it nor recreates the python/build/lib.* layout.
 classy-pip-dev:
 	rm -rf python/build && mkdir -p python/build
-	pip install . --no-build-isolation -Cbuild-dir=build/skbuild -Cbuild.tool-args=-j12
-	python scripts/montepython_layout.py
+	$(PYTHON) -m pip install . --no-build-isolation -Cbuild-dir=build/skbuild -Cbuild.tool-args=-j12
+	$(PYTHON) scripts/montepython_layout.py
+
+# Xcode project with the classy core (classy_core: src/classy/_core.cpp), opened in Xcode.
+# PYTHON gets nanobind (the bound in pyproject.toml) if it lacks it, and the core is built
+# against it. Building classy_core in Xcode leaves an importable package in $(XCODE_DIR)/classy/
+# (PYTHONPATH=$(XCODE_DIR)). A build tree of its own: generated in the repo root, that package
+# would shadow the installed classy for every Python started there.
+xcode:
+	$(PYTHON) -m pip install -q "nanobind>=3.1"
+	cmake -G Xcode -S . -B $(XCODE_DIR) -DCLASS_BUILD_PYTHON=ON \
+	  -DPython_EXECUTABLE="$$($(PYTHON) -c 'import sys; print(sys.executable)')"
+	open $(XCODE_DIR)/CLASSpp.xcodeproj
 
 clean:
 	rm -rf $(BUILD_DIR)

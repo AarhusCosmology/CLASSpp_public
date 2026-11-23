@@ -58,6 +58,7 @@ CLASS uses CMake. Quick start:
     make class          # CLI binary ./class (thin shim around CMake)
     make classy         # Python wrapper: pip install . + MontePython layout
     make test           # C++ unit tests via CTest
+    make xcode          # Xcode project in build/xcode, with the classy core, opened
 
 or directly:
 
@@ -67,11 +68,12 @@ or directly:
 For faster repeated Python installs with build dependencies preinstalled
 (nanobind, scikit-build-core): `pip install --no-build-isolation .`
 
-IDE projects are generated, not committed:
-
-    cmake -S . -B build-xcode -G Xcode    # Xcode (run schemes are preconfigured
-                                          # to run from the repo root with
-                                          # explanatory.ini)
+IDE projects are generated, not committed. `make xcode` generates the Xcode
+project in build/xcode, with the classy core in it, and opens it; its run
+schemes are preconfigured to run from the repo root with explanatory.ini. The
+`classy` and `xcode` targets use `python`; choose another with
+`PYTHON=python3.12 make xcode`. `make xcode` installs nanobind into that Python
+if it is missing.
 
 VS Code: install the CMake Tools extension; .vscode/settings.json already
 points it at build/cmake and sets the launch args/cwd.
