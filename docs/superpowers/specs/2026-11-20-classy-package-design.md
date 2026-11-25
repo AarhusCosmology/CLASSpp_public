@@ -4,6 +4,10 @@
 (PR #504, after #503, which merged as 67e51a6b). Phase 2: nanobind replaced Cython, decided by
 Thomas on 2026-11-21 (PR #506), with the numbers in `2026-11-21-classy-nanobind-results.md`.
 Everything below about Cython, `cclassy.pxi` and `generate_wrapper.py` is superseded by it.**
+**2026-11-25 (PR #509): the parameter dict moved from the core to `_class.py`.** `set`, `empty`, `pars`, `state`,
+`struct_cleanup` and `compute` are Python; the core takes the parameters as `(name, value)` strings
+(`_set_input`) and builds a level by name (`_build`). `get_pk_array` and `get_pk_cb_array` are Python
+over the core's `_pk_arrays`. `raw_cl_no_copy` is gone. Section 2's table is superseded on these rows.
 Where the
 implementation differs from the text below:
 - A module's derived-parameter name keeps the module's meaning when a species answers it too

@@ -105,23 +105,13 @@ std::map<std::string, int> SpectraModule::cl_output_index_map() const {
   return index_map;
 }
 
-namespace {
-// Both C_l outputs refuse the same requests, before anything is allocated for them.
-void CheckClRequest(bool has_cls, int lmax, int l_max_tot) {
-  class_test_severe(!has_cls, "Error: Cls have not been computed! lmax = %d\n", lmax);
-  class_test_severe((lmax > l_max_tot) || (lmax < 0),
+std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) const {
+  // Refused before anything is allocated.
+  class_test_severe(!ppt->has_cls, "Error: Cls have not been computed! lmax = %d\n", lmax);
+  class_test_severe((lmax > l_max_tot_) || (lmax < 0),
                     "Error: lmax = %d is outside the allowed range [0, %d]\n",
                     lmax,
-                    l_max_tot);
-}
-}  // namespace
-
-void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_pointers) const {
-  CheckClRequest(ppt->has_cls, lmax, l_max_tot_);
-  class_test_severe(output_pointers.size() != ct_size_,
-                    "Error: Size of input vector (%zu) does not match ct_size = %d\n",
-                    output_pointers.size(),
-                    ct_size_);
+                    l_max_tot_);
 
   std::vector<double*> cl_md(md_size_);
   std::vector<double> cl_md_data(md_size_ * ct_size_);
@@ -131,8 +121,8 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
 
   // Room for the C_l of every pair of initial conditions, in each mode that has several.
   // Also with a single mode: sizing this only when md_size_ > 1 left it empty for scalars
-  // with two initial conditions, and spectra_cl_at_l wrote past it (classy's
-  // raw_cl_no_copy crashed, until 2026-11-20).
+  // with two initial conditions, and spectra_cl_at_l wrote past it (classy crashed, until
+  // 2026-11-20).
   int cl_md_ic_size = 0;
   for (int index_md = 0; index_md < md_size_; index_md++) {
     if (perturbations_module_->ic_size_[index_md] > 1) {
@@ -149,35 +139,19 @@ void SpectraModule::cl_output_no_copy(int lmax, std::vector<double*>& output_poi
     }
   }
 
+  // One vector per C_l type, zero at l = 0 and 1.
+  std::vector<std::vector<double>> cl(ct_size_, std::vector<double>(lmax + 1, 0.0));
   std::vector<double> cl_tot(ct_size_);
-  for (int l = 0; l <= lmax; l++) {
-    if (l < 2) {
-      for (auto& output_pointer : output_pointers) {
-        output_pointer[l] = 0.0;
-      }
-    }
-    else {
-      spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
-      for (int index_ct = 0; index_ct < ct_size_; ++index_ct) {
-        output_pointers[index_ct][l] = cl_tot[index_ct];
-      }
+  for (int l = 2; l <= lmax; l++) {
+    spectra_cl_at_l(l, cl_tot.data(), cl_md.data(), cl_md_ic.data());
+    for (int index_ct = 0; index_ct < ct_size_; ++index_ct) {
+      cl[index_ct][l] = cl_tot[index_ct];
     }
   }
-}
-
-std::map<std::string, std::vector<double>> SpectraModule::cl_output(int lmax) const {
-  CheckClRequest(ppt->has_cls, lmax, l_max_tot_);
-  const std::map<std::string, int> index_map = cl_output_index_map();
-  std::vector<std::vector<double>> data_vectors(ct_size_, std::vector<double>(lmax + 1, 0.0));
-  std::vector<double*> output_pointers(ct_size_);
-  for (int index_ct = 0; index_ct < ct_size_; ++index_ct) {
-    output_pointers[index_ct] = data_vectors[index_ct].data();
-  }
-  cl_output_no_copy(lmax, output_pointers);
 
   std::map<std::string, std::vector<double>> output;
-  for (const auto& element : index_map) {
-    output[element.first] = std::move(data_vectors[element.second]);
+  for (const auto& [name, index_ct] : cl_output_index_map()) {
+    output[name] = std::move(cl[index_ct]);
   }
   return output;
 }

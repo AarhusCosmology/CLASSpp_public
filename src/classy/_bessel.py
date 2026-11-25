@@ -128,7 +128,7 @@ def hyperspherical_bessel_interpolate(K, beta, l, x, sampling=None, derivatives=
     phiminabs = 1.0e-10
 
     Phi, dPhi, d2Phi = _core._bessel_interpolate(K, beta, luniq, xvec_arr, xmin, xmax, samp,
-                                                 l_WKB, phiminabs, derivatives)
+                                                 l_WKB, phiminabs, bool(derivatives))
 
     # Map sorted-unique rows back to the requested l order.
     idx = np.searchsorted(uniq, lvec_arr)

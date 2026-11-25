@@ -1,21 +1,22 @@
 // classy._core, the compiled half of classy.Class, in nanobind. It holds the C++ Cosmology's
-// lifetime and parameter gate, one method per C++ call, exception translation and loops over
-// input arrays, and nothing else: physics and checks are in C++, composition in the plain-Python
-// package (_class.py subclasses PyCosmology).
+// lifetime, one method per C++ call, exception translation and loops over input arrays, and
+// nothing else: physics and checks are in C++; composition, and the parameter dict, in the
+// plain-Python package (_class.py subclasses PyCosmology and hands it the parameters as strings).
 //
-// It replaced a Cython core with the same interface, call for call
-// (docs/superpowers/specs/2026-11-21-classy-nanobind-results.md); the method and argument names,
-// return types and exceptions are classy's public API, which Cobaya, MontePython and the tests
-// use.
+// It replaced a Cython core (docs/superpowers/specs/2026-11-21-classy-nanobind-results.md); the
+// method and argument names, return types and exceptions of classy.Class are classy's public
+// API, which Cobaya, MontePython and the tests use.
 #include <algorithm>
 #include <cstdint>
-#include <limits>
 #include <map>
 #include <memory>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 #include <new>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
@@ -101,83 +102,23 @@ void TranslateException(const std::exception_ptr& exception, void* /*payload*/) 
   throw nb::python_error();
 }
 
-bool Truthy(nb::handle value) {
-  const int truth = PyObject_IsTrue(value.ptr());
-  if (truth < 0) {
-    throw nb::python_error();
-  }
-  return truth != 0;
-}
-
-bool Equal(nb::handle a, nb::handle b) {
-  const int equal = PyObject_RichCompareBool(a.ptr(), b.ptr(), Py_EQ);
-  if (equal < 0) {
-    throw nb::python_error();
-  }
-  return equal != 0;
-}
-
-// An integer argument as classy has always taken one: an int, or anything with __int__, a
-// float truncated (raw_cl(2.5e3) is raw_cl(2500)). Out of the type's range is an OverflowError.
-// The type's __int__ slot through PyType_GetSlot, not tp_as_number: the stable-ABI wheels compile
-// against the limited API, where PyTypeObject is opaque.
-template <class Int>
-Int IntArg(nb::handle value) {
-  nb::object number;
-  if (PyLong_Check(value.ptr())) {
-    number = nb::borrow(value);
-  }
-  else {
-    auto* const nb_int = reinterpret_cast<unaryfunc>(
-        PyType_GetSlot(reinterpret_cast<PyTypeObject*>(value.type().ptr()), Py_nb_int));
-    if (nb_int == nullptr) {
-      PyErr_Format(PyExc_TypeError,
-                   "an integer is required, not '%U'",
-                   nb::type_name(value.type()).ptr());
-      throw nb::python_error();
-    }
-    number = nb::steal(nb_int(value.ptr()));
-    if (!number.is_valid()) {
-      throw nb::python_error();
-    }
-  }
-  const long long result = PyLong_AsLongLong(number.ptr());
-  if (result == -1 && PyErr_Occurred() != nullptr) {
-    throw nb::python_error();
-  }
-  if (result < std::numeric_limits<Int>::min() || result > std::numeric_limits<Int>::max()) {
-    PyErr_SetString(PyExc_OverflowError, "value too large to convert to int");
-    throw nb::python_error();
-  }
-  return static_cast<Int>(result);
-}
-
-// A str's or bytes' content up to its first NUL, as a char* hands it to std::string.
-std::string Bytes(const nb::object& bytes) {
-  const char* data = PyBytes_AsString(bytes.ptr());
-  if (data == nullptr) {
-    throw nb::python_error();
-  }
-  return data;
-}
-
-nb::module_ Numpy() {
-  return nb::module_::import_("numpy");
-}
-
-nb::object Builtin(const char* name) {
-  return nb::module_::import_("builtins").attr(name);
-}
-
 // A numpy array that owns `values`, moved into a capsule: nothing is copied.
-nb::object ToArray(std::vector<double>&& values, std::vector<size_t> shape = {}) {
+template <class T>
+nb::object ToArray(std::vector<T>&& values, std::vector<size_t> shape = {}) {
   if (shape.empty()) {
     shape.push_back(values.size());
   }
-  auto* owned = new std::vector<double>(std::move(values));
+  auto* owned = new std::vector<T>(std::move(values));
   owned->reserve(1);  // a valid pointer for an empty array
-  nb::capsule owner(owned, [](void* p) noexcept { delete static_cast<std::vector<double>*>(p); });
-  return nb::ndarray<nb::numpy, double>(owned->data(), shape.size(), shape.data(), owner).cast();
+  nb::capsule owner(owned, [](void* p) noexcept { delete static_cast<std::vector<T>*>(p); });
+  return nb::ndarray<nb::numpy, T>(owned->data(), shape.size(), shape.data(), owner).cast();
+}
+
+// The multipoles 0, 1, ..., lmax.
+nb::object Ells(int lmax) {
+  std::vector<int64_t> ell(lmax + 1);
+  std::iota(ell.begin(), ell.end(), 0);
+  return ToArray(std::move(ell));
 }
 
 // An output table as a dict of arrays, in column order. The table moves into a capsule and
@@ -190,7 +131,7 @@ nb::dict TableDict(OutputTable&& table) {
     const OutputColumn column = owned->column(index);
     const nb::str name(owned->names()[index].c_str());
     if (column.size() == 0) {
-      out[name] = ToArray({});
+      out[name] = ToArray(std::vector<double>{});
       continue;
     }
     const size_t shape[1] = {column.size()};
@@ -211,77 +152,51 @@ nb::dict ClDict(std::map<std::string, std::vector<double>> cl) {
   return out;
 }
 
-void CheckSizes(const char* what, std::initializer_list<std::pair<Py_ssize_t, size_t>> sizes) {
-  int axis = 0;
-  for (const auto& [asked, size] : sizes) {
-    if (asked < 0) {
-      throw nb::value_error("negative dimensions are not allowed");
-    }
-    if (static_cast<size_t>(asked) > size) {
-      throw nb::index_error((std::string("Out of bounds on buffer access (") + what + ", axis " +
-                             std::to_string(axis) + ")")
-                                .c_str());
-    }
-    ++axis;
-  }
-}
+// The parameters as CLASS reads them from an input file: (name, value) in the order they were
+// set, every value a string.
+using Input = std::vector<std::pair<std::string, std::string>>;
 
 class PyCosmology {
  public:
-  explicit PyCosmology(nb::handle input_parameters) {
-    // Copy: never alias the caller's dict, so external mutation cannot bypass the
-    // parameters_changed gate (and the class_dir default does not leak into the caller's dict).
-    pars_ = nb::borrow<nb::dict>(
-        Builtin("dict")(input_parameters.is_none() ? nb::dict() : nb::borrow(input_parameters)));
-    if (!pars_.contains("class_dir")) {
-      pars_["class_dir"] = data_dir;
-    }
-    Reset();
+  // Builds the Cosmology at once, so that a parameter that nothing reads is refused here.
+  explicit PyCosmology(Input input) {
+    SetInput(std::move(input));
+    cosmo();
   }
 
-  nb::dict pars() const {
-    // Snapshot, not the live dict: a caller mutating the returned dict would otherwise bypass
-    // the parameters_changed gate and stale-serve. set() is the mutation API.
-    return nb::steal<nb::dict>(PyDict_Copy(pars_.ptr()));
+  // The parameters of the next Cosmology, built on first use. The one built from the previous
+  // parameters goes now.
+  void SetInput(Input input) {
+    cosmology_.reset();
+    input_ = std::move(input);
   }
 
-  void Empty() {
-    pars_               = nb::dict();
-    parameters_changed_ = true;
-  }
-
-  // Keywords as well as a dict: Cobaya calls set(**args). Keys that are not Python
-  // identifiers ('100*theta_s', 'nu1.m') can only travel in the dict. False when nothing
-  // changed.
-  bool Set(nb::handle input_parameters, const nb::kwargs& kwargs) {
-    nb::object merged = Builtin("dict")(Truthy(input_parameters) ? nb::borrow(input_parameters)
-                                                                 : nb::dict());
-    if (PyDict_Update(merged.ptr(), kwargs.ptr()) < 0) {
-      throw nb::python_error();
-    }
-    const int subset =
-        PyObject_RichCompareBool(merged.attr("items")().ptr(), pars_.attr("items")().ptr(), Py_LE);
-    if (subset < 0) {
-      throw nb::python_error();
-    }
-    if (subset != 0) {
-      return false;
-    }
-    if (PyDict_Update(pars_.ptr(), merged.ptr()) < 0) {
-      throw nb::python_error();
-    }
-    parameters_changed_ = true;
-    return true;
-  }
-
-  // Single gate to the C++ object: rebuilds the Cosmology if the parameter dict changed since
-  // it was last built. Everything reaches the C++ object through here, so results always
-  // reflect the current parameters.
+  // Everything reaches the C++ object through here, so results always reflect the parameters
+  // last set.
   Cosmology& cosmo() {
-    if (parameters_changed_ || !cosmology_) {
-      Reset();
+    if (!cosmology_) {
+      Build();
     }
     return *cosmology_;
+  }
+
+  // The modules up to `level`, built now rather than on first use; an unknown level (class_sz's
+  // 'szcount', which MontePython asks for) builds nothing.
+  void BuildUpTo(const std::string& level) {
+    using Build = void (*)(Cosmology&);
+    static const std::map<std::string, Build> levels =
+        {{"background", [](Cosmology& c) { c.GetBackgroundModule(); }},
+         {"thermodynamics", [](Cosmology& c) { c.GetThermodynamicsModule(); }},
+         {"perturb", [](Cosmology& c) { c.GetPerturbationsModule(); }},
+         {"primordial", [](Cosmology& c) { c.GetPrimordialModule(); }},
+         {"nonlinear", [](Cosmology& c) { c.GetNonlinearModule(); }},
+         {"transfer", [](Cosmology& c) { c.GetTransferModule(); }},
+         {"spectra", [](Cosmology& c) { c.GetSpectraModule(); }},
+         {"lensing", [](Cosmology& c) { c.GetLensingModule(); }}};
+    const auto build = levels.find(level);
+    if (build != levels.end()) {
+      build->second(cosmo());
+    }
   }
 
   // The input structs live inside the InputModule, and DoShooting replaces the InputModule
@@ -323,29 +238,26 @@ class PyCosmology {
 
   nb::object GetPk(const Vector3d& k,
                    const Vector1d& z,
-                   nb::handle k_size_arg,
-                   nb::handle z_size_arg,
-                   nb::handle mu_size_arg,
+                   size_t k_size,
+                   size_t z_size,
+                   size_t mu_size,
                    int index_pk,
                    pk_outputs output) {
-    const auto k_size  = IntArg<Py_ssize_t>(k_size_arg);
-    const auto z_size  = IntArg<Py_ssize_t>(z_size_arg);
-    const auto mu_size = IntArg<Py_ssize_t>(mu_size_arg);
-    CheckSizes("k", {{k_size, k.shape(0)}, {z_size, k.shape(1)}, {mu_size, k.shape(2)}});
-    CheckSizes("z", {{z_size, z.shape(0)}});
-    std::vector<double> pk(static_cast<size_t>(k_size * z_size * mu_size));
-    for (Py_ssize_t index_k = 0; index_k < k_size; index_k++) {
-      for (Py_ssize_t index_z = 0; index_z < z_size; index_z++) {
-        for (Py_ssize_t index_mu = 0; index_mu < mu_size; index_mu++) {
+    if (k_size > k.shape(0) || z_size > k.shape(1) || mu_size > k.shape(2) || z_size > z.shape(0)) {
+      throw nb::value_error(
+          "k_size, z_size and mu_size must not exceed the shape of k, nor z_size "
+          "the length of z");
+    }
+    std::vector<double> pk(k_size * z_size * mu_size);
+    for (size_t index_k = 0; index_k < k_size; index_k++) {
+      for (size_t index_z = 0; index_z < z_size; index_z++) {
+        for (size_t index_mu = 0; index_mu < mu_size; index_mu++) {
           pk[(index_k * z_size + index_z) * mu_size + index_mu] =
               Pk(k(index_k, index_z, index_mu), z(index_z), index_pk, output);
         }
       }
     }
-    return ToArray(std::move(pk),
-                   {static_cast<size_t>(k_size),
-                    static_cast<size_t>(z_size),
-                    static_cast<size_t>(mu_size)});
+    return ToArray(std::move(pk), {k_size, z_size, mu_size});
   }
 
   nb::dict GeneralCl(int lmax, bool is_lensed) {
@@ -365,36 +277,20 @@ class PyCosmology {
       cl = spectra->cl_output(lmax);
     }
     nb::dict out = ClDict(std::move(cl));
-    out["ell"]   = Numpy().attr("arange")(lmax + 1);
+    out["ell"]   = Ells(lmax);
     return out;
   }
 
-  nb::dict RawClNoCopy(int lmax) {
-    const auto spectra = cosmo().GetSpectraModule();
-    if (lmax == -1) {
-      lmax = spectra->l_max_tot_;
+  nb::object TransferGeneral(double z, int index_tau, const std::string& output_format) {
+    if (output_format != "class" && output_format != "camb") {
+      throw nb::value_error(
+          ("output_format is 'class' or 'camb', not '" + output_format + "'").c_str());
     }
-    CheckSizes("lmax + 1", {{static_cast<Py_ssize_t>(lmax) + 1, SIZE_MAX}});
-    const std::map<std::string, int> index_map = spectra->cl_output_index_map();
-    std::vector<double*> output_pointers(spectra->ct_size_, nullptr);
-    std::map<std::string, std::vector<double>> cl;
-    for (const auto& [name, index] : index_map) {
-      std::vector<double>& values = cl[name];
-      values.resize(lmax + 1);
-      output_pointers[index] = values.data();
-    }
-    spectra->cl_output_no_copy(lmax, output_pointers);
-    nb::dict out = ClDict(std::move(cl));
-    out["ell"]   = Numpy().attr("arange")(lmax + 1);
-    return out;
-  }
-
-  nb::object TransferGeneral(double z, int index_tau, nb::handle output_format) {
     if (!pt().has_density_transfers && !pt().has_velocity_transfers) {
       return nb::dict();
     }
-    const file_format format = Equal(output_format, nb::str("camb")) ? file_format::camb_format
-                                                                     : file_format::class_format;
+    const file_format format          = output_format == "camb" ? file_format::camb_format
+                                                                : file_format::class_format;
     const PerturbationsModule& module = perturbations();
     std::vector<OutputTable> tables   = index_tau < 0
                                             ? module.GetTransferTables(format, z)
@@ -439,12 +335,13 @@ class PyCosmology {
     return perturbations_out;
   }
 
-  nb::object NonlinearScales(const Vector1d& z, nb::handle z_size_arg, bool cb) {
-    const auto z_size = IntArg<Py_ssize_t>(z_size_arg);
-    CheckSizes("z", {{z_size, z.shape(0)}});
+  nb::object NonlinearScales(const Vector1d& z, size_t z_size, bool cb) {
+    if (z_size > z.shape(0)) {
+      throw nb::value_error("z_size must not exceed the length of z");
+    }
     const NonlinearModule& module = nonlinear_module();
-    std::vector<double> k_nl(static_cast<size_t>(z_size));
-    for (Py_ssize_t index_z = 0; index_z < z_size; index_z++) {
+    std::vector<double> k_nl(z_size);
+    for (size_t index_z = 0; index_z < z_size; index_z++) {
       double k_nl_value    = 0.;
       double k_nl_cb_value = 0.;
       module.nonlinear_k_nl_at_z(z(index_z), &k_nl_value, &k_nl_cb_value);
@@ -455,28 +352,24 @@ class PyCosmology {
 
   // P(k, z) and P_cb(k, z) on a k and a z array, flat; P_cb is P when the module stores no
   // separate cdm+baryon spectrum.
-  std::pair<nb::object, nb::object> GetPkArrays(const Vector1d& k,
-                                                const Vector1d& z,
-                                                nb::handle k_size_arg,
-                                                nb::handle z_size_arg,
-                                                nb::handle nonlinear) {
-    const int k_size        = IntArg<int>(k_size_arg);
-    const int z_size        = IntArg<int>(z_size_arg);
-    const pk_outputs output = Equal(nonlinear, nb::int_(0)) ? pk_linear : pk_nonlinear;
-    // Empty k and z arrays are refused, as classy always did, and so are sizes beyond them.
-    CheckSizes("k", {{std::max<Py_ssize_t>(k_size, 1), k.shape(0)}});
-    CheckSizes("z", {{std::max<Py_ssize_t>(z_size, 1), z.shape(0)}});
-    CheckSizes("pk", {{static_cast<Py_ssize_t>(k_size) * z_size, SIZE_MAX}});
-    std::vector<double> pk(static_cast<size_t>(k_size) * z_size);
+  std::pair<nb::object, nb::object> GetPkArrays(
+      const Vector1d& k, const Vector1d& z, size_t k_size, size_t z_size, bool nonlinear) {
+    if (k_size > k.shape(0) || z_size > z.shape(0)) {
+      throw nb::value_error("k_size and z_size must not exceed the lengths of k and z");
+    }
+    std::vector<double> pk(k_size * z_size);
     std::vector<double> pk_cb(pk.size());
     const auto module = cosmo().GetNonlinearModule();
-    module->nonlinear_pks_at_kvec_and_zvec(output,
-                                           k.data(),
-                                           k_size,
-                                           z.data(),
-                                           z_size,
-                                           pk.data(),
-                                           pk_cb.data());
+    // An empty request is answered here, without asking the module for no k or no z.
+    if (!pk.empty()) {
+      module->nonlinear_pks_at_kvec_and_zvec(nonlinear ? pk_nonlinear : pk_linear,
+                                             k.data(),
+                                             static_cast<int>(k_size),
+                                             z.data(),
+                                             static_cast<int>(z_size),
+                                             pk.data(),
+                                             pk_cb.data());
+    }
     nb::object pk_array = ToArray(std::move(pk));
     // The module stores P_cb apart only when it differs from P_m.
     nb::object pk_cb_array = module->has_pk_cb_ ? ToArray(std::move(pk_cb)) : pk_array;
@@ -484,41 +377,33 @@ class PyCosmology {
   }
 
  private:
-  void Reset() {
-    UpdateFileContent();
-    if (!bessel_cache_) {
-      bessel_cache_ = std::make_shared<BesselTableCache>();
+  void Build() {
+    // A fresh FileContent for each Cosmology: it records which parameters were read, for the
+    // check below, and one that a failed build read must not be reused.
+    fc_ = FileContent();
+    // The C++ default class_dir is the source tree this module was built from, which a wheel
+    // need not have.
+    if (std::none_of(input_.begin(), input_.end(), [](const auto& line) {
+          return line.first == "class_dir";
+        })) {
+      fc_.set("class_dir", data_dir);
+    }
+    for (const auto& [name, value] : input_) {
+      fc_.set(name, value);
     }
     // Cosmology(FileContent&) rejects parameters that nothing read
     // (InputModule::RejectUnreadParameters), unless the input sets allow_unread_parameters.
+    // If it throws, cosmology_ stays empty, and the next call builds again and raises again.
     cosmology_ = std::make_unique<Cosmology>(fc_, bessel_cache_);
-    // Only clear the dirty flag after all throwing operations have succeeded, so that a failed
-    // construction is retried and re-raised on the next call instead of serving stale results.
-    parameters_changed_ = false;
   }
 
-  void UpdateFileContent() {
-    fc_ = FileContent();
-    // empty() and set() can leave the parameters without class_dir; the C++ default would then
-    // be the source tree this module was built from, which a wheel need not have.
-    if (!pars_.contains("class_dir")) {
-      fc_.set("class_dir", data_dir);
-    }
-    // The key encoded (a key that is not a str fails there, with an AttributeError) and the
-    // value's str() encoded, as classy has always passed them.
-    for (const auto& [name, value] : pars_) {
-      fc_.set(Bytes(name.attr("encode")()), Bytes(nb::str(value).attr("encode")()));
-    }
-  }
-
+  Input input_;
   // Before cosmology_, so that it outlives it: the InputModule keeps a reference to it.
   FileContent fc_;
   std::unique_ptr<Cosmology> cosmology_;
   // The transfer module's Bessel table, kept across the Cosmology objects this wrapper builds
   // one after another (include/bessel_table_cache.h). A cached table never changes a result.
-  std::shared_ptr<BesselTableCache> bessel_cache_;
-  nb::dict pars_;
-  bool parameters_changed_ = false;
+  std::shared_ptr<BesselTableCache> bessel_cache_ = std::make_shared<BesselTableCache>();
 };
 
 // One background quantity at z, by its index in the background vector.
@@ -563,8 +448,9 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
   m.def(
       "_bessel_direct",
       [](int K, double beta, const IntVector& l, const Vector1d& x) {
-        CheckSizes("l", {{1, l.shape(0)}});
-        CheckSizes("x", {{1, x.shape(0)}});
+        if (l.shape(0) == 0 || x.shape(0) == 0) {
+          throw nb::value_error("l and x must not be empty");
+        }
         try {
           std::vector<int> lvec(l.data(), l.data() + l.shape(0));
           std::vector<double> phi(l.shape(0) * x.shape(0));
@@ -601,14 +487,14 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
          double sampling,
          int l_WKB,
          double phiminabs,
-         nb::handle derivatives) {
+         bool with_derivatives) {
         // The interpolation table needs an l, and the evaluation an x.
-        CheckSizes("l_unique", {{1, l_unique.shape(0)}});
-        CheckSizes("x", {{1, x.shape(0)}});
+        if (l_unique.shape(0) == 0 || x.shape(0) == 0) {
+          throw nb::value_error("l_unique and x must not be empty");
+        }
         try {
-          const bool with_derivatives = Truthy(derivatives);
-          const size_t nl             = l_unique.shape(0);
-          const size_t nx             = x.shape(0);
+          const size_t nl = l_unique.shape(0);
+          const size_t nx = x.shape(0);
           std::vector<int> lvec(l_unique.data(), l_unique.data() + nl);
           std::vector<double> phi(nl * nx);
           std::vector<double> dphi(with_derivatives ? nl * nx : 0);
@@ -666,7 +552,7 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
       "sampling"_a,
       "l_WKB"_a,
       "phiminabs"_a,
-      "derivatives"_a.none(),
+      "derivatives"_a,
       "Phi_l^beta(x) on a grid over [xmin, xmax] with Hermite interpolation, one row per l in\n"
       "l_unique (sorted, unique); with derivatives, also dPhi and d2Phi, else None for both.");
 
@@ -703,79 +589,37 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
                               "C++ call. classy.Class "
                               "subclasses it.");
 
-  cls.def(
-         "__init__",
-         [](PyCosmology* self, nb::handle input_parameters) {
-           new (self) PyCosmology(input_parameters);
-         },
-         "input_parameters"_a.none() = nb::none())
-      .def_prop_ro("pars", &PyCosmology::pars)
-      .def_prop_ro("state", [](PyCosmology&) { return true; })
+  cls.def(nb::init<Input>(),
+          "input"_a,
+          "A Cosmology from (name, value) strings, as from an input file; classy.Class takes a "
+          "dict.")
+      .def("_set_input",
+           &PyCosmology::SetInput,
+           "input"_a,
+           "New parameters as (name, value) strings, in the order they were set; the Cosmology "
+           "is rebuilt from them on next use.")
+      .def("_build",
+           &PyCosmology::BuildUpTo,
+           "level"_a,
+           "Build the modules up to `level` ('background', ..., 'lensing') now; an unknown level "
+           "builds nothing.")
       .def_prop_ro("nonlinear_method",
                    [](PyCosmology& self) { return static_cast<int>(self.nl().method); })
-      // struct_cleanup(), empty(), set() and compute() are not necessary, but they are here to
-      // support legacy code and MontePython.
-      .def("struct_cleanup", [](PyCosmology&) {})
-      .def("empty",
-           [](PyCosmology& self) {
-             self.Empty();
-             return nb::find(self);
-           })
-      .def(
-          "set",
-          [](PyCosmology& self, nb::handle input_parameters, const nb::kwargs& kwargs) {
-            return self.Set(input_parameters, kwargs) ? nb::find(self) : nb::none();
-          },
-          "input_parameters"_a.none() = nb::none(),
-          "kwargs"_a)
-      .def(
-          "compute",
-          [](PyCosmology& self, nb::handle level) {
-            // Legacy shim (MontePython): modules are built lazily on first access, so
-            // compute() only pre-triggers the requested level. Its remaining value is that
-            // computation errors surface here, where callers expect to catch them.
-            // The level is compared as Python compares it; an unknown one builds nothing.
-            const nb::object final_level = level.is_none() ? nb::object(nb::str("lensing"))
-                                                           : level[0].attr("lower")();
-            using Build                  = void (*)(Cosmology&);
-            static const std::pair<const char*, Build> levels[] =
-                {{"background", [](Cosmology& c) { c.GetBackgroundModule(); }},
-                 {"thermodynamics", [](Cosmology& c) { c.GetThermodynamicsModule(); }},
-                 {"perturb", [](Cosmology& c) { c.GetPerturbationsModule(); }},
-                 {"primordial", [](Cosmology& c) { c.GetPrimordialModule(); }},
-                 {"nonlinear", [](Cosmology& c) { c.GetNonlinearModule(); }},
-                 {"transfer", [](Cosmology& c) { c.GetTransferModule(); }},
-                 {"spectra", [](Cosmology& c) { c.GetSpectraModule(); }},
-                 {"lensing", [](Cosmology& c) { c.GetLensingModule(); }}};
-            for (const auto& [name, build] : levels) {
-              if (Equal(final_level, nb::str(name))) {
-                build(self.cosmo());
-                break;
-              }
-            }
-            return nb::find(self);
-          },
-          "level"_a.none() = nb::none())
       .def(
           "raw_cl",
-          [](PyCosmology& self, nb::handle lmax) {
-            return self.GeneralCl(IntArg<int>(lmax), false);
-          },
+          [](PyCosmology& self, int lmax) { return self.GeneralCl(lmax, false); },
           "lmax"_a = -1)
       .def(
           "lensed_cl",
-          [](PyCosmology& self, nb::handle lmax) {
-            return self.GeneralCl(IntArg<int>(lmax), true);
-          },
-          "lmax"_a = -1)
-      .def(
-          "raw_cl_no_copy",
-          [](PyCosmology& self, nb::handle lmax) { return self.RawClNoCopy(IntArg<int>(lmax)); },
+          [](PyCosmology& self, int lmax) { return self.GeneralCl(lmax, true); },
           "lmax"_a = -1)
       .def("lensed_cl_computed",
            [](PyCosmology& self) {
-             nb::dict out = ClDict(self.cosmo().GetLensingModule()->cl_output_computed());
-             out["ell"]   = out["ell"].attr("astype")(Builtin("int"));
+             auto cl                        = self.cosmo().GetLensingModule()->cl_output_computed();
+             const std::vector<double>& ell = cl.at("ell");
+             std::vector<int64_t> ell_int(ell.begin(), ell.end());
+             nb::dict out = ClDict(std::move(cl));
+             out["ell"]   = ToArray(std::move(ell_int));
              return out;
            })
       .def(
@@ -857,9 +701,9 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
           [](PyCosmology& self,
              const Vector3d& k,
              const Vector1d& z,
-             nb::handle k_size,
-             nb::handle z_size,
-             nb::handle mu_size) {
+             size_t k_size,
+             size_t z_size,
+             size_t mu_size) {
             return self.GetPk(k,
                               z,
                               k_size,
@@ -879,9 +723,9 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
           [](PyCosmology& self,
              const Vector3d& k,
              const Vector1d& z,
-             nb::handle k_size,
-             nb::handle z_size,
-             nb::handle mu_size) {
+             size_t k_size,
+             size_t z_size,
+             size_t mu_size) {
             return self.GetPk(k,
                               z,
                               k_size,
@@ -901,9 +745,9 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
           [](PyCosmology& self,
              const Vector3d& k,
              const Vector1d& z,
-             nb::handle k_size,
-             nb::handle z_size,
-             nb::handle mu_size) {
+             size_t k_size,
+             size_t z_size,
+             size_t mu_size) {
             return self.GetPk(k,
                               z,
                               k_size,
@@ -923,9 +767,9 @@ NB_MODULE(_core, m) {  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast): nanobi
           [](PyCosmology& self,
              const Vector3d& k,
              const Vector1d& z,
-             nb::handle k_size,
-             nb::handle z_size,
-             nb::handle mu_size) {
+             size_t k_size,
+             size_t z_size,
+             size_t mu_size) {
             return self.GetPk(k,
                               z,
                               k_size,
@@ -951,19 +795,19 @@ combines them, as get_Weyl_pk_and_k_and_z does, is aligned by
 construction rather than by coincidence.)doc")
       .def(
           "_pk_grid",
-          [](PyCosmology& self, nb::handle nonlinear, nb::handle only_clustering_species) {
+          [](PyCosmology& self, bool nonlinear, bool only_clustering_species) {
             const NonlinearModule& module = self.nonlinear_module();
             std::vector<double> k;
             std::vector<double> pk;
-            module.GetPkGrid(Truthy(nonlinear) ? pk_nonlinear : pk_linear,
-                             Truthy(only_clustering_species) ? module.index_pk_cluster_
-                                                             : module.index_pk_m_,
+            module.GetPkGrid(nonlinear ? pk_nonlinear : pk_linear,
+                             only_clustering_species ? module.index_pk_cluster_
+                                                     : module.index_pk_m_,
                              k,
                              pk);
             return nb::make_tuple(ToArray(std::move(pk)), ToArray(std::move(k)));
           },
-          "nonlinear"_a.none(),
-          "only_clustering_species"_a.none(),
+          "nonlinear"_a,
+          "only_clustering_species"_a,
           R"doc(The stored P(k, z) grid, flat and z-major, and its k in 1/Mpc.)doc")
       .def(
           "_scalar_transfer_k",
@@ -971,23 +815,21 @@ construction rather than by coincidence.)doc")
           R"doc(The k axis of the scalar transfer grids, in 1/Mpc; refuses runs it does not fit.)doc")
       .def(
           "_transfer_at_node",
-          [](PyCosmology& self, int index_tau, nb::handle output_format) {
+          [](PyCosmology& self, int index_tau, const std::string& output_format) {
             return self.TransferGeneral(0., index_tau, output_format);
           },
           "index_tau"_a,
-          "output_format"_a.none(),
+          "output_format"_a,
           R"doc(The transfer functions at a node of the stored late-time sampling.)doc")
       .def(
           "_sigma",
-          [](PyCosmology& self, double R, double z, nb::handle cb) {
+          [](PyCosmology& self, double R, double z, bool cb) {
             const NonlinearModule& module = self.nonlinear_module();
-            return module.GetSigma(R,
-                                   z,
-                                   Truthy(cb) ? module.index_pk_cluster_ : module.index_pk_m_);
+            return module.GetSigma(R, z, cb ? module.index_pk_cluster_ : module.index_pk_m_);
           },
           "R"_a,
           "z"_a,
-          "cb"_a.none(),
+          "cb"_a,
           R"doc(sigma(R, z) of all matter, or of cdm + baryons with cb; R in Mpc.)doc")
       .def(
           "pk_tilt",
@@ -1187,11 +1029,11 @@ perturbations : dict of array of dicts
         Similar for perturbations['vector'] and perturbations['tensor'].)doc")
       .def(
           "get_transfer",
-          [](PyCosmology& self, double z, nb::handle output_format) {
+          [](PyCosmology& self, double z, const std::string& output_format) {
             return self.TransferGeneral(z, -1, output_format);
           },
-          "z"_a                    = 0.,
-          "output_format"_a.none() = "class",
+          "z"_a             = 0.,
+          "output_format"_a = "class",
           R"doc(Return the density and/or velocity transfer functions for all initial
 conditions today. You must include 'mTk' and/or 'vCTk' in the list of
 'output'. The transfer functions can also be computed at higher redshift z
@@ -1215,7 +1057,7 @@ tk : dictionary containing transfer functions.)doc")
           R"doc(One derived parameter, by name (Cosmology::GetDerivedParameter).)doc")
       .def(
           "nonlinear_scale",
-          [](PyCosmology& self, const Vector1d& z, nb::handle z_size) {
+          [](PyCosmology& self, const Vector1d& z, size_t z_size) {
             return self.NonlinearScales(z, z_size, false);
           },
           "z"_a,
@@ -1233,7 +1075,7 @@ z_size : int
         Size of the redshift array)doc")
       .def(
           "nonlinear_scale_cb",
-          [](PyCosmology& self, const Vector1d& z, nb::handle z_size) {
+          [](PyCosmology& self, const Vector1d& z, size_t z_size) {
             return self.NonlinearScales(z, z_size, true);
           },
           "z"_a,
@@ -1249,34 +1091,12 @@ z : numpy array
         Array of requested redshifts
 z_size : int
         Size of the redshift array)doc")
-      .def(
-          "get_pk_array",
-          [](PyCosmology& self,
-             const Vector1d& k,
-             const Vector1d& z,
-             nb::handle k_size,
-             nb::handle z_size,
-             nb::handle nonlinear) {
-            return self.GetPkArrays(k, z, k_size, z_size, nonlinear).first;
-          },
-          "k"_a,
-          "z"_a,
-          "k_size"_a,
-          "z_size"_a,
-          "nonlinear"_a.none())
-      .def(
-          "get_pk_cb_array",
-          [](PyCosmology& self,
-             const Vector1d& k,
-             const Vector1d& z,
-             nb::handle k_size,
-             nb::handle z_size,
-             nb::handle nonlinear) {
-            return self.GetPkArrays(k, z, k_size, z_size, nonlinear).second;
-          },
-          "k"_a,
-          "z"_a,
-          "k_size"_a,
-          "z_size"_a,
-          "nonlinear"_a.none());
+      .def("_pk_arrays",
+           &PyCosmology::GetPkArrays,
+           "k"_a,
+           "z"_a,
+           "k_size"_a,
+           "z_size"_a,
+           "nonlinear"_a,
+           R"doc(P(k, z) and P_cb(k, z) on a k and a z array, flat, z-major (get_pk_array).)doc");
 }

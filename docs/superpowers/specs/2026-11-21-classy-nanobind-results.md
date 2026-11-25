@@ -37,6 +37,14 @@ prototype:
   - calling `__init__` a second time on a live object is refused;
   - `inspect.signature` does not work on the core's methods;
   - the messages of TypeErrors for wrong argument types differ.
+- **2026-11-25, PR #509:** the parameter dict is in `_class.py`, and the core takes `(name, value)`
+  strings. A non-str parameter name is now a TypeError from `set()`, before anything changes,
+  not an AttributeError at the next build. `raw_cl_no_copy` and `cl_output_no_copy` are gone.
+  The arguments are typed, which supersedes "Inputs as before" below. `lmax` is an int and the
+  sizes are `size_t`, so a float or a negative size is a TypeError (`raw_cl(2.5e3)` included;
+  MontePython never passes one), and NumPy integers are taken. A size beyond its array is a
+  ValueError that says so, and `output_format` is 'class' or 'camb'. The public flags
+  (`get_pk_array`'s `nonlinear`, ...) are truth values read in Python; the core's are `bool`.
 - **Checks on the PR [M]:**
   - 1668 calls are identical to master's Cython core;
   - ctest, the level-1 scenarios, the other Python suites (the goldens included) and

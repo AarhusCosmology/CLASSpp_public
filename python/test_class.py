@@ -2682,16 +2682,15 @@ class TestLazyLifecycle(unittest.TestCase):
             cosmo.empty()
 
     def test_error_is_sticky_after_failed_compute(self):
-        # If reset() clears parameters_changed before the unread-parameter
-        # check, a caught error leaves the gate believing it is clean while
-        # _thisptr holds a Cosmology that silently ignored the bogus parameter.
-        # The second access must re-raise rather than serving stale results.
+        # A caught error must not leave behind a Cosmology that silently
+        # ignored the bogus parameter: the second access must re-raise rather
+        # than serve stale results.
         cosmo = Class()
         try:
             cosmo.set({'this_parameter_does_not_exist': 1})
             with self.assertRaises(CosmoSevereError):
                 cosmo.compute()
-            # Gate must remain dirty: subsequent access must still raise.
+            # Subsequent access must still raise.
             with self.assertRaises(CosmoSevereError):
                 cosmo.angular_distance(1.0)
             # Recovery: clear the bad parameter, set a good one, verify results.
@@ -2704,10 +2703,8 @@ class TestLazyLifecycle(unittest.TestCase):
             cosmo.struct_cleanup()
 
     def test_no_stale_serve_after_failed_rebuild(self):
-        # If reset() clears parameters_changed before the Cosmology constructor
-        # runs, a thrown constructor error leaves the gate believing it is clean
-        # while _thisptr still holds the previous Cosmology. The next access
-        # must re-raise rather than silently returning d1.
+        # A failed rebuild must not leave the previous Cosmology in place: the
+        # next access must re-raise rather than silently return d1.
         cosmo = Class({'h': 0.67})
         try:
             d1 = cosmo.angular_distance(1.0)
@@ -2716,7 +2713,7 @@ class TestLazyLifecycle(unittest.TestCase):
             cosmo.set({'100*theta_s': 1.042})
             with self.assertRaises(CosmoSevereError):
                 cosmo.compute()
-            # Gate must remain dirty: subsequent access must still raise.
+            # Subsequent access must still raise.
             with self.assertRaises(CosmoSevereError):
                 cosmo.angular_distance(1.0)
         finally:
@@ -2726,9 +2723,9 @@ class TestLazyLifecycle(unittest.TestCase):
     def test_pars_property_mutation_is_inert(self):
         # pars exposes a snapshot, not the live dict: mutating the returned
         # dict must neither change the cosmology nor leak into the internal
-        # parameter dict (set() is the only mutation API — anything else
-        # would bypass the parameters_changed gate). The constructor must
-        # likewise not alias or pollute the caller's dict.
+        # parameter dict (set() is the only mutation API: anything else would
+        # change the dict without rebuilding the Cosmology). The constructor
+        # must likewise not alias or pollute the caller's dict.
         caller_dict = {'h': 0.67}
         cosmo = Class(caller_dict)
         try:
@@ -2877,12 +2874,10 @@ class TestQueriesTheRunCannotAnswer(unittest.TestCase):
         ('pk_tilt_without_mPk', 'no_pk', lambda c: c.pk_tilt(0.1, 0.)),
         ('pk_tilt_beyond_the_k_table', 'pk', lambda c: c.pk_tilt(100., 0.)),
         ('raw_cl_without_Cls', 'pk', lambda c: c.raw_cl()),
-        ('raw_cl_no_copy_without_Cls', 'pk', lambda c: c.raw_cl_no_copy()),
         ('lensed_cl_without_Cls', 'pk', lambda c: c.lensed_cl()),
         ('lensed_cl_without_lensing', 'no_pk', lambda c: c.lensed_cl()),
         # the unlensed C_l's of 'lensed' reach l_max_scalars + delta_l_max = 300 + 1000
         ('raw_cl_above_l_max', 'lensed', lambda c: c.raw_cl(1301)),
-        ('raw_cl_no_copy_above_l_max', 'lensed', lambda c: c.raw_cl_no_copy(1301)),
         ('lensed_cl_above_l_max', 'lensed', lambda c: c.lensed_cl(301)),
         ('perturbations_without_computing_them', 'k_output_without_perturbations',
          lambda c: c.get_perturbations()),

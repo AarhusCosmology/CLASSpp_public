@@ -2,13 +2,20 @@
 
 Class subclasses the compiled core, so the core's methods (the per-redshift ones that Cobaya
 calls thousands of times per point among them) are called directly, with no Python layer in
-between. What is defined here is composition over those methods; the numbers themselves come
-from C++ (docs/superpowers/specs/2026-11-20-classy-package-design.md).
+between. What is defined here is composition over those methods, and the parameter dict, which
+the core receives as strings; the numbers themselves come from C++
+(docs/superpowers/specs/2026-11-20-classy-package-design.md).
 """
 import numpy as np
 
 from ._core import PyCosmology
 from ._errors import CosmoSevereError
+
+
+def _input(pars):
+    """The parameters as CLASS reads them from an input file: (name, str(value)) in the order
+    they were set."""
+    return [(name, str(value)) for name, value in pars.items()]
 
 
 class Class(PyCosmology):
@@ -17,6 +24,60 @@ class Class(PyCosmology):
     The modules are computed on first use, so a question about the background never pays for
     the perturbations.
     """
+
+    # ------------------------------------------------------------------ parameters --
+
+    def __init__(self, input_parameters=None):
+        # A copy: the caller's dict, changed later, changes nothing here.
+        pars = dict(input_parameters or {})
+        super().__init__(_input(pars))
+        self._pars = pars
+
+    @property
+    def pars(self):
+        """The parameters set so far, as a copy: set() changes them."""
+        return dict(self._pars)
+
+    def set(self, input_parameters=None, **kwargs):
+        """Set parameters from a dict, keywords or both: set({'100*theta_s': 1.0411}, h=0.7).
+
+        Returns self, or None if every one already had that value; the computed modules are
+        then kept.
+        """
+        # Keywords as well as a dict: Cobaya calls set(**args). Keys that are not Python
+        # identifiers ('100*theta_s', 'nu1.m') can only travel in the dict.
+        new = dict(input_parameters or {}, **kwargs)
+        if new.items() <= self._pars.items():
+            return None
+        pars = {**self._pars, **new}
+        # The core first: it refuses a name that is not a str before anything has changed.
+        self._set_input(_input(pars))
+        self._pars = pars
+        return self
+
+    def empty(self):
+        """Forget every parameter."""
+        self._set_input([])
+        self._pars = {}
+        return self
+
+    def compute(self, level=None):
+        """Build the modules up to level[0] ('lensing' if None) now, so that a computation error
+        is raised here. Each module is built on first use anyway; MontePython calls this.
+
+        A level CLASS++ does not have (class_sz's 'szcount') builds nothing.
+        """
+        self._build('lensing' if level is None else level[0].lower())
+        return self
+
+    # Legacy, for MontePython and older scripts: the modules are freed when the parameters
+    # change, so there is no state to ask about and nothing to clean up.
+    @property
+    def state(self):
+        return True
+
+    def struct_cleanup(self):
+        pass
 
     # ---------------------------------------------------------- derived parameters --
 
@@ -168,6 +229,17 @@ class Class(PyCosmology):
         """Omega of all species of the NCDM family (massive neutrinos and the like) today."""
         return self._derived_parameter('Omega_nu')
 
+    # ------------------------------------------------------------- P(k) on arrays --
+
+    def get_pk_array(self, k, z, k_size, z_size, nonlinear):
+        """P(k, z) in Mpc^3 on the first k_size values of k (1/Mpc) and z_size of z, flat with
+        index z*k_size + k; non-linear if nonlinear is true."""
+        return self._pk_arrays(k, z, k_size, z_size, bool(nonlinear))[0]
+
+    def get_pk_cb_array(self, k, z, k_size, z_size, nonlinear):
+        """As get_pk_array, for cdm + baryons."""
+        return self._pk_arrays(k, z, k_size, z_size, bool(nonlinear))[1]
+
     # ------------------------------------------------------------------ the grids --
 
     def get_pk_and_k_and_z(self, nonlinear=True, only_clustering_species=False, h_units=False):
@@ -191,7 +263,7 @@ class Class(PyCosmology):
         k : vector of k values, k[index_k]
         z : vector of z values, z[index_z]
         """
-        pk, k = self._pk_grid(nonlinear, only_clustering_species)
+        pk, k = self._pk_grid(bool(nonlinear), bool(only_clustering_species))
         z = self._z_grid_for_output()
         # The grid comes back in its stored order, z-major.
         pk = pk.reshape(z.size, k.size).T.copy()

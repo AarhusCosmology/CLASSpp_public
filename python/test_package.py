@@ -56,6 +56,57 @@ def test_get_input_methods_are_gone():
     assert not hasattr(classy.Class, 'get_input_background')
 
 
+# ----------------------------------------------------------------- parameters --
+# The dict is Python's (_class.py); the core holds (name, value) strings. The gate itself
+# (fresh results after set(), errors that stay until the parameters change) is pinned in
+# test_class.py, TestLazyLifecycle.
+
+def test_set_returns_self_or_none_when_nothing_changed():
+    c = classy.Class({'h': 0.7, 'output': ''})
+    assert c.set(h=0.7) is None
+    assert c.set({'output': ''}, h=0.7) is None
+    assert c.set(h=0.6) is c
+    assert c.empty() is c and c.pars == {}
+
+
+def test_pars_holds_what_was_set_and_no_more():
+    # The class_dir default is the core's, applied when the Cosmology is built.
+    c = classy.Class({'h': 0.7})
+    c.set({'Omega_k': 0.}, output='')
+    assert c.pars == {'h': 0.7, 'Omega_k': 0., 'output': ''}
+    assert classy.Class().pars == {}
+
+
+def test_a_name_that_is_not_a_str_changes_nothing():
+    c = classy.Class({'h': 0.7, 'output': ''})
+    with pytest.raises(TypeError):
+        c.set({1: 0.6})
+    assert c.pars == {'h': 0.7, 'output': ''}
+    assert c.h() == 0.7
+
+
+def test_set_builds_nothing_until_compute():
+    # A sampler may call set() several times, with parameters that fit together only after
+    # the last call. set() builds nothing, so nothing is checked or shot before compute() or
+    # the first result asked for.
+    c = classy.Class({'output': ''})
+    assert c.set({'100*theta_s': 3.0}) is c  # a shooting would fail: no h gives this
+    assert c.set(h=0.7) is c                 # and h with 100*theta_s is refused at the build
+    c.empty()
+    c.set({'100*theta_s': 1.0411, 'output': ''})
+    assert c.compute(['background']) is c
+    assert 0.6 < c.h() < 0.75
+
+
+def test_compute_with_an_unknown_level_builds_nothing():
+    # MontePython asks for class_sz's levels; the parameters below fail only when built.
+    c = classy.Class({'h': 0.67, 'output': ''})
+    c.set({'100*theta_s': 1.042})
+    assert c.compute(['szcount']) is c
+    with pytest.raises(classy.CosmoSevereError):
+        c.compute(['background'])
+
+
 # --------------------------------------------------------- derived parameters --
 
 @pytest.mark.parametrize('getter,name', sorted(GETTERS.items()))
@@ -141,14 +192,14 @@ def test_nonlinear_scale_needs_a_nonlinear_method():
         c.nonlinear_scale(np.array([0., 1.]), 2)
 
 
-def test_raw_cl_no_copy_with_two_initial_conditions():
-    # Its buffer for the cross-correlated initial conditions was sized only with several
+def test_raw_cl_with_two_initial_conditions():
+    # The buffer for the cross-correlated initial conditions was sized only with several
     # modes, so scalars with ad + cdi wrote past it and crashed the interpreter.
-    c = classy.Class({'output': 'tCl,pCl', 'ic': 'ad,cdi', 'f_cdi': 0.5})
-    without_copy, with_copy = c.raw_cl_no_copy(200), c.raw_cl(200)
-    assert sorted(without_copy) == sorted(with_copy)
-    for key in with_copy:
-        assert np.array_equal(without_copy[key], with_copy[key])
+    cl = classy.Class({'output': 'tCl,pCl', 'ic': 'ad,cdi', 'f_cdi': 0.5}).raw_cl(200)
+    assert sorted(cl) == ['bb', 'ee', 'ell', 'te', 'tt']
+    for key in ('tt', 'ee', 'te', 'bb'):
+        assert np.all(np.isfinite(cl[key])) and np.all(cl[key][:2] == 0.)
+    assert np.all(cl['tt'][2:] > 0.)
 
 
 def test_a_failed_shooting_raises_instead_of_aborting():
@@ -179,3 +230,80 @@ def test_derived_parameters_obey_their_definitions(cosmo):
     assert d['ln10^{10}A_s'] == pytest.approx(np.log(1e10*d['A_s']), rel=1e-12)
     assert d['exp_m_2_tau_As'] == pytest.approx(np.exp(-2*d['tau_reio'])*d['A_s'], rel=1e-12)
     assert cosmo.rs_drag() == d['rs_d'] and cosmo.theta_s_100() == d['100*theta_s']
+
+
+# ------------------------------------------------------------------ arguments --
+# Typed in the core: nanobind converts and refuses, and the public flags are truth values.
+
+def test_integer_arguments_take_numpy_integers_but_not_floats(cosmo):
+    assert np.array_equal(cosmo.raw_cl(np.int64(100))['tt'], cosmo.raw_cl(100)['tt'])
+    with pytest.raises(TypeError):
+        cosmo.raw_cl(100.)
+    with pytest.raises(TypeError):
+        cosmo.get_pk_array(np.array([0.1]), np.zeros(1), -1, 1, False)
+
+
+def test_a_size_beyond_its_array_is_a_value_error(cosmo):
+    k, z = np.array([0.01, 0.1]), np.zeros(1)
+    with pytest.raises(ValueError, match='k_size and z_size'):
+        cosmo.get_pk_array(k, z, 3, 1, False)
+    with pytest.raises(ValueError, match='mu_size'):
+        cosmo.get_pk(np.full((2, 1, 1), 0.1), z, 2, 1, 2)
+    assert cosmo.get_pk_array(k[:0], z, 0, 1, False).shape == (0,)
+
+
+def test_flags_are_truth_values(cosmo):
+    k, z = np.array([0.01, 0.1]), np.zeros(1)
+    linear = cosmo.get_pk_array(k, z, 2, 1, False)
+    for flag in (0, None, np.False_, []):
+        assert np.array_equal(cosmo.get_pk_array(k, z, 2, 1, flag), linear)
+
+
+def test_output_format_is_class_or_camb(cosmo):
+    with pytest.raises(ValueError, match="'class' or 'camb', not 'CAMB'"):
+        cosmo.get_transfer(0., 'CAMB')
+
+
+# ------------------------------------- methods no caller in Cobaya or MontePython uses --
+# Public classy API (class_public has them too), so scripts may: each against another way
+# to get the same number.
+
+def test_Om_m_scales_as_the_matter_density_over_H_squared(cosmo):
+    # Omega_m(z) = Omega_m (1+z)^3 (H0/H)^2 with no massive neutrinos.
+    H0 = cosmo.Hubble(0.)
+    for z in (0., 0.5, 3., 1100.):
+        expected = cosmo.Omega0_m()*(1. + z)**3*(H0/cosmo.Hubble(z))**2
+        assert cosmo.Om_m(z) == pytest.approx(expected, rel=1e-6)
+
+
+def test_z_of_tau_inverts_the_comoving_distance(cosmo):
+    # Flat: tau(z) = tau_0 - r(z), with r from z_of_r, which is r(z) despite its name.
+    tau_0 = cosmo.get_background()['conf. time [Mpc]'][-1]
+    z = np.array([0.5, 3., 1100.])
+    r, _ = cosmo.z_of_r(z)
+    for z_i, r_i in zip(z, r):
+        assert cosmo.z_of_tau(tau_0 - r_i) == pytest.approx(z_i, rel=1e-6)
+
+
+def test_nonlinear_scale_cb():
+    z = np.array([0., 1.])
+    halofit = {'output': 'mPk', 'non_linear': 'halofit', 'P_k_max_1/Mpc': 3.}
+    # Without massive neutrinos, the cdm+baryon spectrum is the matter spectrum.
+    c = classy.Class(halofit)
+    assert np.array_equal(c.nonlinear_scale_cb(z, 2), c.nonlinear_scale(z, 2))
+    # With them, P_cb has more power than P_m, so it turns nonlinear on larger scales.
+    c = classy.Class(dict(halofit, N_ur=0., N_ncdm=1, m_ncdm=0.3, deg_ncdm=3.))
+    k_nl, k_nl_cb = c.nonlinear_scale(z, 2), c.nonlinear_scale_cb(z, 2)
+    assert np.all(k_nl_cb > 0.) and np.all(k_nl_cb < k_nl)
+
+
+def test_lensed_cl_computed_is_lensed_cl_at_the_computed_multipoles():
+    c = classy.Class({'output': 'tCl,pCl,lCl', 'lensing': 'yes', 'l_max_scalars': 500})
+    computed, lensed = c.lensed_cl_computed(), c.lensed_cl()
+    ell = computed['ell']
+    # The lensing module's own l grid, a sparse one, up to l_max_scalars.
+    assert ell.dtype.kind == 'i' and ell[0] == 0 and ell[-1] <= lensed['ell'][-1]
+    assert np.all(np.diff(ell) > 0) and len(ell) < len(lensed['ell'])/5
+    assert sorted(computed) == sorted(lensed)
+    for key in ('tt', 'ee', 'te', 'bb', 'pp', 'tp'):
+        assert np.array_equal(computed[key], lensed[key][ell]), key
