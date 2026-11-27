@@ -11,6 +11,7 @@
 class PpfFluid;
 class ModifiedGravity;
 class IDM_DR_IDR_Species;
+class PhotonsSpecies;
 
 /* Resolved-once views into PerturbationsModule's frozen all_species_ collection.
    The module owns several numerical approximation schemes (TCA/RSA/UFA/ncdmfa),
@@ -28,6 +29,9 @@ struct ResolvedSpecies {
   const BaseSpecies* lambda      = nullptr;             // excluded from rho_tot (delta_tot)
   int idr_nature                 = idr_free_streaming;  // absorbs idr_nature_
   std::size_t cdm_index          = static_cast<std::size_t>(-1);  // h source (sync gauge)
+  /* The photons, whichever basis their hierarchy uses: tight coupling, radiation streaming,
+     the CMB sources and the gravitational-wave source go through PhotonsSpecies' hooks. */
+  const PhotonsSpecies* photons = nullptr;
 
   std::vector<const BaseSpecies*> ur;  // UR and its subclasses: UFA, RSA-ur, tensor rho
 };

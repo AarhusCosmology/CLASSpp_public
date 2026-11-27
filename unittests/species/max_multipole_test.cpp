@@ -18,7 +18,7 @@
 #include "dncdm_dr_species.h"
 #include "dncdm_species.h"
 #include "parser.h"
-#include "photons.h"
+#include "photons_optimal.h"
 #include "precision.h"
 #include "ultra_relativistic.h"
 
@@ -100,7 +100,7 @@ void test_photons_are_mode_dependent() {
   ppr.l_max_g_ten     = 5;
   ppr.l_max_pol_g_ten = 7;
   background pba{};
-  PhotonsSpecies g(pba);
+  PhotonsOptimalSpecies g(pba);
   expect(g.MaxMultipole(&ppr, /*tensors=*/false) == 12, "photons: scalars use l_max_g");
   expect(g.MaxMultipole(&ppr, /*tensors=*/true) == 7, "photons: tensors use l_max_pol_g_ten");
 }

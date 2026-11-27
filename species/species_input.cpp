@@ -52,7 +52,8 @@ struct SingleInstanceSpec {
 // reads its <N>.* fields itself.
 const std::vector<SingleInstanceSpec>& SingleInstanceTable() {
   static const std::vector<SingleInstanceSpec> table = {
-      {PhotonsSpecies::kTypeName, {{"Omega", "Omega_g"}, {"T_cmb", "T_cmb"}}},
+      {PhotonsSpecies::kTypeName,
+       {{"Omega", "Omega_g"}, {"T_cmb", "T_cmb"}, {"hierarchy", "hierarchy"}}},
       {BaryonsSpecies::kTypeName, {{"Omega", "Omega_b"}}},
       {CDMSpecies::kTypeName, {{"Omega", "Omega_cdm"}}},
       {UltraRelativisticSpecies::kTypeName,

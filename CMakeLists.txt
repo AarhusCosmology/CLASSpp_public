@@ -111,6 +111,8 @@ set(CLASS_SPECIES_FILES
   species/ncdm_species.cpp
   species/nede_species.cpp
   species/photons.cpp
+  species/photons_optimal.cpp
+  species/photons_tam.cpp
   species/scalar_field.cpp
   species/scalar_tensor_species.cpp
   species/scalar_field_potential.cpp

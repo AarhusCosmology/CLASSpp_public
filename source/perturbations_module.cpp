@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iterator>
+#include <optional>
 
 #include "../species/baryons.h"
 #include "../species/cdm.h"
@@ -20,6 +21,7 @@
 #include "../species/modified_gravity.h"
 #include "../species/ncdm_species.h"
 #include "../species/photons.h"
+#include "../species/photons_optimal.h"
 #include "../species/ppf_fluid.h"
 #include "../species/scalar_field.h"
 #include "../species/ultra_relativistic.h"
@@ -64,6 +66,8 @@ void PerturbationsModule::ResolveSpecies() {
   }
 
   resolved_.cdm_index = all_species_.index_of("CDM");
+
+  resolved_.photons = static_cast<const PhotonsSpecies*>(&all_species_.photons());
 
   if (const auto* p = all_species_.find("Fluid")) {
     if (auto* f = dynamic_cast<PpfFluid*>(p->get())) {
@@ -3325,41 +3329,14 @@ void PerturbationsModule::perturb_vector_init(
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
         }
 
-        const size_t new_g_i = all_species_.index_of("Photons");
-        auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
-            *ppv->species_layouts[new_g_i]);
-
-        /* tight-coupling approximation for shear_g (previously
-           computed in perturb_derivs: perturb_derivs is always
-           called at the end of generic_evolver, in order to update
-           all quantities in ppw to the time at which the
-           approximation is switched off) */
-        ppv->y[new_g_lay.idx_shear] = ppw->tca_shear_g;
-
-        ppv->y[new_g_lay.idx_l3] =
-            6. / 7. * k / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] * ppw->s_l[3] *
-            ppv->y[new_g_lay.idx_shear]; /* second-order tight-coupling approximation for l=3 */
-        ppv->y[new_g_lay.idx_pol0] =
-            2.5 *
-            ppv->y
-                [new_g_lay
-                     .idx_shear]; /* first-order tight-coupling approximation for polarization, l=0 */
-        ppv->y[new_g_lay.idx_pol1] =
-            k / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] *
-            (5. - 2. * ppw->s_l[2]) / 6. *
-            ppv->y
-                [new_g_lay
-                     .idx_shear]; /* second-order tight-coupling approximation for polarization, l=1 */
-        ppv->y[new_g_lay.idx_pol2] =
-            0.5 *
-            ppv->y
-                [new_g_lay
-                     .idx_shear]; /* first-order tight-coupling approximation for polarization, l=2 */
-        ppv->y[new_g_lay.idx_pol3] =
-            k / ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_] * 3. * ppw->s_l[3] / 14. *
-            ppv->y
-                [new_g_lay
-                     .idx_shear]; /* second-order tight-coupling approximation for polarization, l=3 */
+        const auto& new_g_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+            *ppv->photon_layout);
+        resolved_.photons
+            ->StartScalarHierarchy(new_g_lay,
+                                   ppv->y.data(),
+                                   k,
+                                   ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_],
+                                   ppw);
 
         /* perturbed recombination */
         /* the initial conditions are set when tca is switched off (current block) */
@@ -3515,8 +3492,10 @@ void PerturbationsModule::perturb_vector_init(
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
         }
 
+        /* Vector modes exist only in the optimal basis so far (and do not run: perturb_init
+           stops on them). */
         const size_t new_g_i = all_species_.index_of("Photons");
-        auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
+        auto& new_g_lay      = static_cast<PhotonsOptimalSpecies::PerturbLayout&>(
             *ppv->species_layouts[new_g_i]);
         ppv->y[new_g_lay.idx_delta] = 0.0;  //TBC
         //-4./3.*ppw->pv->y[ppw->pv->index_pt_gwdot]/ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
@@ -3587,11 +3566,7 @@ void PerturbationsModule::perturb_vector_init(
           fprintf(stdout, "Mode k=%e: switch off tight-coupling approximation at tau=%e\n", k, tau);
         }
 
-        const size_t new_g_i = all_species_.index_of("Photons");
-        auto& new_g_lay      = static_cast<PhotonsSpecies::PerturbLayout&>(
-            *ppv->species_layouts[new_g_i]);
-        /* Hand the exact hierarchy the state tight coupling was standing in for.
-           Multipoles above l = 0 are higher order in 1/kappa' and stay at zero. */
+        /* Hand the exact hierarchy the state tight coupling was standing in for. */
         /* gw'' from the last Einstein evaluation, which is at (or within one
            rejected step of) this switch time. It only enters the first-order
            correction, so an error in it is second order. */
@@ -3604,8 +3579,10 @@ void PerturbationsModule::perturb_vector_init(
                                                                ->index_th_ddkappa_]);
         const PhotonsSpecies::TensorTcaClosure tca =
             PhotonsSpecies::TensorTightCoupling(ppw->pv->y[ppw->pv->index_pt_gwdot], dkappa, drift);
-        ppv->y[new_g_lay.idx_delta] = tca.F0;
-        ppv->y[new_g_lay.idx_pol0]  = tca.G0;
+        resolved_.photons->StartTensorHierarchy(static_cast<const PhotonsSpecies::PerturbLayout&>(
+                                                    *ppv->photon_layout),
+                                                ppv->y.data(),
+                                                tca);
       }
 
       /* -- case of switching on radiation streaming
@@ -4770,7 +4747,8 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
 
     /** - --> photon contribution to vector sources: */
     {
-      const auto& g_vec_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
+      /* Vector modes: optimal basis only (see perturb_vector_init). */
+      const auto& g_vec_lay = static_cast<const PhotonsOptimalSpecies::PerturbLayout&>(
           *ppw->pv->photon_layout);
       if (ppw->approx[ppw->index_ap_rsa] ==
           static_cast<int>(rsa_off)) { /* if radiation streaming approximation is off */
@@ -4802,12 +4780,25 @@ void PerturbationsModule::perturb_total_stress_energy(int index_md,
         static_cast<int>(rsa_off)) { /* if radiation streaming approximation is off */
       if (ppw->approx[ppw->index_ap_tca] ==
           static_cast<int>(tca_off)) { /* if tight-coupling approximation is off */
-        const auto& g_tens_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-            *ppw->pv->photon_layout);
-        ppw->gw_source += (-_SQRT6_ * 4 * a2 * all_species_.photons().Rho(ppw->pvecback.data()) *
-                           (1. / 15. * y[g_tens_lay.idx_delta] +
-                            4. / 21. * y[g_tens_lay.idx_shear] +
-                            1. / 35. * y[g_tens_lay.idx_l3 + 1]));
+        ppw->gw_source +=
+            resolved_.photons->TensorGwSource(static_cast<const PhotonsSpecies::PerturbLayout&>(
+                                                  *ppw->pv->photon_layout),
+                                              y,
+                                              a2,
+                                              all_species_.photons().Rho(ppw->pvecback.data()));
+      }
+      else {
+        /* Tightly coupled photons still carry an anisotropic stress, of order h'/kappa'
+           (C. Pitrou, class_public v3.4.0). Left out, h feels the photons only once tight
+           coupling ends, and depends on when that happens (2e-3 in TT, and in EE and BB above
+           l = 100). The stress of the closure's state is that of its F_0, in either basis.
+           Leading order: the drift term needs h'', which this source is part of. */
+        const PhotonsSpecies::TensorTcaClosure tca =
+            PhotonsSpecies::TensorTightCoupling(y[ppw->pv->index_pt_gwdot],
+                                                ppw->pvecthermo[thermodynamics_module_
+                                                                    ->index_th_dkappa_]);
+        ppw->gw_source += -_SQRT6_ * 4 * a2 * all_species_.photons().Rho(ppw->pvecback.data()) *
+                          (1. / 15. * tca.F0);
       }
     }
 
@@ -4922,9 +4913,7 @@ void PerturbationsModule::perturb_sources(
         P = 5. * ppw->s_l[2] * ppw->tca_shear_g / 8.; /* (2.5+0.5+2)shear_g/8 */
       }
       else {
-        P = (y[g_src_lay.idx_pol0] + y[g_src_lay.idx_pol2] +
-             2. * ppw->s_l[2] * y[g_src_lay.idx_shear]) /
-            8.;
+        P = resolved_.photons->ScalarPolarisationSource(g_src_lay, y, ppw);
       }
     }
 
@@ -5235,12 +5224,7 @@ void PerturbationsModule::perturb_sources(
       if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
         const auto& g_tsrc_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
             *ppw->pv->photon_layout);
-        P = PhotonsSpecies::TensorP2(y[g_tsrc_lay.idx_delta],
-                                     y[g_tsrc_lay.idx_shear],
-                                     y[g_tsrc_lay.idx_delta + 4],
-                                     y[g_tsrc_lay.idx_pol0],
-                                     y[g_tsrc_lay.idx_pol2],
-                                     y[g_tsrc_lay.idx_pol0 + 4]);
+        P = resolved_.photons->TensorPolarisationSource(g_tsrc_lay, y);
       }
       else {
         const double dkappa = ppw->pvecthermo[thermodynamics_module_->index_th_dkappa_];
@@ -5340,14 +5324,8 @@ void PerturbationsModule::perturb_print_variables(double tau,
     delta_chi  = y[ppw->pv->index_pt_perturbed_recombination_delta_chi];
   }
 
-  /* Physics variables: used in _tensors_ block (photon/UR multipoles set fresh there);
+  /* Physics variables: used in _tensors_ block (UR multipoles set fresh there);
    * phi, psi, alpha computed in _scalars_ block for the gauge-potential output columns. */
-  double delta_g  = 0.;
-  double shear_g  = 0.;
-  double pol0_g   = 0.;
-  double pol2_g   = 0.;
-  double l4_g     = 0.;
-  double pol4_g   = 0.;
   double delta_ur = 0.;
   double shear_ur = 0.;
   double phi      = 0.;
@@ -5397,43 +5375,22 @@ void PerturbationsModule::perturb_print_variables(double tau,
   if (_tensors_) {
     double l4_ur = 0.;
 
-    if (ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) {
-      const auto& g_pv_lay = static_cast<const PhotonsSpecies::PerturbLayout&>(
-          *ppw->pv->photon_layout);
-      if (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_off)) {
-        delta_g = y[g_pv_lay.idx_delta];
-        shear_g = y[g_pv_lay.idx_shear];
-        l4_g    = y[g_pv_lay.idx_delta + 4];
-        pol0_g  = y[g_pv_lay.idx_pol0];
-        pol2_g  = y[g_pv_lay.idx_pol2];
-        pol4_g  = y[g_pv_lay.idx_pol0 + 4];
-      }
-      else {
-        const double dkappa = pvecthermo[thermodynamics_module_->index_th_dkappa_];
-        // y, not ppw->pv->y: the evolver hands print_variables the state at the
-        // output time, while pv->y is its own working vector (#136, PR #495).
-        const PhotonsSpecies::TensorTcaClosure tca = PhotonsSpecies::TensorTightCoupling(
-            y[ppw->pv->index_pt_gwdot],
-            dkappa,
-            PhotonsSpecies::TensorTcaDrift(y[ppw->pv->index_pt_gwdot],
-                                           dkappa,
-                                           dy[ppw->pv->index_pt_gwdot],
-                                           pvecthermo[thermodynamics_module_->index_th_ddkappa_]));
-        delta_g = tca.F0;
-        shear_g = 0.;
-        l4_g    = 0.;
-        pol0_g  = tca.G0;
-        pol2_g  = 0.;
-        pol4_g  = 0.;
-      }
-    }
-    else {
-      delta_g = 0.;
-      shear_g = 0.;
-      l4_g    = 0.;
-      pol0_g  = 0.;
-      pol2_g  = 0.;
-      pol4_g  = 0.;
+    /* The photons' columns come from the tight-coupling state while it stands in for their
+       hierarchy. */
+    std::optional<PhotonsSpecies::TensorTcaClosure> tca;
+    if ((ppw->approx[ppw->index_ap_rsa] == static_cast<int>(rsa_off)) &&
+        (ppw->approx[ppw->index_ap_tca] == static_cast<int>(tca_on))) {
+      const double dkappa = pvecthermo[thermodynamics_module_->index_th_dkappa_];
+      // y, not ppw->pv->y: the evolver hands print_variables the state at the
+      // output time, while pv->y is its own working vector (#136, PR #495).
+      tca = PhotonsSpecies::
+          TensorTightCoupling(y[ppw->pv->index_pt_gwdot],
+                              dkappa,
+                              PhotonsSpecies::TensorTcaDrift(y[ppw->pv->index_pt_gwdot],
+                                                             dkappa,
+                                                             dy[ppw->pv->index_pt_gwdot],
+                                                             pvecthermo[thermodynamics_module_
+                                                                            ->index_th_ddkappa_]));
     }
 
     if (evolve_tensor_ur_) {
@@ -5445,12 +5402,12 @@ void PerturbationsModule::perturb_print_variables(double tau,
 
     row.Set("tau [Mpc]", tau);
     row.Set("a", pvecback[background_module_->index_bg_a_]);
-    row.Set("delta_g", delta_g);
-    row.Set("shear_g", shear_g);
-    row.Set("l4_g", l4_g);
-    row.Set("pol0_g", pol0_g);
-    row.Set("pol2_g", pol2_g);
-    row.Set("pol4_g", pol4_g);
+    resolved_.photons
+        ->AddTensorPerturbationOutput(row,
+                                      static_cast<const PhotonsSpecies::PerturbLayout&>(
+                                          *ppw->pv->photon_layout),
+                                      y,
+                                      tca ? &*tca : nullptr);
     row.Set("H (gw)", y[ppw->pv->index_pt_gw]);
     row.Set("Hdot (gwdot)", y[ppw->pv->index_pt_gwdot]);
 

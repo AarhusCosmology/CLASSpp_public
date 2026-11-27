@@ -1,7 +1,7 @@
 /* The leading-order tensor tight-coupling closure, checked against the hierarchy
    it closes rather than against transcribed numbers.
 
-   PhotonsSpecies::PerturbTensorDerivs integrates
+   PhotonsOptimalSpecies::PerturbTensorDerivs integrates
 
      F_0' = -4/3 theta - kappa' (F_0 + sqrt6 P_2) + sqrt6 hdot
      G_0' = -k G_1     - kappa' (G_0 - sqrt6 P_2)
@@ -22,7 +22,7 @@
 #include <cstdio>
 
 #include "constants.h"
-#include "photons.h"
+#include "photons_optimal.h"
 
 namespace {
 
@@ -59,7 +59,7 @@ void test_closure_balances_the_polarisation_equation() {
    gwdot/kappa' while the source branch used +0.97980. */
 void test_P2_is_the_hierarchy_combination_of_the_closed_state() {
   const PhotonsSpecies::TensorTcaClosure c = PhotonsSpecies::TensorTightCoupling(kGwdot, kDkappa);
-  const double from_multipoles             = PhotonsSpecies::TensorP2(c.F0, 0., 0., c.G0, 0., 0.);
+  const double from_multipoles = PhotonsOptimalSpecies::TensorP2(c.F0, 0., 0., c.G0, 0., 0.);
   assert(Close(from_multipoles, c.P2));
 }
 
@@ -95,10 +95,11 @@ void test_closure_scales_as_gwdot_over_dkappa() {
 void test_TensorP2_uses_the_hierarchy_coefficients() {
   /* Only the shear slot populated: P_2 = -(2/7) sigma / sqrt6. */
   const double sigma = 1.3e-4;
-  assert(Close(PhotonsSpecies::TensorP2(0., sigma, 0., 0., 0., 0.), -(2. / 7.) * sigma / _SQRT6_));
+  assert(Close(PhotonsOptimalSpecies::TensorP2(0., sigma, 0., 0., 0., 0.),
+               -(2. / 7.) * sigma / _SQRT6_));
   /* Only the polarisation quadrupole: P_2 = -(6/7) G_2 / sqrt6. */
   const double g2 = -8.1e-5;
-  assert(Close(PhotonsSpecies::TensorP2(0., 0., 0., 0., g2, 0.), -(6. / 7.) * g2 / _SQRT6_));
+  assert(Close(PhotonsOptimalSpecies::TensorP2(0., 0., 0., 0., g2, 0.), -(6. / 7.) * g2 / _SQRT6_));
 }
 
 /* ---------------------------------------------------------------------------
@@ -146,7 +147,7 @@ void test_first_order_balances_the_polarisation_equation() {
 void test_first_order_P2_is_the_hierarchy_combination() {
   const PhotonsSpecies::TensorTcaClosure c =
       PhotonsSpecies::TensorTightCoupling(kGwdot, kDkappa, kDrift);
-  assert(Close(PhotonsSpecies::TensorP2(c.F0, 0., 0., c.G0, 0., 0.), c.P2));
+  assert(Close(PhotonsOptimalSpecies::TensorP2(c.F0, 0., 0., c.G0, 0., 0.), c.P2));
 }
 
 /* The -1/4 ratio is leading order only. If the first-order closure still
